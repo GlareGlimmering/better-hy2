@@ -1,0 +1,29 @@
+// 全局SCSS变量
+
+:root {
+  --hui-radius-sm: 8px;
+  --hui-radius-md: 12px;
+  --hui-radius-lg: 14px;
+  --hui-space-sm: 10px;
+  --hui-space-md: 16px;
+  --hui-space-lg: 20px;
+  --hui-control-height: 36px;
+  --menuBg: #304156;
+  --menuText: #bfcbd9;
+  --menuActiveText: #409eff;
+  --menuHover: #263445;
+  --subMenuBg: #1f2d3d;
+  --subMenuActiveText: #f4f4f5;
+  --subMenuHover: #001528;
+}
+
+$menuBg: var(--menuBg);
+$menuText: var(--menuText);
+$menuActiveText: var(--menuActiveText);
+$menuHover: var(--menuHover);
+
+$subMenuBg: var(--subMenuBg);
+$subMenuActiveText: var(--subMenuActiveText);
+$subMenuHover: var(--subMenuHover);
+
+$sideBarWidth: 210px;
