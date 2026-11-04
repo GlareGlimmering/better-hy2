@@ -27,11 +27,13 @@ import (
 )
 
 const (
-	DefaultRepository = "GlareGlimmering/h-ui"
-	BinaryAsset       = "h-ui-linux-amd64"
-	ChecksumAsset     = "SHA256SUMS"
-	DefaultPanelPort  = constant.PanelPort
-	DefaultUnitPath   = "/etc/systemd/system/h-ui.service"
+	DefaultRepository   = "GlareGlimmering/h-ui"
+	BinaryAsset         = "h-ui-linux-amd64"
+	ChecksumAsset       = "SHA256SUMS"
+	DefaultPanelPort    = constant.PanelPort
+	DefaultUnitPath     = "/etc/systemd/system/h-ui.service"
+	panelHealthAttempts = 60
+	panelHealthInterval = time.Second
 )
 
 var releaseTagPattern = regexp.MustCompile(`^v\d+\.\d+\.\d+-custom\.\d+(?:-rc\.\d+)?$`)
@@ -754,13 +756,13 @@ func waitForPreviousHealthyPanel(opts Options, deps Dependencies) error {
 
 func waitForPanelURL(healthURL string, deps Dependencies) error {
 	var lastErr error
-	for attempt := 0; attempt < 10; attempt++ {
+	for attempt := 0; attempt < panelHealthAttempts; attempt++ {
 		if err := checkPanelHealth(healthURL); err == nil {
 			return nil
 		} else {
 			lastErr = err
 		}
-		deps.Sleep(time.Second)
+		deps.Sleep(panelHealthInterval)
 	}
 	return lastErr
 }

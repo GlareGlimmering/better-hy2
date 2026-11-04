@@ -22,9 +22,14 @@ var installManagedXray = service.InstallXrayVersion
 var launchBackground = func(operation func()) { go operation() }
 
 func initializeManagedHysteria2() {
-	if err := initializeHysteria2(); err != nil {
-		logrus.Errorf("Hysteria2 initialization failed; management panel will continue: %v", err)
-	}
+	// RC.16's upgrader allows only about ten seconds for the replacement
+	// process to expose the panel. HY2 readiness can legitimately take longer,
+	// so it must not delay the management listener of the downloaded candidate.
+	launchBackground(func() {
+		if err := initializeHysteria2(); err != nil {
+			logrus.Errorf("Hysteria2 initialization failed; management panel will continue: %v", err)
+		}
+	})
 }
 
 func initializeManagedXray() {

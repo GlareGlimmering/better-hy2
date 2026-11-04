@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -396,7 +397,7 @@ func TestStartFailureRollsBackOldBinaryAndService(t *testing.T) {
 func TestHTTPHealthFailureRollsBackAfterCheckingFrontendAsset(t *testing.T) {
 	var requests atomic.Int32
 	health := healthyPanel(t, func() int {
-		if requests.Add(1) <= 10 {
+		if requests.Add(1) <= panelHealthAttempts {
 			return http.StatusServiceUnavailable
 		}
 		return http.StatusOK
@@ -413,6 +414,46 @@ func TestHTTPHealthFailureRollsBackAfterCheckingFrontendAsset(t *testing.T) {
 	unit, unitErr := os.ReadFile(fixture.opts.SystemdUnitPath)
 	if unitErr != nil || string(unit) != oldSystemdUnit {
 		t.Fatalf("old systemd unit was not restored: %q, %v", unit, unitErr)
+	}
+}
+
+func TestWaitForPanelURLRetriesConnectionRefusedUntilReady(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	address := listener.Addr().String()
+	if err = listener.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	server := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/assets/index.js" {
+			_, _ = w.Write([]byte("console.log('ready')"))
+			return
+		}
+		_, _ = w.Write([]byte(`<html><div id="app"></div><script type="module" src="/assets/index.js"></script></html>`))
+	})}
+	started := false
+	deps := DefaultDependencies()
+	deps.Sleep = func(time.Duration) {
+		if started {
+			return
+		}
+		started = true
+		readyListener, listenErr := net.Listen("tcp", address)
+		if listenErr != nil {
+			t.Fatalf("start delayed panel: %v", listenErr)
+		}
+		go func() { _ = server.Serve(readyListener) }()
+	}
+	t.Cleanup(func() { _ = server.Close() })
+
+	if err = waitForPanelURL("http://"+address+"/", deps); err != nil {
+		t.Fatalf("temporary connection refusal was not retried: %v", err)
+	}
+	if !started {
+		t.Fatal("test did not exercise a connection-refused startup attempt")
 	}
 }
 

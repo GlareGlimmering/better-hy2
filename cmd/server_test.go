@@ -4,22 +4,53 @@ import (
 	"errors"
 	"net"
 	"testing"
+	"time"
 
 	"h-ui/model/constant"
 )
 
 func TestIncompatibleHysteria2DoesNotAbortPanelInitialization(t *testing.T) {
-	original := initializeHysteria2
-	t.Cleanup(func() { initializeHysteria2 = original })
+	original, originalLaunch := initializeHysteria2, launchBackground
+	t.Cleanup(func() { initializeHysteria2, launchBackground = original, originalLaunch })
 	called := false
 	initializeHysteria2 = func() error {
 		called = true
 		return errors.New("Hysteria2 v2.13.0 does not support managed userOutbounds; required v2.13.0-hui.2")
 	}
+	launchBackground = func(operation func()) { operation() }
 	initializeManagedHysteria2()
 	if !called {
 		t.Fatal("Hysteria2 initialization was not attempted")
 	}
+}
+
+func TestRC16UpgradeCandidateDoesNotWaitForManagedHysteria2Readiness(t *testing.T) {
+	original, originalLaunch := initializeHysteria2, launchBackground
+	t.Cleanup(func() { initializeHysteria2, launchBackground = original, originalLaunch })
+	started, release := make(chan struct{}), make(chan struct{})
+	initializeHysteria2 = func() error {
+		close(started)
+		<-release
+		return nil
+	}
+	launchBackground = func(operation func()) { go operation() }
+
+	returned := make(chan struct{})
+	go func() {
+		initializeManagedHysteria2()
+		close(returned)
+	}()
+	select {
+	case <-returned:
+	case <-time.After(time.Second):
+		t.Fatal("candidate startup remained blocked on HY2 readiness")
+	}
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("background HY2 initialization was not started")
+	}
+	close(release)
 }
 
 func TestManagedXrayInitializationInstallsPinnedKernelWithoutStartingRuntime(t *testing.T) {
