@@ -3,7 +3,7 @@ package dto
 type Hysteria2AuthDto struct {
 	Addr *string `json:"addr" form:"addr" validate:"required"`
 	Auth *string `json:"auth" form:"auth" validate:"required"`
-	Tx   *string `json:"tx" form:"tx" validate:"required"`
+	Tx   *uint64 `json:"tx" form:"tx" validate:"required"`
 }
 
 type Hysteria2KickDto struct {

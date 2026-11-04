@@ -119,6 +119,20 @@ func GetAccount(query interface{}, args ...interface{}) (entity.Account, error) 
 	return account, nil
 }
 
+// FindHysteria2AuthAccount distinguishes an unknown credential from a database
+// failure without logging the credential or combining account policy predicates.
+func FindHysteria2AuthAccount(password string) (entity.Account, bool, error) {
+	var account entity.Account
+	err := sqliteDB.Where("con_pass = ?", password).First(&account).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return account, false, nil
+	}
+	if err != nil {
+		return account, false, errors.New(constant.SysError)
+	}
+	return account, true, nil
+}
+
 func PageAccount(accountPageDto dto.AccountPageDto) ([]entity.Account, int64, error) {
 	var accounts []entity.Account
 	var total int64

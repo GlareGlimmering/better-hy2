@@ -7,6 +7,7 @@ import (
 	"h-ui/dao"
 	"h-ui/model/bo"
 	"h-ui/model/constant"
+	"h-ui/model/entity"
 	"h-ui/proxy"
 	"net"
 	"net/url"
@@ -15,26 +16,48 @@ import (
 )
 
 func Hysteria2Auth(conPass string) (int64, string, error) {
-	if !Hysteria2IsRunning() {
-		return 0, "", errors.New("hysteria2 is not running")
-	}
+	return authenticateHysteria2(conPass, Hysteria2IsRunning, dao.FindHysteria2AuthAccount, Hysteria2Online, time.Now().UnixMilli())
+}
 
-	now := time.Now().UnixMilli()
-	account, err := dao.GetAccount("con_pass = ? and deleted = 0 and (quota < 0 or quota > download + upload) and ? < expire_time and ? > kick_util_time", conPass, now, now)
+// Hysteria2AuthError deliberately contains only a fixed classification, never
+// credentials or upstream errors that might contain sensitive request details.
+type Hysteria2AuthError struct{ Reason string }
+
+func (e *Hysteria2AuthError) Error() string { return e.Reason }
+
+func authenticateHysteria2(password string, running func() bool,
+	find func(string) (entity.Account, bool, error), online func() (map[string]int64, error), now int64,
+) (int64, string, error) {
+	reject := func(reason string) (int64, string, error) { return 0, "", &Hysteria2AuthError{Reason: reason} }
+	if !running() {
+		return reject("runtime_unavailable")
+	}
+	account, found, err := find(password)
 	if err != nil {
-		return 0, "", err
+		return reject("account_lookup_failed")
 	}
-
-	// 限制设备数
-	onlineUsers, err := Hysteria2Online()
+	if !found {
+		return reject("connection_password_mismatch")
+	}
+	if *account.Deleted != 0 {
+		return reject("account_disabled")
+	}
+	if *account.Quota >= 0 && *account.Quota <= *account.Download+*account.Upload {
+		return reject("quota_exhausted")
+	}
+	if now >= *account.ExpireTime {
+		return reject("account_expired")
+	}
+	if now <= *account.KickUtilTime {
+		return reject("kick_restricted")
+	}
+	onlineUsers, err := online()
 	if err != nil {
-		return 0, "", err
+		return reject("traffic_stats_unavailable")
 	}
-	device, exist := onlineUsers[*account.Username]
-	if exist && *account.DeviceNo <= device {
-		return 0, "", errors.New("device limited")
+	if devices, exists := onlineUsers[*account.Username]; exists && *account.DeviceNo <= devices {
+		return reject("device_limit_exceeded")
 	}
-
 	return *account.Id, *account.Username, nil
 }
 

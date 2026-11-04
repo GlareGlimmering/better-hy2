@@ -3,6 +3,7 @@ package controller
 import (
 	"encoding/base64"
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"github.com/skip2/go-qrcode"
 	"h-ui/model/constant"
 	"h-ui/model/dto"
@@ -24,27 +25,47 @@ var stopHysteria2 = func() error {
 	return service.UpdateConfig(constant.Hysteria2Enable, "0")
 }
 var restartHysteria2 = service.RestartHysteria2
+var authenticateHysteria2 = service.Hysteria2Auth
+var updateHysteria2AuthAccount = service.UpdateAccount
 
 func Hysteria2Auth(c *gin.Context) {
-	hysteria2AuthDto, err := validateField(c, dto.Hysteria2AuthDto{})
-	if err != nil {
+	var hysteria2AuthDto dto.Hysteria2AuthDto
+	// Unlike the generic form helper, authentication must not ignore JSON
+	// decoding errors (the official HTTP authenticator sends numeric tx).
+	if err := c.ShouldBindJSON(&hysteria2AuthDto); err != nil {
+		logrus.WithField("reason", "request_invalid").Warn("hysteria2_auth")
+		vo.Hysteria2AuthFail("", c)
 		return
 	}
-	id, username, err := service.Hysteria2Auth(*hysteria2AuthDto.Auth)
+	if err := validate.Struct(hysteria2AuthDto); err != nil {
+		logrus.WithField("reason", "request_invalid").Warn("hysteria2_auth")
+		vo.Hysteria2AuthFail("", c)
+		return
+	}
+	id, username, err := authenticateHysteria2(*hysteria2AuthDto.Auth)
 	if err != nil || username == "" {
+		reason := "authentication_failed"
+		if failure, ok := err.(*service.Hysteria2AuthError); ok {
+			reason = failure.Reason
+		}
+		logrus.WithField("reason", reason).Warn("hysteria2_auth")
 		vo.Hysteria2AuthFail("", c)
 		return
 	}
 
 	// 更新最近连接时间
 	now := time.Now().UnixMilli()
-	if err = service.UpdateAccount(entity.Account{
+	if err = updateHysteria2AuthAccount(entity.Account{
 		BaseEntity: entity.BaseEntity{Id: &id},
 		ConAt:      &now,
 	}); err != nil {
-		vo.Fail(err.Error(), c)
+		logrus.WithFields(logrus.Fields{"reason": "connection_time_update_failed", "account_id": id}).Warn("hysteria2_auth")
+		vo.Hysteria2AuthFail("", c)
 		return
 	}
+	// The system logger defaults to Warn; keep successful diagnostic events
+	// visible as well, using only the internal account ID for correlation.
+	logrus.WithFields(logrus.Fields{"reason": "success", "account_id": id}).Warn("hysteria2_auth")
 	vo.Hysteria2AuthSuccess(username, c)
 }
 
