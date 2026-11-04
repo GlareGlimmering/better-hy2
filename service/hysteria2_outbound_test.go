@@ -198,8 +198,12 @@ func TestEnsureHysteria2UserRoutingCompatible(t *testing.T) {
 
 	strict := legacy
 	strict.UserOutbounds = map[string]string{"alice": "DIRECT"}
+	installedHysteria2Version = func() (string, error) { return "v2.13.0-hui.3", nil }
+	if err := EnsureHysteria2UserRoutingCompatible(strict); err == nil {
+		t.Fatal("old hui.3 kernel accepted for strict user routing")
+	}
 	installedHysteria2Version = func() (string, error) {
-		return constant.Hysteria2CustomVersion, nil
+		return "v2.13.0-hui.4", nil
 	}
 	if err := EnsureHysteria2UserRoutingCompatible(strict); err != nil {
 		t.Fatalf("custom kernel was rejected: %v", err)

@@ -43,11 +43,13 @@ func runHysteria2Lifecycle(operation func() error) error {
 }
 
 func InitHysteria2() error {
-	if !util.Exists(util.GetHysteria2BinPath()) {
-		if err := util.DownloadHysteria2(""); err != nil {
-			logrus.Errorf("download hysteria2 bin err: %v", err)
-			return errors.New("download hysteria2 bin err")
+	if err := ensureManagedHysteria2Kernel(util.Exists(util.GetHysteria2BinPath()), util.InstalledHysteria2Version, func() error {
+		if proxy.NewHysteria2Instance().IsRunning() {
+			return errors.New("stop hysteria2 before updating the managed kernel")
 		}
+		return util.DownloadHysteria2(constant.Hysteria2CustomVersion)
+	}); err != nil {
+		return fmt.Errorf("initialize managed hysteria2 kernel: %w", err)
 	}
 
 	config, err := dao.GetConfig("key = ?", constant.Hysteria2Enable)
@@ -61,6 +63,25 @@ func InitHysteria2() error {
 		}
 	}
 	return nil
+}
+
+// Upgrade only known older managed kernels during panel initialization. Keep
+// manually installed hui.4 and legacy official kernels intact; never downgrade
+// an unknown/future kernel. Downloads use the pinned SHA and version verifier.
+func ensureManagedHysteria2Kernel(exists bool, version func() (string, error), install func() error) error {
+	if !exists {
+		return install()
+	}
+	installed, err := version()
+	if err != nil {
+		return err
+	}
+	switch installed {
+	case "v2.13.0-hui.1", "v2.13.0-hui.2", "v2.13.0-hui.3":
+		return install()
+	default:
+		return nil
+	}
 }
 
 func setHysteria2ConfigYAML() error {

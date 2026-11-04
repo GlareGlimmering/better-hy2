@@ -34,7 +34,7 @@ func TestInstallerShellSyntaxAndVersionValidation(t *testing.T) {
 		t.Fatalf("installer syntax: %v\n%s", err, output)
 	}
 	script := "HUI_INSTALLER_TEST=1; source " + shellQuote(path) + "; " +
-		"allowed_version v0.0.25-custom.8-rc.9; ! allowed_version latest; ! allowed_version v2.13.0-hui.3"
+		"allowed_version v0.0.25-custom.8-rc.9; ! allowed_version latest; ! allowed_version v2.13.0-hui.4"
 	if output, err := runBash(t, script); err != nil {
 		t.Fatalf("installer version validation: %v\n%s", err, output)
 	}
