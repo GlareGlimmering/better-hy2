@@ -15,7 +15,7 @@ func TestIncompatibleHysteria2DoesNotAbortPanelInitialization(t *testing.T) {
 	called := false
 	initializeHysteria2 = func() error {
 		called = true
-		return errors.New("Hysteria2 v2.13.0 does not support managed userOutbounds; required v2.13.0-hui.2")
+		return errors.New("Hysteria2 v2.13.0 does not support managed userOutbounds; required v2.13.0-hui.3")
 	}
 	launchBackground = func(operation func()) { operation() }
 	initializeManagedHysteria2()

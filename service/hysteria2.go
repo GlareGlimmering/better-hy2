@@ -6,6 +6,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 	"h-ui/dao"
+	"h-ui/model/bo"
 	"h-ui/model/constant"
 	"h-ui/model/vo"
 	"h-ui/proxy"
@@ -20,8 +21,9 @@ var hysteria2LifecycleMutex sync.Mutex
 var hysteria2RuntimeReady atomic.Bool
 
 const (
-	hysteria2StartupAttempts = 120
-	hysteria2StartupInterval = 250 * time.Millisecond
+	hysteria2StartupAttempts        = 120
+	hysteria2ACMEDNSStartupAttempts = 1200
+	hysteria2StartupInterval        = 250 * time.Millisecond
 )
 
 type hysteria2ReadinessOps struct {
@@ -169,12 +171,26 @@ func startHysteria2Runtime() error {
 		startupOutput:  instance.LastStartupOutput,
 		sleep:          time.Sleep,
 	}
-	if err := waitForHysteria2Readiness(ops, hysteria2StartupAttempts); err != nil {
+	attempts := hysteria2StartupAttempts
+	if config, configErr := GetHysteria2Config(); configErr == nil {
+		attempts = hysteria2StartupAttemptsForConfig(&config)
+	}
+	if err := waitForHysteria2Readiness(ops, attempts); err != nil {
 		_ = instance.StopHysteria2()
 		return err
 	}
 	hysteria2RuntimeReady.Store(true)
 	return nil
+}
+
+func hysteria2StartupAttemptsForConfig(config *bo.Hysteria2ServerConfig) int {
+	if config != nil && config.ACME != nil && config.ACME.DNS != nil {
+		// CertMagic's DNS propagation window is two minutes by default. Allow
+		// the ACME operation to finish and emit its real fatal error instead of
+		// replacing it with an h-ui readiness timeout after thirty seconds.
+		return hysteria2ACMEDNSStartupAttempts
+	}
+	return hysteria2StartupAttempts
 }
 
 func waitForHysteria2Readiness(ops hysteria2ReadinessOps, attempts int) error {

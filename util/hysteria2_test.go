@@ -18,13 +18,13 @@ func TestDownloadHysteria2CustomVersion(t *testing.T) {
 	hash := fmt.Sprintf("%x", sha256.Sum256(candidate))
 	deps := hysteria2DownloadDependencies{
 		assetName: func() (string, error) {
-			return "hysteria-linux-amd64-v2.13.0-hui.2", nil
+			return "hysteria-linux-amd64-v2.13.0-hui.3", nil
 		},
 		releaseAssetURL: func(owner, repo, version, fileName string) (string, error) {
 			if owner != constant.Hysteria2CustomOwner || repo != constant.Hysteria2CustomRepo || version != constant.Hysteria2CustomVersion {
 				t.Fatalf("release = %s/%s %s", owner, repo, version)
 			}
-			if fileName != "hysteria-linux-amd64-v2.13.0-hui.2" {
+			if fileName != "hysteria-linux-amd64-v2.13.0-hui.3" {
 				t.Fatalf("asset = %q", fileName)
 			}
 			return "https://download.example/custom-hysteria", nil
@@ -94,7 +94,7 @@ func TestDownloadHysteria2FailuresPreserveOldBinary(t *testing.T) {
 			versionAt: func(string) (string, error) {
 				return "v2.13.0", nil
 			},
-			wantError: `reports "v2.13.0", expected "v2.13.0-hui.2"`,
+			wantError: `reports "v2.13.0", expected "v2.13.0-hui.3"`,
 		},
 	}
 	for _, tt := range tests {
@@ -224,11 +224,11 @@ func TestInstallHysteria2BinaryRestoresOldAfterActivationFailure(t *testing.T) {
 }
 
 func TestParseHysteria2VersionPreservesCustomSuffix(t *testing.T) {
-	version, err := parseHysteria2Version("Hysteria2 server v2.13.0-hui.2 linux amd64")
+	version, err := parseHysteria2Version("Hysteria2 server v2.13.0-hui.3 linux amd64")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if version != "v2.13.0-hui.2" {
+	if version != "v2.13.0-hui.3" {
 		t.Fatalf("version = %q", version)
 	}
 	if _, err := parseHysteria2Version("unknown"); err == nil {

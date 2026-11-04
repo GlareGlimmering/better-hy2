@@ -2,10 +2,44 @@ package service
 
 import (
 	"errors"
+	"gopkg.in/yaml.v3"
+	"h-ui/model/bo"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestACMEDNSStartupAllowsPropagationWindow(t *testing.T) {
+	var config bo.Hysteria2ServerConfig
+	if err := yaml.Unmarshal([]byte("acme:\n  type: dns\n  dns:\n    name: cloudflare\n    config: {}\n"), &config); err != nil {
+		t.Fatal(err)
+	}
+	if got := hysteria2StartupAttemptsForConfig(&config); got != hysteria2ACMEDNSStartupAttempts {
+		t.Fatalf("DNS-01 startup attempts=%d want %d", got, hysteria2ACMEDNSStartupAttempts)
+	}
+	if time.Duration(hysteria2ACMEDNSStartupAttempts)*hysteria2StartupInterval < 2*time.Minute {
+		t.Fatal("DNS-01 readiness window is shorter than CertMagic propagation timeout")
+	}
+	if got := hysteria2StartupAttemptsForConfig(&bo.Hysteria2ServerConfig{}); got != hysteria2StartupAttempts {
+		t.Fatalf("ordinary startup attempts=%d want %d", got, hysteria2StartupAttempts)
+	}
+
+	processChecks := 0
+	primary := "ACME DNS-01 failed: propagation resolver returned a fatal error"
+	err := waitForHysteria2Readiness(hysteria2ReadinessOps{
+		processRunning: func() bool {
+			processChecks++
+			return processChecks <= hysteria2StartupAttempts
+		},
+		mainReady:     func() bool { return false },
+		apiReady:      func() error { return errors.New("unexpected API probe") },
+		startupOutput: func() string { return primary },
+		sleep:         func(time.Duration) {},
+	}, hysteria2StartupAttemptsForConfig(&config))
+	if err == nil || !strings.Contains(err.Error(), primary) || strings.Contains(err.Error(), "readiness timed out") {
+		t.Fatalf("real ACME fatal error was not preserved after the ordinary readiness window: %v", err)
+	}
+}
 
 func TestRestartHysteria2UsesStopThenStartAndPropagatesFailures(t *testing.T) {
 	var calls []string
