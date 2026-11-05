@@ -39,7 +39,7 @@ export interface XrayStatus {
   versionInstalled: boolean;
   serviceInstalled: boolean;
   runtimeReady: boolean;
-  runtimeState: "not_installed" | "service_missing" | "not_applied" | "running" | "stopped";
+  runtimeState: "not_installed" | "service_missing" | "not_applied" | "running" | "stopped" | "not_required";
   running: boolean;
   configValid: boolean;
   pendingChanges: boolean;

@@ -7,6 +7,8 @@ import { classifyServerAddress, isLiteralIp, serverAddressValue } from "../src/v
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 const xray = read("../src/views/xray/index.vue");
 const accounts = read("../src/views/account/list/index.vue");
+const settingsPage = read("../src/views/config/list/index.vue");
+const settingsStore = read("../src/store/modules/settings.ts");
 const subscription = read("../src/views/subscription/settings/index.vue");
 const locales = ["zh-cn", "en", "ru"].map(language =>
   read(`../src/lang/package/${language}.ts`)
@@ -40,6 +42,25 @@ test("account create and edit share a responsive drawer", () => {
   assert.match(accounts, /closeDialog\(\);[\s\S]*await Promise\.all/);
   assert.match(accounts, /:loading="accountSaving"/);
   assert.doesNotMatch(accounts, /class="account-dialog"/);
+});
+
+test("account more button cannot open editor and drawer dismisses without saving", () => {
+  assert.doesNotMatch(accounts, /@row-click="handleUpdate"/);
+  assert.match(accounts, /@click\.stop="handleUpdate\(scope\.row\)"/);
+  assert.match(accounts, /<el-button type="primary" link @click\.stop>\s*\{\{ \$t\("common\.more"\)/);
+  assert.match(accounts, /:close-on-click-modal="true"/);
+  assert.match(accounts, /@close="closeDialog"/);
+  const close = accounts.slice(accounts.indexOf("const closeDialog ="), accounts.indexOf("const closeDialogKick ="));
+  assert.match(close, /resetFields/);
+  assert.doesNotMatch(close, /saveAccountApi|updateAccountApi|submitForm/);
+});
+
+test("theme initializes globally and settings route has no color-mode mount side effects", () => {
+  assert.match(read("../src/App.vue"), /const settingsStore = useSettingsStore\(\)/);
+  assert.match(settingsStore, /useColorMode\(\{ emitAuto: true \}\)/);
+  assert.match(settingsStore, /colorMode\.value = dark \? "dark" : "light"/);
+  assert.match(settingsPage, /v-model="settingsStore\.isDark"/);
+  assert.doesNotMatch(settingsPage, /useDark\(|useColorMode\(/);
 });
 
 test("subscription server address supports only automatic server IP or literal IP", () => {

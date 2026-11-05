@@ -21,6 +21,7 @@ export default {
     xrayOutbound: "出站节点",
   },
   xray: {
+    notRequiredState: "无需运行（无适配节点）",
     phaseNotice: "第一阶段仅管理和验证独立 Xray 服务，不修改 Hysteria2 当前的 DIRECT 出站。",
     status: "运行状态", totalNodes: "节点总数", serviceInstalled: "systemd 服务已安装", running: "正在运行", activeVersion: "当前版本", configValid: "当前配置有效", caStatus: "CA 状态", installedVersions: "已安装版本", valid: "有效", missing: "缺失或无效", tcpAvailable: "TCP 测试", udpAvailable: "UDP 测试", localProxy: "受管本地代理", remoteConnectivity: "远端连通", exitIdentity: "出口身份已验证", testFailed: "出站测试失败", notTested: "未测试", caFingerprint: "CA SHA-256 指纹",
     version: "固定 Xray 版本", name: "节点名称", address: "远端服务器", port: "端口", uuid: "VLESS UUID", sni: "TLS SNI", caCertificate: "自建 CA 证书", uploadCA: "上传 CA", username: "代理用户名（可选）", password: "代理密码（可选）", passwordUnchanged: "留空则保留已保存的密码", nativeHy2: "HY2 原生直连",

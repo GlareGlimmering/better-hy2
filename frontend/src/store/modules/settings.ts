@@ -1,8 +1,17 @@
 import { defineStore } from "pinia";
 import defaultSettings from "@/settings";
-import { useStorage } from "@vueuse/core";
+import { useStorage, useColorMode, usePreferredDark } from "@vueuse/core";
+import { computed } from "vue";
 
 export const useSettingsStore = defineStore("setting", () => {
+  // Initialize once with App, not when the settings route is opened. Keep the
+  // existing storage key; an explicit toggle persists light/dark, never auto.
+  const colorMode = useColorMode({ emitAuto: true });
+  const preferredDark = usePreferredDark();
+  const isDark = computed({
+    get: () => colorMode.value === "dark" || (colorMode.value === "auto" && preferredDark.value),
+    set: (dark: boolean) => { colorMode.value = dark ? "dark" : "light"; },
+  });
   // state
   const fixedHeader = useStorage<boolean>(
     "fixedHeader",
@@ -42,6 +51,7 @@ export const useSettingsStore = defineStore("setting", () => {
   }
 
   return {
+    isDark,
     fixedHeader,
     sidebarLogo,
     layout,

@@ -21,6 +21,7 @@ export default {
     xrayOutbound: "Outbound Nodes",
   },
   xray: {
+    notRequiredState: "Not required (no adapter nodes)",
     phaseNotice: "Phase one manages and validates an independent Xray service. It does not change Hysteria2's current DIRECT outbound.",
     status: "Runtime status", totalNodes: "Total nodes", serviceInstalled: "systemd service installed", running: "Running", activeVersion: "Active version", configValid: "Active config valid", caStatus: "CA status", installedVersions: "Installed versions", valid: "Valid", missing: "Missing or invalid", tcpAvailable: "TCP test", udpAvailable: "UDP test", localProxy: "Managed local proxy", remoteConnectivity: "Remote connectivity", exitIdentity: "Exit identity verified", testFailed: "Outbound test failed", notTested: "Not tested", caFingerprint: "CA SHA-256 fingerprint",
     version: "Pinned Xray version", name: "Node name", address: "Remote server", port: "Port", uuid: "VLESS UUID", sni: "TLS SNI", caCertificate: "Custom CA certificate", uploadCA: "Upload CA", username: "Proxy username (optional)", password: "Proxy password (optional)", passwordUnchanged: "Leave empty to keep the stored password", nativeHy2: "Native HY2",

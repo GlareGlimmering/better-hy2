@@ -89,7 +89,7 @@
     />
 
     <el-card shadow="never">
-      <el-table v-loading="loading" :data="records" class="account-table" @row-click="handleUpdate">
+      <el-table v-loading="loading" :data="records" class="account-table">
         <el-table-column
           key="username"
           :label="$t('account.username')"
@@ -168,7 +168,7 @@
               @click.stop
               @command="handleAccountCommand($event, scope.row)"
             >
-              <el-button type="primary" link>
+              <el-button type="primary" link @click.stop>
                 {{ $t("common.more") }}<i-ep-arrow-down />
               </el-button>
               <template #dropdown>
@@ -222,7 +222,7 @@
       class="account-drawer"
       append-to-body
       destroy-on-close
-      :close-on-click-modal="false"
+      :close-on-click-modal="true"
       @close="closeDialog"
     >
       <el-form

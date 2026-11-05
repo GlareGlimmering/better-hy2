@@ -12,6 +12,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"h-ui/dao"
 	"h-ui/model/bo"
 	"h-ui/model/constant"
 	"h-ui/model/vo"
@@ -163,8 +164,17 @@ func TestSaveXrayDraftCreatesEditsAndDeletesUnreferencedOutbound(t *testing.T) {
 }
 
 func TestReferencedXrayOutboundCannotBeDisabledOrDeleted(t *testing.T) {
-	_, _ = setupSubscriptionTestDatabase(t)
+	accountID, _ := setupSubscriptionTestDatabase(t)
 	current := normalizeXraySettings(validXraySettings())
+	if err := dao.UpdateAccount([]int64{accountID}, map[string]interface{}{"outbound": current.Outbounds[0].Name}); err != nil {
+		t.Fatal(err)
+	}
+	renamed := current
+	renamed.Outbounds = append([]bo.XrayManagedOutbound(nil), current.Outbounds...)
+	renamed.Outbounds[0].Name = "RENAMED"
+	if err := validateXrayOutboundReferences(current, renamed); err == nil {
+		t.Fatal("account-bound node was renamed")
+	}
 	next := current
 	next.Outbounds = append([]bo.XrayManagedOutbound(nil), current.Outbounds...)
 	next.Outbounds[0].Enabled = false

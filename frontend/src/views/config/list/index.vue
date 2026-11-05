@@ -57,7 +57,7 @@
         <div class="appearance-item">
           <span>{{ $t("config.darkMode") }}</span>
           <el-switch
-            v-model="isDark"
+            v-model="settingsStore.isDark"
             inline-prompt
             :active-icon="IconEpMoon"
             :inactive-icon="IconEpSunny"
@@ -260,7 +260,6 @@ import IconEpMoon from "~icons/ep/moon";
 const { t } = useI18n();
 const route = useRoute();
 const settingsStore = useSettingsStore();
-const isDark = useDark();
 
 const themeColors = [
   "#409EFF",

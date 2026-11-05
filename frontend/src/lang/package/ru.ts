@@ -21,6 +21,7 @@ export default {
     xrayOutbound: "Исходящие узлы",
   },
   xray: {
+    notRequiredState: "Не требуется (нет узлов адаптера)",
     phaseNotice: "Первый этап управляет независимым Xray и не меняет DIRECT-маршрут Hysteria2.",
     status: "Состояние", totalNodes: "Всего узлов", serviceInstalled: "Служба systemd установлена", running: "Запущен", activeVersion: "Активная версия", configValid: "Конфигурация действительна", caStatus: "Статус CA", installedVersions: "Установленные версии", valid: "Действителен", missing: "Отсутствует или недействителен", tcpAvailable: "Тест TCP", udpAvailable: "Тест UDP", localProxy: "Управляемый локальный прокси", remoteConnectivity: "Удаленное подключение", exitIdentity: "Идентичность выхода проверена", testFailed: "Тест исходящего подключения не пройден", notTested: "Не проверено", caFingerprint: "SHA-256 отпечаток CA",
     version: "Фиксированная версия Xray", name: "Имя узла", address: "Удалённый сервер", port: "Порт", uuid: "UUID VLESS", sni: "TLS SNI", caCertificate: "Сертификат CA", uploadCA: "Загрузить CA", username: "Имя прокси (необязательно)", password: "Пароль прокси (необязательно)", passwordUnchanged: "Оставьте пустым, чтобы сохранить пароль", nativeHy2: "Встроенный HY2",

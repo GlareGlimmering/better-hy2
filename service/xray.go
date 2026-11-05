@@ -85,6 +85,7 @@ var xrayCommand = func(name string, args ...string) ([]byte, error) {
 	return exec.Command(name, args...).CombinedOutput()
 }
 var xrayRuntimeFactory = func() xrayRuntime { return systemdXrayRuntime{} }
+var applyManagedHysteria2Config = ApplyHysteria2Config
 
 func GetXraySettings() (vo.XraySettingsVo, error) {
 	settings, err := loadXraySettings(constant.XrayDraftConfig)
@@ -95,6 +96,8 @@ func GetXraySettings() (vo.XraySettingsVo, error) {
 }
 
 func SaveXrayDraft(input bo.XraySettings) error {
+	xrayOperationMutex.Lock()
+	defer xrayOperationMutex.Unlock()
 	input = normalizeXraySettings(input)
 	current, err := loadXraySettings(constant.XrayDraftConfig)
 	if err != nil {
@@ -126,6 +129,13 @@ func SaveXrayDraft(input bo.XraySettings) error {
 		return err
 	}
 	if err := validateXrayOutboundReferences(current, input); err != nil {
+		return err
+	}
+	active, err := loadXraySettings(constant.XrayActiveConfig)
+	if err != nil {
+		return err
+	}
+	if err := validateXrayOutboundReferences(active, input); err != nil {
 		return err
 	}
 	data, err := json.Marshal(input)
@@ -174,9 +184,6 @@ func validateXraySettings(settings bo.XraySettings, requireInstalled bool) error
 	settings = normalizeXraySettings(settings)
 	if !regexp.MustCompile(`^v[0-9]+(?:\.[0-9A-Za-z-]+)+$`).MatchString(settings.Version) {
 		return errors.New("Xray version must be an explicit v-prefixed release tag")
-	}
-	if len(settings.Outbounds) == 0 {
-		return errors.New("at least one outbound node is required")
 	}
 	names := map[string]bool{}
 	ports := map[uint16]bool{}
@@ -235,15 +242,24 @@ func validateXraySettings(settings bo.XraySettings, requireInstalled bool) error
 			enabled++
 		}
 	}
-	if enabled == 0 {
+	if enabled == 0 && len(settings.Outbounds) > 0 {
 		return errors.New("at least one outbound node must be enabled")
 	}
-	if requireInstalled {
+	if requireInstalled && hasXrayAdapters(settings) {
 		if err := verifyInstalledXrayVersion(managedXrayPaths, settings.Version); err != nil {
 			return fmt.Errorf("Xray version %s failed verification: %w", settings.Version, err)
 		}
 	}
 	return nil
+}
+
+func hasXrayAdapters(settings bo.XraySettings) bool {
+	for _, node := range normalizeXraySettings(settings).Outbounds {
+		if node.Enabled && (node.Protocol == "vless" || node.Protocol == "http") {
+			return true
+		}
+	}
+	return false
 }
 
 func normalizeXraySettings(settings bo.XraySettings) bo.XraySettings {
@@ -307,34 +323,79 @@ func validateXrayOutboundReferences(previous, settings bo.XraySettings) error {
 	}
 	config, err := GetHysteria2Config()
 	if err != nil {
-		return nil
-	}
-	availableNames := map[string]bool{}
-	availablePorts := map[uint16]bool{}
-	managedNames := map[string]bool{}
-	managedPorts := map[uint16]bool{}
-	for _, outbound := range previous.Outbounds {
-		managedNames[strings.ToLower(outbound.Name)] = true
-		managedPorts[outbound.SOCKSPort] = true
-	}
-	for _, outbound := range settings.Outbounds {
-		if outbound.Enabled {
-			availableNames[strings.ToLower(outbound.Name)] = true
-			availablePorts[outbound.SOCKSPort] = true
-		}
+		return fmt.Errorf("inspect Hysteria2 outbound references: %w", err)
 	}
 	for _, outbound := range config.Outbounds {
 		if outbound.Name == nil || outbound.Type == nil || !strings.EqualFold(*outbound.Type, "socks5") || outbound.SOCKS5 == nil || outbound.SOCKS5.Addr == nil {
 			continue
 		}
-		host, portText, _ := net.SplitHostPort(*outbound.SOCKS5.Addr)
-		port, _ := strconv.Atoi(portText)
-		managedReference := strings.EqualFold(host, constant.XraySOCKSListen) && (managedNames[strings.ToLower(*outbound.Name)] || managedPorts[uint16(port)])
-		if managedReference && !availablePorts[uint16(port)] {
-			return fmt.Errorf("Xray outbound %q is still referenced by Hysteria2 at %s", *outbound.Name, *outbound.SOCKS5.Addr)
+		for _, old := range previous.Outbounds {
+			if !managedAdapterRule(outbound, old) {
+				continue
+			}
+			next, exists := nextByID[old.ID]
+			if exists && next.Enabled && (managedAdapterRule(outbound, next) || strings.EqualFold(*outbound.Name, next.Name)) {
+				continue
+			}
+			if OutboundInUse(*outbound.Name, accounts) {
+				return fmt.Errorf("Xray node %q is referenced by account outbound %q at %s", old.Name, *outbound.Name, *outbound.SOCKS5.Addr)
+			}
+			aclText := ""
+			if config.ACL != nil {
+				aclText = strings.Join(config.ACL.Inline, "\n")
+				if config.ACL.File != nil && *config.ACL.File != "" {
+					data, err := os.ReadFile(*config.ACL.File)
+					if err != nil {
+						return errors.New("cannot verify configured Hysteria2 ACL file references")
+					}
+					aclText += "\n" + string(data)
+				}
+			}
+			if regexp.MustCompile(`(?mi)^\s*` + regexp.QuoteMeta(*outbound.Name) + `\s*\(`).MatchString(aclText) {
+				return fmt.Errorf("Xray node %q has a legacy Hysteria2 rule %q with custom ACL; remove that rule from ACL before deleting the node", old.Name, *outbound.Name)
+			}
 		}
 	}
 	return nil
+}
+
+func managedAdapterRule(rule bo.ServerConfigOutboundEntry, node bo.XrayManagedOutbound) bool {
+	if rule.Type == nil || !strings.EqualFold(*rule.Type, "socks5") || rule.SOCKS5 == nil || rule.SOCKS5.Addr == nil {
+		return false
+	}
+	if node.Protocol == "socks5" {
+		return *rule.SOCKS5.Addr == net.JoinHostPort(node.Address, strconv.Itoa(int(node.Port)))
+	}
+	if node.Protocol != "vless" && node.Protocol != "http" {
+		return false
+	}
+	return *rule.SOCKS5.Addr == net.JoinHostPort(node.SOCKSListen, strconv.Itoa(int(node.SOCKSPort)))
+}
+
+// Remove only identifiable generated rules (name AND endpoint). Unmatched
+// advanced/legacy rules remain intact, including aliases sharing an endpoint.
+func pruneRetiredManagedOutbounds(config bo.Hysteria2ServerConfig, previous, next bo.XraySettings) bo.Hysteria2ServerConfig {
+	keep := make(map[string]bool)
+	for _, node := range next.Outbounds {
+		if node.Enabled {
+			keep[node.ID+"\x00"+strings.ToLower(node.Name)] = true
+		}
+	}
+	var rules []bo.ServerConfigOutboundEntry
+	for _, rule := range config.Outbounds {
+		retired := false
+		for _, old := range previous.Outbounds {
+			if rule.Name != nil && strings.EqualFold(*rule.Name, old.Name) && managedAdapterRule(rule, old) && !keep[old.ID+"\x00"+strings.ToLower(old.Name)] {
+				retired = true
+				break
+			}
+		}
+		if !retired {
+			rules = append(rules, rule)
+		}
+	}
+	config.Outbounds = rules
+	return config
 }
 
 func validHost(value string) bool {
@@ -434,6 +495,9 @@ func validateXraySnapshot(settings bo.XraySettings) (vo.XrayValidationVo, []byte
 	if err != nil {
 		return vo.XrayValidationVo{}, nil, err
 	}
+	if !hasXrayAdapters(settings) {
+		return vo.XrayValidationVo{Valid: true, Output: "No Xray adapter required"}, data, nil
+	}
 	if err := ensureXrayDirectories(managedXrayPaths); err != nil {
 		return vo.XrayValidationVo{}, nil, err
 	}
@@ -529,6 +593,14 @@ func ApplyXrayDraft() error {
 		setXrayApplyStatus(err)
 		return err
 	}
+	previous, previousErr := loadXraySettings(constant.XrayActiveConfig)
+	if previousErr != nil {
+		return previousErr
+	}
+	if err := validateXrayOutboundReferences(previous, settings); err != nil {
+		setXrayApplyStatus(err)
+		return err
+	}
 	validation, data, err := validateXraySnapshot(settings)
 	if err != nil || !validation.Valid {
 		if err != nil {
@@ -539,12 +611,13 @@ func ApplyXrayDraft() error {
 		setXrayApplyStatus(err)
 		return err
 	}
-	previous, previousErr := loadXraySettings(constant.XrayActiveConfig)
+	wasRunning := xrayRuntimeFactory().IsRunning()
 	err = applyXrayConfiguration(settings, data, managedXrayPaths, xrayRuntimeFactory())
 	if err == nil {
 		hy2Config, configErr := GetHysteria2Config()
 		if configErr == nil {
-			configErr = ApplyHysteria2Config(hy2Config)
+			hy2Config = pruneRetiredManagedOutbounds(hy2Config, previous, settings)
+			configErr = applyManagedHysteria2Config(hy2Config)
 		}
 		if configErr != nil {
 			if previousErr != nil {
@@ -554,7 +627,15 @@ func ApplyXrayDraft() error {
 			} else if rollbackErr := applyXrayConfiguration(previous, previousData, managedXrayPaths, xrayRuntimeFactory()); rollbackErr != nil {
 				err = fmt.Errorf("apply managed Hysteria2 mappings: %v; Xray rollback failed: %v", configErr, rollbackErr)
 			} else {
-				err = fmt.Errorf("apply managed Hysteria2 mappings: %w; previous Xray state restored", configErr)
+				if !wasRunning {
+					if stopErr := xrayRuntimeFactory().Stop(); stopErr != nil {
+						err = fmt.Errorf("apply managed Hysteria2 mappings: %v; restore stopped Xray state failed: %w", configErr, stopErr)
+					} else {
+						err = fmt.Errorf("apply managed Hysteria2 mappings: %w; previous Xray state restored", configErr)
+					}
+				} else {
+					err = fmt.Errorf("apply managed Hysteria2 mappings: %w; previous Xray state restored", configErr)
+				}
 			}
 		}
 	}
@@ -584,7 +665,12 @@ type xrayRuntime interface {
 }
 
 func applyXrayConfiguration(settings bo.XraySettings, data []byte, paths xrayPaths, runtime xrayRuntime) error {
-	if err := runtime.Ensure(); err != nil {
+	needsXray := hasXrayAdapters(settings)
+	if needsXray {
+		if err := runtime.Ensure(); err != nil {
+			return err
+		}
+	} else if err := os.MkdirAll(paths.dataDir, 0750); err != nil {
 		return err
 	}
 	wasRunning := runtime.IsRunning()
@@ -608,19 +694,28 @@ func applyXrayConfiguration(settings bo.XraySettings, data []byte, paths xrayPat
 		return err
 	}
 	versionDir := filepath.Join(paths.versionsDir, settings.Version)
-	if err := replaceSymlink(paths.currentLink, versionDir); err != nil {
-		return rollbackXrayApplyError(err, paths, oldConfig, configErr, oldLink, linkErr, wasRunning, runtime)
-	}
-	if err := runtime.PrepareFiles(paths.dataDir); err != nil {
-		return rollbackXrayApplyError(err, paths, oldConfig, configErr, oldLink, linkErr, wasRunning, runtime)
+	if needsXray {
+		if err := replaceSymlink(paths.currentLink, versionDir); err != nil {
+			return rollbackXrayApplyError(err, paths, oldConfig, configErr, oldLink, linkErr, wasRunning, runtime)
+		}
+		if err := runtime.PrepareFiles(paths.dataDir); err != nil {
+			return rollbackXrayApplyError(err, paths, oldConfig, configErr, oldLink, linkErr, wasRunning, runtime)
+		}
 	}
 	var applyErr error
-	if wasRunning {
+	if !needsXray {
+		if wasRunning {
+			applyErr = runtime.Stop()
+		}
+		if applyErr == nil && runtime.IsRunning() {
+			applyErr = errors.New("Xray remained running with no adapter nodes")
+		}
+	} else if wasRunning {
 		applyErr = runtime.Restart()
 	} else {
 		applyErr = runtime.Start()
 	}
-	if applyErr == nil {
+	if applyErr == nil && needsXray {
 		applyErr = runtime.Ready()
 	}
 	if applyErr != nil {
@@ -744,6 +839,9 @@ func validateActiveXrayRuntime(paths xrayPaths) error {
 	if err != nil || strings.TrimSpace(settings.Version) == "" {
 		return errors.New("Xray configuration has not been applied")
 	}
+	if !hasXrayAdapters(settings) {
+		return errors.New("no enabled Xray adapter nodes; Xray is not required")
+	}
 	if err := verifyInstalledXrayVersion(paths, settings.Version); err != nil {
 		return fmt.Errorf("Xray version %s is not installed or failed verification: %w", settings.Version, err)
 	}
@@ -809,6 +907,10 @@ func GetXrayStatus() vo.XrayStatusVo {
 	}
 	if draft, draftErr := loadXraySettings(constant.XrayDraftConfig); draftErr == nil {
 		if active, activeErr := loadXraySettings(constant.XrayActiveConfig); activeErr == nil {
+			if !hasXrayAdapters(active) && !hasXrayAdapters(draft) && !status.Running {
+				status.RuntimeState = "not_required"
+				status.Error = ""
+			}
 			draftJSON, _ := json.Marshal(normalizeXraySettings(draft))
 			activeJSON, _ := json.Marshal(normalizeXraySettings(active))
 			status.PendingChanges = !bytes.Equal(draftJSON, activeJSON)
