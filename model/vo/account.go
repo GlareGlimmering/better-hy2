@@ -1,5 +1,17 @@
 package vo
 
+type AccountOutboundOption struct {
+	Name   string `json:"name"`
+	Type   string `json:"type"`
+	Source string `json:"source"`
+	Reason string `json:"reason,omitempty"`
+}
+
+type AccountOutboundOptions struct {
+	Options     []AccountOutboundOption `json:"options"`
+	Unavailable []AccountOutboundOption `json:"unavailable"`
+}
+
 type AccountVo struct {
 	BaseVo
 	Username     string `json:"username"`

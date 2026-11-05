@@ -96,6 +96,9 @@ export default {
       "I want to be a shooting star, cutting through the darkness, just to illuminate your dreams, good night🌛！",
   },
   account: {
+    outboundLoadFailed: "Could not load outbounds. Retry; the current binding is unchanged.",
+    outboundBindingUnavailable: "Current binding {name} is not selectable. Check the outbound configuration; it will not switch to DIRECT automatically.",
+    outboundHistoricalExcluded: "Unapplied, disabled or unverified local mappings are excluded; their original configuration is retained.",
     resetTrafficConfirm: "Reset traffic statistics for this account?",
     remark: "Remark",
     username: "Username",

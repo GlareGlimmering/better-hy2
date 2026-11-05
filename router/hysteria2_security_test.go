@@ -26,3 +26,14 @@ func TestHysteria2LifecycleRoutesRequireAuthentication(t *testing.T) {
 		}
 	}
 }
+
+func TestAccountOutboundOptionsRequiresAuthentication(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	Router(engine, nil)
+	w := httptest.NewRecorder()
+	engine.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/hui/account/outboundOptions", nil))
+	if !strings.Contains(w.Body.String(), `"message":"unauthorized"`) {
+		t.Fatalf("unprotected endpoint: %s", w.Body.String())
+	}
+}

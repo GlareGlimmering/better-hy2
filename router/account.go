@@ -9,6 +9,7 @@ func initAccountAdminRouter(accountApi *gin.RouterGroup) {
 	account := accountApi.Group("/account")
 	{
 		account.GET("/pageAccount", controller.PageAccount)
+		account.GET("/outboundOptions", controller.AccountOutboundOptions)
 		account.POST("/saveAccount", controller.SaveAccount)
 		account.POST("/deleteAccount", controller.DeleteAccount)
 		account.POST("/updateAccount", controller.UpdateAccount)

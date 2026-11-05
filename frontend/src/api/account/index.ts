@@ -1,4 +1,11 @@
 import request from "@/utils/request";
+
+export function getAccountOutboundOptionsApi(): AxiosPromise<{
+  options: { name: string; type: string; source: string }[];
+  unavailable: { name: string; type: string; source: string; reason: string }[];
+}> {
+  return request({ url: "/account/outboundOptions", method: "get" });
+}
 import { AxiosPromise } from "axios";
 import {
   AccountSaveDto,

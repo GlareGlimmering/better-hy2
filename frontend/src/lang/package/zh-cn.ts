@@ -95,6 +95,9 @@ export default {
     greeting5: "我愿成为流星，划破黑夜，只为照亮你的梦境，晚安🌛！",
   },
   account: {
+    outboundLoadFailed: "出站列表加载失败，请重试；当前绑定未更改。",
+    outboundBindingUnavailable: "当前绑定 {name} 不在可用候选中，请检查出站配置；不会自动切换 DIRECT。",
+    outboundHistoricalExcluded: "部分未应用、禁用或无法验证的历史本地映射已排除，原配置仍保留。",
     resetTrafficConfirm: "确定要重设该账户的流量统计吗？",
     remark: "备注",
     username: "用户名",

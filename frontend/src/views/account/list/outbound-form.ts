@@ -3,6 +3,10 @@ export interface AccountOutboundOption {
   type: string;
 }
 
+export function hasUnavailableBinding(outbounds: AccountOutboundOption[], binding: string | undefined): boolean {
+  return !!binding && !outbounds.some(item => item.name.toLowerCase() === binding.toLowerCase());
+}
+
 export interface AccountOutboundFormState {
   options: AccountOutboundOption[];
   disabled: boolean;

@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   buildAccountOutboundFormState,
   newAccountOutboundFields,
+  hasUnavailableBinding,
 } from "../src/views/account/list/outbound-form.ts";
 
 const direct = { name: "DIRECT", type: "direct" };
@@ -30,8 +31,8 @@ test("account dialog always renders the outbound field", () => {
     component,
     /<el-form-item[^>]*v-if="dataForm\.role !== 'admin'"[^>]*account\.outbound/
   );
-  assert.match(component, /getXraySettingsApi/);
-  assert.match(component, /name: "DIRECT", type: "direct"/);
+  assert.match(component, /getAccountOutboundOptionsApi/);
+  assert.doesNotMatch(component, /getXraySettingsApi|getHysteria2ConfigApi/);
   assert.match(component, /router\.push\(\{ name: "XrayOutbound" \}\)/);
 });
 
@@ -73,4 +74,23 @@ test("administrator form shows the field but cannot bind an outbound", () => {
   const state = buildAccountOutboundFormState([direct], "admin");
   assert.equal(state.admin, true);
   assert.equal(state.disabled, true);
+});
+
+test("deleted and renamed bindings warn without rewriting an account to DIRECT", () => {
+  const account = { outbound: "OLD" };
+  assert.equal(hasUnavailableBinding([direct, socks5], account.outbound), true);
+  assert.equal(account.outbound, "OLD");
+  assert.equal(hasUnavailableBinding([direct], "DIRECT"), false);
+  assert.equal(hasUnavailableBinding([direct], ""), false);
+  assert.equal(hasUnavailableBinding([direct, { name: "OLD", type: "socks5" }], account.outbound), false);
+});
+
+test("selector fetches authoritative options on each open and clears failed stale results", () => {
+  const component = readFileSync(new URL("../src/views/account/list/index.vue", import.meta.url), "utf8");
+  assert.match(component, /@visible-change="refreshOutboundOptions"/);
+  assert.match(component, /if \(visible\) void loadOutboundOptions\(\)/);
+  assert.match(component, /const handleAdd = async[\s\S]*await loadOutboundOptions\(\)/);
+  assert.match(component, /const handleUpdate = async[\s\S]*await loadOutboundOptions\(\)/);
+  assert.match(component, /catch \{\s*state\.outboundOptions = \[\]/);
+  assert.match(component, /outboundBindingUnavailable/);
 });

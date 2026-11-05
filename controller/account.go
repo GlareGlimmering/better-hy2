@@ -15,6 +15,16 @@ import (
 	"time"
 )
 
+func AccountOutboundOptions(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	options, err := service.GetAccountOutboundOptions()
+	if err != nil {
+		vo.Fail(err.Error(), c)
+		return
+	}
+	vo.Success(options, c)
+}
+
 func Login(c *gin.Context) {
 	loginDto, err := validateField(c, dto.LoginDto{})
 	if err != nil {

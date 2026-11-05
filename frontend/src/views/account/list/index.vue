@@ -279,6 +279,8 @@
         <el-form-item :label="$t('account.outbound')" prop="outbound">
           <el-select
             v-model="dataForm.outbound"
+            :loading="outboundOptionsLoading"
+            @visible-change="refreshOutboundOptions"
             :placeholder="$t('account.unbound')"
             :disabled="outboundFormState.disabled"
             clearable
@@ -301,6 +303,9 @@
             </el-button>
           </div>
           <div v-else class="form-tip">{{ $t("account.outboundTip") }}</div>
+          <el-alert v-if="outboundOptionsFailed" type="error" :closable="false" :title="$t('account.outboundLoadFailed')" />
+          <el-alert v-else-if="!outboundOptionsLoading && unavailableBinding" type="warning" :closable="false" :title="$t('account.outboundBindingUnavailable', { name: dataForm.outbound })" />
+          <div v-if="outboundExcludedCount > 0" class="form-tip">{{ $t('account.outboundHistoricalExcluded') }}</div>
         </el-form-item>
         <el-form-item :label="$t('account.quota')" prop="quota">
           <unit-select :setValue="setQuota" :valueTmp="quotaTmp" />
@@ -459,6 +464,7 @@ import {
   releaseKickAccountApi,
   importAccountApi,
   resetTrafficApi,
+  getAccountOutboundOptionsApi,
 } from "@/api/account";
 import { Search, Plus, Refresh } from "@element-plus/icons-vue";
 import {
@@ -493,12 +499,11 @@ import {
 } from "@/api/hysteria2/types";
 import copy from "copy-to-clipboard";
 import { useRoute, useRouter } from "vue-router";
-import { getHysteria2ConfigApi } from "@/api/config";
-import { getXraySettingsApi } from "@/api/xray";
 import {
   AccountOutboundOption,
   buildAccountOutboundFormState,
   newAccountOutboundFields,
+  hasUnavailableBinding,
 } from "./outbound-form";
 
 const { t } = useI18n();
@@ -508,6 +513,10 @@ const { width: viewportWidth } = useWindowSize();
 const isMobile = computed(() => viewportWidth.value < 768);
 const useFullscreenDialog = computed(() => viewportWidth.value < 520);
 const accountSaving = ref(false);
+const outboundOptionsLoading = ref(false);
+const outboundOptionsFailed = ref(false);
+const outboundExcludedCount = ref(0);
+let outboundOptionsRequest: Promise<void> | undefined;
 const queryFormRef = ref(ElForm); // 查询表单
 const dataFormRef = ref(ElForm); // 用户表单
 const kickFormRef = ref(ElForm); // 下线表单
@@ -725,6 +734,7 @@ const outboundFormState = computed(() =>
 const drawerAccount = computed(() =>
   state.records.find(item => item.id === state.dataForm.id)
 );
+const unavailableBinding = computed(() => hasUnavailableBinding(state.outboundOptions, state.dataForm.outbound));
 
 const resetDataForm = () => {
   Object.assign(state.dataForm, {
@@ -737,21 +747,26 @@ const resetDataForm = () => {
   quotaTmp.value = 0;
 };
 
-const loadOutboundOptions = async () => {
-  const [{ data: nodes }, { data: legacy }] = await Promise.all([
-    getXraySettingsApi(),
-    getHysteria2ConfigApi(),
-  ]);
-  const options: AccountOutboundOption[] = [{ name: "DIRECT", type: "direct" }];
-  for (const node of nodes.outbounds || []) {
-    if (node.enabled) options.push({ name: node.name, type: "socks5" });
-  }
-  for (const outbound of legacy.outbounds || []) {
-    if (!outbound.name || options.some(item => item.name.toLowerCase() === outbound.name.toLowerCase())) continue;
-    options.push({ name: outbound.name, type: outbound.type || "" });
-  }
-  state.outboundOptions = options;
+const loadOutboundOptions = (): Promise<void> => {
+  if (outboundOptionsRequest) return outboundOptionsRequest;
+  outboundOptionsLoading.value = true;
+  outboundOptionsRequest = (async () => {
+    try {
+      const { data } = await getAccountOutboundOptionsApi();
+      state.outboundOptions = data.options;
+      outboundExcludedCount.value = data.unavailable.length;
+      outboundOptionsFailed.value = false;
+    } catch {
+      state.outboundOptions = [];
+      outboundOptionsFailed.value = true;
+    } finally {
+      outboundOptionsLoading.value = false;
+      outboundOptionsRequest = undefined;
+    }
+  })();
+  return outboundOptionsRequest;
 };
+const refreshOutboundOptions = (visible: boolean) => { if (visible) void loadOutboundOptions(); };
 
 const openHysteriaSettings = () => {
   closeDialog();
@@ -788,9 +803,9 @@ const resetQuery = () => {
 /**
  * 保存
  **/
-const handleAdd = () => {
+const handleAdd = async () => {
   resetDataForm();
-  loadOutboundOptions();
+  await loadOutboundOptions();
   state.dialog = {
     title: t("common.add"),
     visible: true,
@@ -801,7 +816,7 @@ const handleAdd = () => {
  * 修改
  **/
 const handleUpdate = async (row: { [key: string]: any }) => {
-  loadOutboundOptions();
+  await loadOutboundOptions();
   const id = row.id;
   const { data } = await getAccountApi({ id: id });
   Object.assign(state.dataForm, data);
