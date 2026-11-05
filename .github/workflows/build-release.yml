@@ -1,0 +1,232 @@
+name: Better HY2 build and release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - "feature/**"
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type == 'branch' }}
+
+env:
+  BINARY_NAME: h-ui-linux-amd64
+
+jobs:
+  build:
+    name: Test and build Linux AMD64
+    runs-on: ubuntu-latest
+    outputs:
+      is-release-tag: ${{ steps.release-tag.outputs.match }}
+      is-prerelease-tag: ${{ steps.release-tag.outputs.prerelease }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Validate release tag
+        id: release-tag
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            if [[ "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-custom\.[0-9]+-rc\.[0-9]+$ ]]; then
+              echo "match=true" >> "${GITHUB_OUTPUT}"
+              echo "prerelease=true" >> "${GITHUB_OUTPUT}"
+            elif [[ "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-custom\.[0-9]+$ ]]; then
+              echo "match=true" >> "${GITHUB_OUTPUT}"
+              echo "prerelease=false" >> "${GITHUB_OUTPUT}"
+            elif [[ "${GITHUB_REF_NAME}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+              echo "match=true" >> "${GITHUB_OUTPUT}"
+              echo "prerelease=false" >> "${GITHUB_OUTPUT}"
+            else
+              echo "Invalid release tag: ${GITHUB_REF_NAME}" >&2
+              exit 1
+            fi
+          else
+            echo "match=false" >> "${GITHUB_OUTPUT}"
+            echo "prerelease=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Set up Go from go.mod
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Set up Node.js from frontend/package.json
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/package.json
+          package-manager-cache: false
+
+      - name: Set up pnpm from frontend/package.json
+        uses: pnpm/action-setup@v6.1.0
+        with:
+          package_json_file: frontend/package.json
+          cache: true
+          cache_dependency_path: frontend/pnpm-lock.yaml
+          run_install: false
+
+      - name: Report tool versions
+        run: |
+          go version
+          node --version
+          pnpm --version
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Run frontend unit tests
+        working-directory: frontend
+        run: pnpm run test:unit
+
+      - name: Check frontend types
+        working-directory: frontend
+        run: pnpm exec vue-tsc --noEmit
+
+      - name: Build production frontend
+        working-directory: frontend
+        run: pnpm run build:prod
+
+      - name: Verify production frontend output
+        shell: bash
+        run: |
+          test -s frontend/dist/index.html
+          test -d frontend/dist/assets
+          grep -Fq '<div id="app"></div>' frontend/dist/index.html
+
+      - name: Verify embedded frontend asset graph
+        run: go test ./frontend -run 'Test(ProductionFrontendIsEmbedded|EmbeddedProductionAssetReferences|EmbeddedUnderscoreChunksAreServed|AssetReferenceValidationDetectsMissingUnderscoreChunk)$' -count=1
+
+      - name: Run Go tests
+        run: go test ./...
+
+      - name: Build static Linux AMD64 binary
+        env:
+          CGO_ENABLED: "0"
+          GOOS: linux
+          GOARCH: amd64
+        shell: bash
+        run: |
+          mkdir -p build
+          build_version="dev-${GITHUB_SHA::12}"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            build_version="${GITHUB_REF_NAME}"
+          fi
+          go build -trimpath -ldflags="-s -w -X h-ui/model/constant.Version=${build_version}" -o "build/${BINARY_NAME}" .
+          chmod +x "build/${BINARY_NAME}"
+          cp install.sh build/install.sh
+          chmod +x build/install.sh
+          printf '%s\n' "${build_version}" > build/EXPECTED_VERSION
+
+      - name: Verify binary and embedded frontend
+        shell: bash
+        run: |
+          file "build/${BINARY_NAME}" | tee build/file-info.txt
+          grep -Fq 'ELF 64-bit' build/file-info.txt
+          grep -Fq 'statically linked' build/file-info.txt
+          test "$(build/${BINARY_NAME} version)" = "Better HY2 version $(cat build/EXPECTED_VERSION)"
+          grep -aFq '<div id="app"></div>' "build/${BINARY_NAME}"
+          while IFS= read -r asset_path; do
+            embedded_path="${asset_path#frontend/}"
+            grep -aFq "${embedded_path}" "build/${BINARY_NAME}"
+          done < <(find frontend/dist/assets -type f -name '_*' -print)
+
+      - name: Refuse environment-specific release contamination
+        shell: bash
+        run: |
+          known_node="$(printf 'TM_NET_%s' '1')"
+          known_domain="$(printf 'host.%s%s.com' 'crosscloud' 'connect')"
+          if grep -aEiq "${known_node}|${known_domain}" "build/${BINARY_NAME}"; then
+            echo "Environment-specific outbound data is present in the release binary" >&2
+            exit 1
+          fi
+
+      - name: Generate SHA-256 checksum
+        working-directory: build
+        shell: bash
+        run: |
+          sha256sum "${BINARY_NAME}" install.sh > SHA256SUMS
+          sha256sum --check SHA256SUMS
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: h-ui-linux-amd64-${{ github.sha }}
+          path: |
+            build/h-ui-linux-amd64
+            build/SHA256SUMS
+            build/install.sh
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    if: needs.build.outputs.is-release-tag == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_REPO: ${{ github.repository }}
+
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download verified build artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: h-ui-linux-amd64-${{ github.sha }}
+          path: release-assets
+
+      - name: Verify downloaded checksum
+        working-directory: release-assets
+        run: sha256sum --check SHA256SUMS
+
+      - name: Refuse to overwrite an existing Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            echo "Release ${GITHUB_REF_NAME} already exists; refusing to overwrite it." >&2
+            exit 1
+          fi
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          release_title="Better HY2 ${GITHUB_REF_NAME}"
+          release_args=(
+            "${GITHUB_REF_NAME}"
+            "release-assets/${BINARY_NAME}"
+            "release-assets/SHA256SUMS"
+            "release-assets/install.sh"
+            --verify-tag
+            --title "${release_title}"
+          )
+          if [[ "${{ needs.build.outputs.is-prerelease-tag }}" == "true" ]]; then
+            release_args+=(--prerelease --notes-from-tag)
+          else
+            release_args+=(--latest --notes-from-tag)
+          fi
+          gh release create "${release_args[@]}"

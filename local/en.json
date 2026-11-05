@@ -1,0 +1,15 @@
+{
+  "menu": {
+    "recommend_os": "Recommended OS",
+    "description": "Description: Quick Installation of Better HY2",
+    "author": "Author",
+    "install_hui_systemd": "Install Better HY2 (systemd)",
+    "upgrade_h_ui_systemd": "Upgrade Better HY2 (systemd)",
+    "uninstall_h_ui_systemd": "Uninstall Better HY2 (systemd)",
+    "install_h_ui_docker": "Install Better HY2 (Docker)",
+    "upgrade_h_ui_docker": "Upgrade Better HY2 (Docker)",
+    "uninstall_h_ui_docker": "Uninstall Better HY2 (Docker)",
+    "ssh_local_port_forwarding": "SSH local port forwarding (Invalid after restarting the server)",
+    "reset_sysadmin": "Reset sysadmin username and password"
+  }
+}
