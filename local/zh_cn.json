@@ -1,0 +1,15 @@
+{
+  "menu": {
+    "recommend_os": "推荐系统",
+    "description": "描述: 一键安装 Better HY2",
+    "author": "作者",
+    "install_hui_systemd": "安装 Better HY2 (systemd)",
+    "upgrade_h_ui_systemd": "更新 Better HY2 (systemd)",
+    "uninstall_h_ui_systemd": "卸载 Better HY2 (systemd)",
+    "install_h_ui_docker": "安装 Better HY2 (Docker)",
+    "upgrade_h_ui_docker": "更新 Better HY2 (Docker)",
+    "uninstall_h_ui_docker": "卸载 Better HY2 (Docker)",
+    "ssh_local_port_forwarding": "SSH 本地端口转发（重启服务器后失效）",
+    "reset_sysadmin": "重置系统管理员用户名和密码"
+  }
+}
