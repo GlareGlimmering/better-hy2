@@ -103,7 +103,16 @@ func SaveXrayDraft(input bo.XraySettings) error {
 	if err != nil {
 		return err
 	}
+	active, err := loadXraySettings(constant.XrayActiveConfig)
+	if err != nil {
+		return err
+	}
 	currentByID := make(map[string]bo.XrayManagedOutbound, len(current.Outbounds))
+	// A failed deletion can restore a masked UI row after it has disappeared
+	// from the draft; retain its credentials from the last applied snapshot.
+	for _, outbound := range active.Outbounds {
+		currentByID[outbound.ID] = outbound
+	}
 	for _, outbound := range current.Outbounds {
 		currentByID[outbound.ID] = outbound
 	}
@@ -129,10 +138,6 @@ func SaveXrayDraft(input bo.XraySettings) error {
 		return err
 	}
 	if err := validateXrayOutboundReferences(current, input); err != nil {
-		return err
-	}
-	active, err := loadXraySettings(constant.XrayActiveConfig)
-	if err != nil {
 		return err
 	}
 	if err := validateXrayOutboundReferences(active, input); err != nil {

@@ -45,6 +45,19 @@ func TestRetiredNodeRulesAreNotAccountReferences(t *testing.T) {
 	if err := SaveXrayDraft(empty); err != nil {
 		t.Fatalf("last unreferenced node: %v", err)
 	}
+	maskedRestore := old
+	maskedRestore.Outbounds = append([]bo.XrayManagedOutbound(nil), old.Outbounds...)
+	maskedRestore.Outbounds[0].UUID = ""
+	if err := SaveXrayDraft(maskedRestore); err != nil {
+		t.Fatalf("masked row restore lost active credentials: %v", err)
+	}
+	restored, _ := loadXraySettings(constant.XrayDraftConfig)
+	if restored.Outbounds[0].UUID != old.Outbounds[0].UUID {
+		t.Fatal("active credential was not retained")
+	}
+	if err := SaveXrayDraft(empty); err != nil {
+		t.Fatal(err)
+	}
 	cleaned := pruneRetiredManagedOutbounds(config, old, empty)
 	for _, rule := range cleaned.Outbounds {
 		if rule.Name != nil && *rule.Name == old.Outbounds[0].Name {
