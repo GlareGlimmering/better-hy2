@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v3"
 	"h-ui/dao"
 	"h-ui/model/bo"
 	"h-ui/model/constant"
@@ -92,33 +91,14 @@ func setHysteria2ConfigYAML() error {
 	if serverConfig.Listen == nil || *serverConfig.Listen == "" {
 		return errors.New("hysteria2 config is empty")
 	}
-	serverConfig, err = PrepareHysteria2OutboundConfig(serverConfig)
+	hysteria2Config, err := prepareHysteria2ConfigYAML(serverConfig)
 	if err != nil {
 		return err
 	}
-	if err := EnsureHysteria2UserRoutingCompatible(serverConfig); err != nil {
+	if err := persistHysteria2ConfigYAML(hysteria2Config); err != nil {
 		return err
 	}
-
-	authHttpUrl, err := GetAuthHttpUrl()
-	if err != nil {
-		return err
-	}
-
-	// update auth http url
-	if *serverConfig.Auth.HTTP.URL != authHttpUrl {
-		serverConfig.Auth.HTTP.URL = &authHttpUrl
-		if err := UpdateHysteria2Config(serverConfig); err != nil {
-			return err
-		}
-	}
-
-	hysteria2Config, err := yaml.Marshal(&serverConfig)
-	if err != nil {
-		logrus.Errorf("marshal hysteria2 config err: %v", err)
-		return errors.New("marshal hysteria2 config err")
-	}
-	if err := atomicWriteFile(constant.Hysteria2ConfigPath, hysteria2Config, 0644); err != nil {
+	if err := atomicWriteFile(constant.Hysteria2ConfigPath, hysteria2Config, constant.Hysteria2ConfigMode); err != nil {
 		logrus.Errorf("write hysteria2 config file err: %v", err)
 		return errors.New("hysteria2 config file write err")
 	}
@@ -180,7 +160,7 @@ func startHysteria2Runtime() error {
 		_ = instance.StopHysteria2()
 		return err
 	}
-	secret, err := dao.GetConfig("key = ?", constant.JwtSecret)
+	secret, err := trafficStatsSecret()
 	if err != nil {
 		_ = instance.StopHysteria2()
 		return err
@@ -188,7 +168,7 @@ func startHysteria2Runtime() error {
 	ops := hysteria2ReadinessOps{
 		processRunning: instance.IsRunning,
 		mainReady:      instance.MainServerReady,
-		apiReady:       func() error { return proxy.NewHysteria2Api(apiPort).Ready(*secret.Value) },
+		apiReady:       func() error { return proxy.NewHysteria2Api(apiPort).Ready(secret) },
 		startupOutput:  instance.LastStartupOutput,
 		sleep:          time.Sleep,
 	}

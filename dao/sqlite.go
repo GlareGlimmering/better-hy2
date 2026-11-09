@@ -27,6 +27,9 @@ func InitSqliteDB() error {
 		logrus.Errorf("sqlite directory create err: %v", err)
 		return errors.New("sqlite directory create err")
 	}
+	if err = protectSQLiteFiles(databasePath); err != nil {
+		return err
+	}
 	sqliteDB, err = gorm.Open(sqlite.Open(databasePath), &gorm.Config{
 		TranslateError: true,
 		Logger: logger.New(
@@ -92,6 +95,10 @@ func InitSqliteSchema() error {
 		return err
 	}
 	if err := initXrayConfig(); err != nil {
+		_ = CloseSqliteDB()
+		return err
+	}
+	if err := initIndependentTrafficSecret(); err != nil {
 		_ = CloseSqliteDB()
 		return err
 	}

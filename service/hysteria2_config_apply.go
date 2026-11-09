@@ -85,7 +85,7 @@ func applyHysteria2Config(config bo.Hysteria2ServerConfig, ops hysteria2ConfigAp
 	}
 
 	candidate := ops.path + ".candidate"
-	if err := ops.writeFile(candidate, newYAML, 0644); err != nil {
+	if err := ops.writeFile(candidate, newYAML, constant.Hysteria2ConfigMode); err != nil {
 		return fmt.Errorf("write Hysteria2 candidate config: %w", err)
 	}
 	defer ops.remove(candidate)
@@ -102,7 +102,7 @@ func applyHysteria2Config(config bo.Hysteria2ServerConfig, ops hysteria2ConfigAp
 			return applyFailureWithRollback("stop old Hysteria2 process", err, oldDB, oldYAML, oldYAMLExists, wasRunning, ops)
 		}
 	}
-	if err := ops.writeFile(ops.path, newYAML, 0644); err != nil {
+	if err := ops.writeFile(ops.path, newYAML, constant.Hysteria2ConfigMode); err != nil {
 		return applyFailureWithRollback("replace Hysteria2 YAML", err, oldDB, oldYAML, oldYAMLExists, wasRunning, ops)
 	}
 	if wasRunning {
@@ -127,7 +127,7 @@ func rollbackHysteria2Config(oldDB, oldYAML []byte, oldYAMLExists, wasRunning bo
 		failures = append(failures, "database: "+err.Error())
 	}
 	if oldYAMLExists {
-		if err := ops.writeFile(ops.path, oldYAML, 0644); err != nil {
+		if err := ops.writeFile(ops.path, oldYAML, constant.Hysteria2ConfigMode); err != nil {
 			failures = append(failures, "YAML: "+err.Error())
 		}
 	} else if err := ops.remove(ops.path); err != nil {
@@ -153,7 +153,7 @@ func validateHysteria2Candidate(path string) error {
 	}
 	var config bo.Hysteria2ServerConfig
 	if err := yaml.Unmarshal(content, &config); err != nil {
-		return err
+		return errors.New("invalid Hysteria2 candidate YAML")
 	}
 	if config.Listen == nil || strings.TrimSpace(*config.Listen) == "" {
 		return errors.New("listen is required")

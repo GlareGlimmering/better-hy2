@@ -15,7 +15,7 @@ func Router(router *gin.Engine, huiWebContext *string) {
 	}
 	globalGroup := router.Group(relativePath)
 	{
-		globalGroup.Use(middleware.FilterHandler(), middleware.LogHandler(), middleware.RateLimiterHandler())
+		globalGroup.Use(middleware.FilterHandler(), middleware.RateLimiterHandler())
 
 		frontend.InitFrontend(router, relativePath)
 

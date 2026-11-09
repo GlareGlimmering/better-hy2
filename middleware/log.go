@@ -1,11 +1,13 @@
 package middleware
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/natefinch/lumberjack.v2"
 	"h-ui/model/constant"
 	"h-ui/util"
+	"net/http"
 	"time"
 )
 
@@ -24,21 +26,20 @@ func InitLog() {
 
 func LogHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		startTime := time.Now()
-		endTime := time.Now()
-		statusCode := c.Writer.Status()
-		latencyTime := endTime.Sub(startTime)
-		clientIP := c.ClientIP()
-		reqMethod := c.Request.Method
-		reqUri := c.Request.RequestURI
-
-		logrus.WithFields(logrus.Fields{
-			"statusCode":  statusCode,
-			"latencyTime": latencyTime,
-			"clientIP":    clientIP,
-			"reqMethod":   reqMethod,
-			"reqUri":      reqUri,
-		}).Info()
+		start := time.Now()
 		c.Next()
+		method := "OTHER"
+		switch c.Request.Method {
+		case http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodPatch,
+			http.MethodDelete, http.MethodConnect, http.MethodOptions, http.MethodTrace:
+			method = c.Request.Method
+		}
+		route := c.FullPath()
+		if route == "" {
+			route = "unmatched"
+		}
+		// FullPath is the registered route template, never the requested URL.
+		fmt.Fprintf(gin.DefaultWriter, "http method=%s route=%q status=%d duration=%s\n",
+			method, route, c.Writer.Status(), time.Since(start))
 	}
 }

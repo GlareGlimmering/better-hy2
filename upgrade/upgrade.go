@@ -24,6 +24,7 @@ import (
 
 	_ "github.com/glebarez/go-sqlite"
 	"h-ui/model/constant"
+	"h-ui/util"
 )
 
 const (
@@ -504,11 +505,17 @@ func createSnapshot(opts Options, target string, deps Dependencies) (snapshot, e
 	paths := []string{
 		filepath.Join(opts.InstallDir, "h-ui"),
 		opts.SystemdUnitPath,
-		filepath.Join(opts.DataDir, "bin", "hysteria2.yaml"),
+		filepath.Join(opts.DataDir, constant.Hysteria2ConfigPath),
 		filepath.Join(opts.StateDir, "xray", "config.json"),
 		filepath.Join(opts.StateDir, "xray", "config.previous.json"),
 		filepath.Join(opts.StateDir, "xray", "candidate.json"),
 		filepath.Join(opts.StateDir, "xray", "certs", "ca.crt"),
+	}
+	hy2Config := filepath.Join(opts.DataDir, constant.Hysteria2ConfigPath)
+	for _, file := range []string{hy2Config, hy2Config + ".candidate"} {
+		if err := util.ProtectPrivateFile(file); err != nil {
+			return snapshot{}, fmt.Errorf("protect legacy HY2 configuration: %w", err)
+		}
 	}
 	for index, source := range paths {
 		info, err := os.Stat(source)
@@ -532,10 +539,13 @@ func createSnapshot(opts Options, target string, deps Dependencies) (snapshot, e
 		if err := deps.BackupDatabase(database, destination); err != nil {
 			return snapshot{}, fmt.Errorf("backup SQLite database: %w", err)
 		}
+		if err := util.ProtectPrivateFile(destination); err != nil {
+			return snapshot{}, fmt.Errorf("protect SQLite backup: %w", err)
+		}
 		snap.Files[database] = destination
 		if info, infoErr := os.Stat(database); infoErr == nil {
 			uid, gid := fileOwnership(info)
-			snap.Metadata[database] = fileMetadata{Mode: uint32(info.Mode().Perm()), UID: uid, GID: gid}
+			snap.Metadata[database] = fileMetadata{Mode: 0600, UID: uid, GID: gid}
 		}
 	} else if os.IsNotExist(err) {
 		snap.Absent = append(snap.Absent, database)
@@ -655,10 +665,19 @@ func rollback(previous, binary string, wasActive bool, snap snapshot, opts Optio
 		if err != nil {
 			return fmt.Errorf("read snapshot %s: %w", source, err)
 		}
-		if err := copyFile(source, destination, info.Mode().Perm()); err != nil {
+		mode := info.Mode().Perm()
+		private := destination == filepath.Join(opts.DataDir, constant.Hysteria2ConfigPath) ||
+			destination == filepath.Join(opts.DataDir, filepath.FromSlash(constant.SqliteDBPath))
+		if private {
+			mode = 0600
+		}
+		if err := copyFile(source, destination, mode); err != nil {
 			return fmt.Errorf("restore %s: %w", destination, err)
 		}
 		if metadata, ok := snap.Metadata[destination]; ok {
+			if private {
+				metadata.Mode = uint32(mode)
+			}
 			if err := restoreFileMetadata(destination, metadata); err != nil {
 				return fmt.Errorf("restore metadata for %s: %w", destination, err)
 			}
@@ -855,7 +874,15 @@ func checkPanelHealth(endpoint string) error {
 }
 
 func backupSQLiteDatabase(source, destination string) error {
-	_ = os.Remove(destination)
+	// VACUUM INTO accepts an empty destination. Reserve it privately before
+	// SQLite writes any credentials to it.
+	file, err := os.OpenFile(destination, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	if err != nil {
+		return err
+	}
+	if err := file.Close(); err != nil {
+		return err
+	}
 	db, err := sql.Open("sqlite", source)
 	if err != nil {
 		return err

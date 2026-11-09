@@ -12,6 +12,7 @@ const (
 	SqliteDBPath = "data/h_ui.db"
 
 	Hysteria2ConfigPath    = "bin/hysteria2.yaml"
+	Hysteria2ConfigMode    = 0600
 	Hysteria2CustomVersion = "v2.13.0-hui.4"
 	Hysteria2CustomOwner   = "GlareGlimmering"
 	Hysteria2CustomRepo    = "hysteria"

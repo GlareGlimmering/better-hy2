@@ -69,11 +69,11 @@ func Hysteria2Online() (map[string]int64, error) {
 	if err != nil {
 		return nil, errors.New("get hysteria2 apiPort err")
 	}
-	jwtSecretConfig, err := dao.GetConfig("key = ?", constant.JwtSecret)
+	secret, err := trafficStatsSecret()
 	if err != nil {
 		return nil, err
 	}
-	onlineUsers, err := proxy.NewHysteria2Api(apiPort).OnlineUsers(*jwtSecretConfig.Value)
+	onlineUsers, err := proxy.NewHysteria2Api(apiPort).OnlineUsers(secret)
 	if err != nil {
 		return nil, err
 	}
@@ -100,11 +100,11 @@ func Hysteria2Kick(ids []int64, kickUtilTime int64) error {
 	if err != nil {
 		return errors.New("get hysteria2 apiPort err")
 	}
-	jwtSecretConfig, err := dao.GetConfig("key = ?", constant.JwtSecret)
+	secret, err := trafficStatsSecret()
 	if err != nil {
 		return err
 	}
-	if err = proxy.NewHysteria2Api(apiPort).KickUsers(keys, *jwtSecretConfig.Value); err != nil {
+	if err = proxy.NewHysteria2Api(apiPort).KickUsers(keys, secret); err != nil {
 		return err
 	}
 	return nil
