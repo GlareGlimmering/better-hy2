@@ -27,16 +27,16 @@ func CronHandleAccount() {
 				return
 			}
 
-			jwtSecretConfig, err := dao.GetConfig("key = ?", constant.JwtSecret)
+			secret, err := trafficStatsSecret()
 			if err != nil {
 				return
 			}
 
 			// 保存流量数据
-			go saveAccountTraffic(apiPort, *jwtSecretConfig.Value)
+			go saveAccountTraffic(apiPort, secret)
 
 			// 踢下线
-			go kickAccount(apiPort, *jwtSecretConfig.Value)
+			go kickAccount(apiPort, secret)
 		}
 	}()
 }

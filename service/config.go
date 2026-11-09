@@ -14,6 +14,9 @@ import (
 )
 
 func UpdateConfig(key string, value string) error {
+	if IsSensitiveConfigKey(key) {
+		return errors.New(constant.ForbiddenError)
+	}
 	if key == constant.Hysteria2Enable {
 		if value == "1" {
 			hysteria2Config, err := GetHysteria2Config()
@@ -54,7 +57,8 @@ func ListConfig(keys []string) ([]entity.Config, error) {
 }
 
 func IsSensitiveConfigKey(key string) bool {
-	return key == constant.XrayDraftConfig || key == constant.XrayActiveConfig
+	return key == constant.XrayDraftConfig || key == constant.XrayActiveConfig ||
+		key == constant.JwtSecret || key == constant.Hysteria2TrafficStatsSecret || key == constant.Hysteria2Config
 }
 
 func ListConfigNotIn(keys []string) ([]entity.Config, error) {
@@ -68,7 +72,7 @@ func GetHysteria2Config() (bo.Hysteria2ServerConfig, error) {
 		return serverConfig, err
 	}
 	if err = yaml.Unmarshal([]byte(*config.Value), &serverConfig); err != nil {
-		return serverConfig, err
+		return serverConfig, errors.New("invalid stored Hysteria2 configuration")
 	}
 	return serverConfig, nil
 }
@@ -93,25 +97,9 @@ func prepareHysteria2ConfigYAML(hysteria2ServerConfig bo.Hysteria2ServerConfig) 
 	if err := EnsureHysteria2UserRoutingCompatible(hysteria2ServerConfig); err != nil {
 		return nil, err
 	}
-	// 默认值
-	config, err := dao.ListConfig("key in ?", []string{constant.HUIWebPort, constant.JwtSecret})
+	secret, err := trafficStatsSecret()
 	if err != nil {
 		return nil, err
-	}
-
-	var hUIWebPort string
-	var jwtSecret string
-	for _, item := range config {
-		if *item.Key == constant.HUIWebPort {
-			hUIWebPort = *item.Value
-		} else if *item.Key == constant.JwtSecret {
-			jwtSecret = *item.Value
-		}
-	}
-
-	if hUIWebPort == "" || jwtSecret == "" {
-		logrus.Errorf("hUIWebPort or jwtSecret is nil")
-		return nil, errors.New(constant.SysError)
 	}
 
 	authHttpUrl, err := GetAuthHttpUrl()
@@ -128,13 +116,21 @@ func prepareHysteria2ConfigYAML(hysteria2ServerConfig bo.Hysteria2ServerConfig) 
 	http.Insecure = &authHttpInsecure
 	auth.HTTP = &http
 	hysteria2ServerConfig.Auth = &auth
-	hysteria2ServerConfig.TrafficStats.Secret = &jwtSecret
+	hysteria2ServerConfig.TrafficStats.Secret = &secret
 
 	yamlConfig, err := yaml.Marshal(&hysteria2ServerConfig)
 	if err != nil {
 		return nil, err
 	}
 	return yamlConfig, nil
+}
+
+func trafficStatsSecret() (string, error) {
+	config, err := dao.GetConfig("key = ?", constant.Hysteria2TrafficStatsSecret)
+	if err != nil || config.Value == nil || *config.Value == "" {
+		return "", errors.New("Traffic Stats credential unavailable")
+	}
+	return *config.Value, nil
 }
 
 func persistHysteria2ConfigYAML(yamlConfig []byte) error {
@@ -155,7 +151,17 @@ func SetHysteria2Config(hysteria2ServerConfig bo.Hysteria2ServerConfig) error {
 }
 
 func UpsertConfig(configs []entity.Config) error {
-	return dao.UpsertConfig(configs)
+	filtered := make([]entity.Config, 0, len(configs))
+	for _, config := range configs {
+		if config.Key != nil && (*config.Key == constant.JwtSecret || *config.Key == constant.Hysteria2TrafficStatsSecret) {
+			continue // Legacy exports can contain the old shared key.
+		}
+		filtered = append(filtered, config)
+	}
+	if len(filtered) == 0 {
+		return nil
+	}
+	return dao.UpsertConfig(filtered)
 }
 
 func GetHysteria2ApiPort() (int64, error) {

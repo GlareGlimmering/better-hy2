@@ -392,6 +392,26 @@ func TestStartFailureRollsBackOldBinaryAndService(t *testing.T) {
 	if configErr != nil || string(configContent) != "old-config" {
 		t.Fatalf("old config was not restored: %q, %v", configContent, configErr)
 	}
+	if os.PathSeparator != '\\' {
+		info, err := os.Stat(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm() != 0600 {
+			t.Errorf("upgrade rollback restored non-private mode %o", info.Mode().Perm())
+		}
+		snapshots, err := filepath.Glob(filepath.Join(fixture.opts.StateDir, "backups", "upgrade-*", "*hysteria2.yaml"))
+		if err != nil || len(snapshots) != 1 {
+			t.Fatalf("expected one HY2 configuration snapshot: %v", err)
+		}
+		info, err = os.Stat(snapshots[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm() != 0600 {
+			t.Errorf("upgrade snapshot has non-private mode %o", info.Mode().Perm())
+		}
+	}
 }
 
 func TestHTTPHealthFailureRollsBackAfterCheckingFrontendAsset(t *testing.T) {

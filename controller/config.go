@@ -6,7 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
-	"h-ui/dao"
 	"h-ui/model/bo"
 	"h-ui/model/constant"
 	"h-ui/model/dto"
@@ -217,6 +216,9 @@ func GetHysteria2Config(c *gin.Context) {
 		vo.Fail(err.Error(), c)
 		return
 	}
+	if config.TrafficStats != nil {
+		config.TrafficStats.Secret = nil
+	}
 	vo.Success(config, c)
 }
 
@@ -263,29 +265,6 @@ func ExportHysteria2Config(c *gin.Context) {
 		return
 	}
 
-	// 默认值
-	config, err := dao.ListConfig("key in ?", []string{constant.HUIWebPort, constant.JwtSecret})
-	if err != nil {
-		vo.Fail(err.Error(), c)
-		return
-	}
-
-	var hUIWebPort string
-	var jwtSecret string
-	for _, item := range config {
-		if *item.Key == constant.HUIWebPort {
-			hUIWebPort = *item.Value
-		} else if *item.Key == constant.JwtSecret {
-			jwtSecret = *item.Value
-		}
-	}
-
-	if hUIWebPort == "" || jwtSecret == "" {
-		logrus.Errorf("hUIWebPort or jwtSecret is nil")
-		vo.Fail(constant.SysError, c)
-		return
-	}
-
 	authHttpUrl, err := service.GetAuthHttpUrl()
 	if err != nil {
 		vo.Fail(err.Error(), c)
@@ -301,24 +280,19 @@ func ExportHysteria2Config(c *gin.Context) {
 	http.Insecure = &authHttpInsecure
 	auth.HTTP = &http
 	hysteria2ServerConfig.Auth = &auth
-	hysteria2ServerConfig.TrafficStats.Secret = &jwtSecret
+	if hysteria2ServerConfig.TrafficStats != nil {
+		hysteria2ServerConfig.TrafficStats.Secret = nil
+	}
 
 	fileName := fmt.Sprintf("Hysteria2Config-%s.yaml", time.Now().Format("20060102150405"))
-	filePath := constant.ExportPathDir + fileName
-
-	if err = util.ExportFile(filePath, hysteria2ServerConfig, 1); err != nil {
-		vo.Fail(err.Error(), c)
+	data, err := yaml.Marshal(hysteria2ServerConfig)
+	if err != nil {
+		vo.Fail(constant.SysError, c)
 		return
 	}
-
-	if !util.Exists(filePath) {
-		vo.Fail("file not exist", c)
-		return
-	}
-	c.Header("Content-Type", "application/octet-stream")
 	c.Header("Content-Transfer-Encoding", "binary")
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", fileName))
-	c.File(filePath)
+	c.Data(200, "application/octet-stream", data)
 }
 
 func ImportHysteria2Config(c *gin.Context) {
@@ -359,6 +333,8 @@ func ExportConfig(c *gin.Context) {
 		constant.Hysteria2Config,
 		constant.XrayDraftConfig,
 		constant.XrayActiveConfig,
+		constant.JwtSecret,
+		constant.Hysteria2TrafficStatsSecret,
 	})
 	if err != nil {
 		vo.Fail(err.Error(), c)

@@ -57,6 +57,9 @@ func runServer(port, bindAddress string) error {
 	if err := initFile(); err != nil {
 		return err
 	}
+	if err := protectHY2Configuration(constant.Hysteria2ConfigPath); err != nil {
+		return err
+	}
 	if err := dao.InitSql(port); err != nil {
 		return err
 	}
@@ -81,8 +84,7 @@ func runServer(port, bindAddress string) error {
 		return err
 	}
 
-	r := gin.Default()
-	router.Router(r, config.Value)
+	r := newPanelRouter(config.Value)
 
 	serverPort, crtPath, keyPath, err := service.GetServerPortAndCert()
 	if err != nil {
@@ -98,6 +100,28 @@ func runServer(port, bindAddress string) error {
 	if err := service.StartServer(crtPath, keyPath); err != nil && err != http.ErrServerClosed {
 		logrus.Errorf("start server err: %v", err)
 		return errors.New("start server err")
+	}
+	return nil
+}
+
+func newPanelRouter(contextPath *string) *gin.Engine {
+	// Gin's debug redirect diagnostics include the raw URL.
+	if gin.Mode() == gin.DebugMode {
+		gin.SetMode(gin.ReleaseMode)
+	}
+	r := gin.New()
+	r.Use(middleware.LogHandler(), gin.CustomRecoveryWithWriter(nil, func(c *gin.Context, _ interface{}) {
+		c.AbortWithStatus(http.StatusInternalServerError)
+	}))
+	router.Router(r, contextPath)
+	return r
+}
+
+func protectHY2Configuration(path string) error {
+	for _, file := range []string{path, path + ".candidate"} {
+		if err := util.ProtectPrivateFile(file); err != nil {
+			return fmt.Errorf("protect HY2 configuration: %w", err)
+		}
 	}
 	return nil
 }
