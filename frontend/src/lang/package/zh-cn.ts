@@ -256,6 +256,9 @@ export default {
     },
   },
   hysteria: {
+    tlsFilesMissing: "请同时配置 TLS 证书和私钥。",
+    acmeDomainsMissing: "请填写 ACME 证书域名。",
+    acmeDNSMissing: "请选择 DNS 服务商并配置所需凭据。",
     enable: "开启",
     disable: "关闭",
     addConfigItem: "添加配置项",

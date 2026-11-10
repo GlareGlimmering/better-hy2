@@ -258,6 +258,9 @@ export default {
     },
   },
   hysteria: {
+    tlsFilesMissing: "Select both a TLS certificate and its private key.",
+    acmeDomainsMissing: "Enter an ACME domain.",
+    acmeDNSMissing: "Select a DNS provider and enter its credentials.",
     enable: "Enable",
     disable: "Disable",
     addConfigItem: "Add Config Item",
