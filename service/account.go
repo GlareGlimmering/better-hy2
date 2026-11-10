@@ -35,7 +35,7 @@ func Login(username string, pass string) (string, error) {
 		Roles:    []string{*account.Role},
 		Deleted:  *account.Deleted,
 	}
-	return genToken(accountBo, *account.Pass)
+	return genToken(accountBo, *account.Pass, account.AuthGeneration)
 }
 
 func PageAccount(accountPageDto dto.AccountPageDto) ([]entity.Account, int64, error) {

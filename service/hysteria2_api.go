@@ -15,8 +15,8 @@ import (
 	"time"
 )
 
-func Hysteria2Auth(conPass string) (int64, string, error) {
-	return authenticateHysteria2(conPass, Hysteria2IsRunning, dao.FindHysteria2AuthAccount, Hysteria2Online, time.Now().UnixMilli())
+func Hysteria2Auth(conPass string) (int64, string, int64, error) {
+	return authenticateHysteria2(conPass, Hysteria2IsRunning, dao.FindHysteria2AuthAccount, time.Now().UnixMilli())
 }
 
 // Hysteria2AuthError deliberately contains only a fixed classification, never
@@ -26,9 +26,11 @@ type Hysteria2AuthError struct{ Reason string }
 func (e *Hysteria2AuthError) Error() string { return e.Reason }
 
 func authenticateHysteria2(password string, running func() bool,
-	find func(string) (entity.Account, bool, error), online func() (map[string]int64, error), now int64,
-) (int64, string, error) {
-	reject := func(reason string) (int64, string, error) { return 0, "", &Hysteria2AuthError{Reason: reason} }
+	find func(string) (entity.Account, bool, error), now int64,
+) (int64, string, int64, error) {
+	reject := func(reason string) (int64, string, int64, error) {
+		return 0, "", 0, &Hysteria2AuthError{Reason: reason}
+	}
 	if !running() {
 		return reject("runtime_unavailable")
 	}
@@ -39,36 +41,35 @@ func authenticateHysteria2(password string, running func() bool,
 	if !found {
 		return reject("connection_password_mismatch")
 	}
-	if *account.Deleted != 0 {
-		return reject("account_disabled")
+	if reason := accountTrafficPolicy(account, now); reason != "" {
+		return reject(reason)
 	}
-	if *account.Quota >= 0 && *account.Quota <= *account.Download+*account.Upload {
-		return reject("quota_exhausted")
+	if *account.DeviceNo < 1 {
+		return reject("device_limit_invalid")
 	}
-	if now >= *account.ExpireTime {
-		return reject("account_expired")
+	return *account.Id, *account.Username, *account.DeviceNo, nil
+}
+
+func accountTrafficPolicy(account entity.Account, now int64) string {
+	switch {
+	case *account.Deleted != 0:
+		return "account_disabled"
+	case *account.Quota >= 0 && (*account.Upload >= *account.Quota || *account.Download >= *account.Quota-*account.Upload):
+		return "quota_exhausted"
+	case now >= *account.ExpireTime:
+		return "account_expired"
+	case now <= *account.KickUtilTime:
+		return "kick_restricted"
+	default:
+		return ""
 	}
-	if now <= *account.KickUtilTime {
-		return reject("kick_restricted")
-	}
-	onlineUsers, err := online()
-	if err != nil {
-		return reject("traffic_stats_unavailable")
-	}
-	if devices, exists := onlineUsers[*account.Username]; exists && *account.DeviceNo <= devices {
-		return reject("device_limit_exceeded")
-	}
-	return *account.Id, *account.Username, nil
 }
 
 func Hysteria2Online() (map[string]int64, error) {
 	if !Hysteria2IsRunning() {
 		return map[string]int64{}, nil
 	}
-	apiPort, err := GetHysteria2ApiPort()
-	if err != nil {
-		return nil, errors.New("get hysteria2 apiPort err")
-	}
+	apiPort := hysteria2RuntimeStatsPort.Load()
 	secret, err := trafficStatsSecret()
 	if err != nil {
 		return nil, err
@@ -96,10 +97,7 @@ func Hysteria2Kick(ids []int64, kickUtilTime int64) error {
 	for _, item := range accounts {
 		keys = append(keys, *item.Username)
 	}
-	apiPort, err := GetHysteria2ApiPort()
-	if err != nil {
-		return errors.New("get hysteria2 apiPort err")
-	}
+	apiPort := hysteria2RuntimeStatsPort.Load()
 	secret, err := trafficStatsSecret()
 	if err != nil {
 		return err

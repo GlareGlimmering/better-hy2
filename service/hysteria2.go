@@ -18,6 +18,7 @@ import (
 
 var hysteria2LifecycleMutex sync.Mutex
 var hysteria2RuntimeReady atomic.Bool
+var hysteria2RuntimeStatsPort atomic.Int64
 
 const (
 	hysteria2StartupAttempts        = 120
@@ -145,8 +146,46 @@ func startHysteria2() error {
 }
 
 func stopHysteria2() error {
+	instance := proxy.NewHysteria2Instance()
+	if !Hysteria2IsRunning() {
+		hysteria2RuntimeReady.Store(false)
+		return instance.StopHysteria2()
+	}
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+	port := hysteria2RuntimeStatsPort.Load()
+	api := proxy.NewHysteria2Api(port)
+	secret, err := trafficStatsSecret()
+	if err != nil {
+		return err
+	}
+	// An ambiguous pause response can still mean the producer is paused.
+	// Attempt resume on any failure before returning to the running state.
+	stopped := false
+	defer func() {
+		if !stopped {
+			if err := api.ResumeTraffic(secret); err != nil {
+				logrus.Warnf("resume Hysteria2 after interrupted drain: %v", err)
+			}
+		}
+	}()
+	if err := api.PauseTraffic(secret); err != nil {
+		return fmt.Errorf("pause Hysteria2 for settlement: %w", err)
+	}
+	// With traffic paused there are at most two maps to settle: the existing
+	// outstanding batch and the counters recorded after it was produced.
+	for i := 0; i < 2; i++ {
+		if err := settleManagedTraffic(port, secret); err != nil {
+			return fmt.Errorf("drain Hysteria2 traffic before stop: %w", err)
+		}
+	}
 	hysteria2RuntimeReady.Store(false)
-	return proxy.NewHysteria2Instance().StopHysteria2()
+	if err := instance.StopHysteria2(); err != nil {
+		hysteria2RuntimeReady.Store(instance.IsRunning())
+		return err
+	}
+	stopped = true
+	return nil
 }
 
 func startHysteria2Runtime() error {
@@ -180,6 +219,18 @@ func startHysteria2Runtime() error {
 		_ = instance.StopHysteria2()
 		return err
 	}
+	if err := proxy.NewHysteria2Api(apiPort).AccountConsistencyReady(secret); err != nil {
+		_ = instance.StopHysteria2()
+		return fmt.Errorf("incompatible Hysteria2 kernel: account consistency protocol 2 required: %w", err)
+	}
+	trafficMutex.Lock()
+	settlementErr := settleManagedTraffic(apiPort, secret)
+	trafficMutex.Unlock()
+	if settlementErr != nil {
+		_ = instance.StopHysteria2()
+		return fmt.Errorf("initialize traffic settlement: %w", settlementErr)
+	}
+	hysteria2RuntimeStatsPort.Store(apiPort)
 	hysteria2RuntimeReady.Store(true)
 	return nil
 }

@@ -21,7 +21,7 @@ type MyClaims struct {
 	jwt.StandardClaims
 }
 
-func genToken(accountBo bo.AccountBo, passwordHash string) (string, error) {
+func genToken(accountBo bo.AccountBo, passwordHash, generation string) (string, error) {
 	c := MyClaims{
 		AccountBo: accountBo,
 		StandardClaims: jwt.StandardClaims{
@@ -37,13 +37,16 @@ func genToken(accountBo bo.AccountBo, passwordHash string) (string, error) {
 	if config.Value == nil || *config.Value == "" {
 		return "", errors.New(constant.SysError)
 	}
-	return token.SignedString(adminSigningKey(*config.Value, accountBo.Id, accountBo.Username, passwordHash))
+	return token.SignedString(adminSigningKey(*config.Value, accountBo.Id, accountBo.Username, passwordHash, generation))
 }
 
-func adminSigningKey(secret string, id int64, username, passwordHash string) []byte {
+func adminSigningKey(secret string, id int64, username, passwordHash, generation string) []byte {
 	mac := hmac.New(sha256.New, []byte(secret))
 	// Bind the session to the exact credential snapshot verified at login.
 	fmt.Fprintf(mac, "better-hy2/admin-session/v1\x00%d\x00%s\x00%s", id, username, passwordHash)
+	if generation != "" {
+		fmt.Fprintf(mac, "\x00%s", generation)
+	}
 	return mac.Sum(nil)
 }
 
@@ -61,7 +64,7 @@ func ParseToken(tokenString string) (*MyClaims, error) {
 		if err != nil || account.Username == nil || account.Pass == nil {
 			return nil, errors.New(constant.IllegalTokenError)
 		}
-		return adminSigningKey(*config.Value, claims.AccountBo.Id, *account.Username, *account.Pass), nil
+		return adminSigningKey(*config.Value, claims.AccountBo.Id, *account.Username, *account.Pass, account.AuthGeneration), nil
 	})
 	if err != nil {
 		return nil, errors.New(constant.IllegalTokenError)

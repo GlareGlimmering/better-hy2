@@ -11,12 +11,13 @@ const (
 
 	SqliteDBPath = "data/h_ui.db"
 
-	Hysteria2ConfigPath    = "bin/hysteria2.yaml"
-	Hysteria2ConfigMode    = 0600
-	Hysteria2CustomVersion = "v2.13.0-hui.4"
-	Hysteria2CustomOwner   = "GlareGlimmering"
-	Hysteria2CustomRepo    = "hysteria"
-	Hysteria2CustomSHA256  = "f1577bff290f5591a651b88596103045390581a6c0a6e999611cab8baa653d9e"
+	Hysteria2ConfigPath                = "bin/hysteria2.yaml"
+	Hysteria2ConfigMode                = 0600
+	Hysteria2CustomVersion             = "v2.13.0-hui.4"
+	Hysteria2AccountConsistencyVersion = "v2.13.0-hui.5-dev"
+	Hysteria2CustomOwner               = "GlareGlimmering"
+	Hysteria2CustomRepo                = "hysteria"
+	Hysteria2CustomSHA256              = "f1577bff290f5591a651b88596103045390581a6c0a6e999611cab8baa653d9e"
 
 	SystemLogPath          = "logs/h-ui.log"
 	Hysteria2LogPath       = "logs/hysteria2.log"

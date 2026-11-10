@@ -42,7 +42,7 @@ func Hysteria2Auth(c *gin.Context) {
 		vo.Hysteria2AuthFail("", c)
 		return
 	}
-	id, username, err := authenticateHysteria2(*hysteria2AuthDto.Auth)
+	id, username, limit, err := authenticateHysteria2(*hysteria2AuthDto.Auth)
 	if err != nil || username == "" {
 		reason := "authentication_failed"
 		if failure, ok := err.(*service.Hysteria2AuthError); ok {
@@ -66,7 +66,7 @@ func Hysteria2Auth(c *gin.Context) {
 	// The system logger defaults to Warn; keep successful diagnostic events
 	// visible as well, using only the internal account ID for correlation.
 	logrus.WithFields(logrus.Fields{"reason": "success", "account_id": id}).Warn("hysteria2_auth")
-	vo.Hysteria2AuthSuccess(username, c)
+	vo.Hysteria2AuthSuccess(username, limit, id, c)
 }
 
 func Hysteria2Kick(c *gin.Context) {

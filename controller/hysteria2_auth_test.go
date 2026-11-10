@@ -23,8 +23,8 @@ func TestHysteria2HTTPAuthProtocolAndSafeDiagnostics(t *testing.T) {
 	var logs bytes.Buffer
 	logrus.SetOutput(&logs)
 	for _, tc := range []struct{ name, body, want, reason string }{
-		{"numeric zero", `{"addr":"192.0.2.1:1234","auth":"private-test-secret","tx":0}`, `{"ok":true,"id":"TESTsss"}`, "success"},
-		{"numeric bandwidth", `{"addr":"192.0.2.1:1234","auth":"private-test-secret","tx":123456}`, `{"ok":true,"id":"TESTsss"}`, "success"},
+		{"numeric zero", `{"addr":"192.0.2.1:1234","auth":"private-test-secret","tx":0}`, `{"ok":true,"id":"TESTsss","deviceLimit":1,"accountId":3}`, "success"},
+		{"numeric bandwidth", `{"addr":"192.0.2.1:1234","auth":"private-test-secret","tx":123456}`, `{"ok":true,"id":"TESTsss","deviceLimit":1,"accountId":3}`, "success"},
 		{"wrong tx type", `{"addr":"a","auth":"private-test-secret","tx":"0"}`, `{"ok":false,"id":""}`, "request_invalid"},
 		{"missing tx", `{"addr":"a","auth":"private-test-secret"}`, `{"ok":false,"id":""}`, "request_invalid"},
 		{"bad password", `{"addr":"a","auth":"private-test-secret","tx":0}`, `{"ok":false,"id":""}`, "connection_password_mismatch"},
@@ -33,12 +33,12 @@ func TestHysteria2HTTPAuthProtocolAndSafeDiagnostics(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			logs.Reset()
 			called := false
-			authenticateHysteria2 = func(string) (int64, string, error) {
+			authenticateHysteria2 = func(string) (int64, string, int64, error) {
 				called = true
 				if tc.name == "bad password" {
-					return 0, "", &service.Hysteria2AuthError{Reason: tc.reason}
+					return 0, "", 0, &service.Hysteria2AuthError{Reason: tc.reason}
 				}
-				return 3, "TESTsss", nil
+				return 3, "TESTsss", 1, nil
 			}
 			updateHysteria2AuthAccount = func(entity.Account) error {
 				if tc.name == "update failed" {

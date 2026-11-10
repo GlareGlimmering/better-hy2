@@ -151,6 +151,7 @@ func DeleteAccount(c *gin.Context) {
 		vo.Fail(err.Error(), c)
 		return
 	}
+	service.ReconcileAccountConnections()
 	vo.Success(result, c)
 }
 
@@ -211,6 +212,7 @@ func UpdateAccount(c *gin.Context) {
 		vo.Fail(err.Error(), c)
 		return
 	}
+	service.ReconcileAccountConnections()
 	vo.Success(result, c)
 }
 
@@ -303,6 +305,7 @@ func ImportAccount(c *gin.Context) {
 		vo.Fail(err.Error(), c)
 		return
 	}
+	service.ReconcileAccountConnections()
 	vo.Success(nil, c)
 }
 
