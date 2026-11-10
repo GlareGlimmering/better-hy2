@@ -20,7 +20,7 @@ func TestStableVersionMigrationOrdering(t *testing.T) {
 			t.Fatalf("wrong order: %s >= %s", ordered[i-1], version)
 		}
 	}
-	for _, invalid := range []string{"v01.0.0", "v1.0.0-rc.1", "v2.13.0-hui.4", "latest", "v1.0.0/../../"} {
+	for _, invalid := range []string{"v01.0.0", "v1.0.0-rc.01", "v2.13.0-hui.4", "latest", "v1.0.0/../../"} {
 		if releaseTagPattern.MatchString(invalid) {
 			t.Fatalf("accepted unsupported version %s", invalid)
 		}

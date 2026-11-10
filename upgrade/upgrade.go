@@ -38,7 +38,7 @@ const (
 )
 
 // Stable SemVer and the legacy custom release line are both installable.
-var releaseTagPattern = regexp.MustCompile(`^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-custom\.(0|[1-9]\d*)(?:-rc\.(0|[1-9]\d*))?)?$`)
+var releaseTagPattern = regexp.MustCompile(`^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-custom\.(0|[1-9]\d*)(?:-rc\.(0|[1-9]\d*))?|-rc\.(0|[1-9]\d*))?$`)
 var scriptPattern = regexp.MustCompile(`<script[^>]+src=["']([^"']+)["']`)
 
 type Options struct {
@@ -147,6 +147,11 @@ func Run(ctx context.Context, opts Options, deps Dependencies) error {
 		if releaseTagPattern.MatchString(opts.CurrentVersion) && compareReleaseTags(release.TagName, opts.CurrentVersion) < 0 {
 			return fmt.Errorf("no upgrade available: current %s is newer than automatic channel target %s; refusing automatic downgrade", opts.CurrentVersion, release.TagName)
 		}
+	}
+	if opts.Version != "latest" && strings.Contains(opts.CurrentVersion, "-rc.") &&
+		releaseTagPattern.MatchString(opts.CurrentVersion) && !release.Prerelease &&
+		!strings.Contains(release.TagName, "-rc.") && compareReleaseTags(release.TagName, opts.CurrentVersion) < 0 {
+		return errors.New("refusing prerelease-to-stable downgrade; restore the matching pre-upgrade snapshot")
 	}
 	if opts.CurrentVersion == release.TagName {
 		fmt.Fprintf(opts.Output, "Better HY2 is already at %s\n", release.TagName)
@@ -366,6 +371,9 @@ func releaseTagParts(tag string) ([6]int, bool) {
 	if len(numeric) == 3 {
 		parts[3] = int(^uint(0) >> 1) // stable SemVer follows any custom prerelease of the same core
 		parts[4] = 1
+	} else if len(numeric) == 4 && strings.Contains(tag, "-rc.") {
+		parts[5] = parts[3]
+		parts[3] = int(^uint(0) >> 1) // Standard RCs precede the matching stable release.
 	} else if len(numeric) == 5 {
 		parts[4] = 0 // prerelease sorts before the matching stable release
 		parts[5], _ = strconv.Atoi(numeric[4])

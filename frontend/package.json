@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "vite serve --mode development",
     "build:prod": "vite build --mode production && vue-tsc --noEmit",
-    "test:unit": "node --experimental-strip-types --test tests/account-outbound-form.test.ts tests/account-ui.test.ts tests/dashboard.test.ts tests/final-integration.test.ts tests/hysteria-config-ui.test.ts tests/xray-management.test.ts tests/ui-polish.test.ts",
+    "test:unit": "node --experimental-strip-types --test tests/account-quota.test.ts tests/account-outbound-form.test.ts tests/account-ui.test.ts tests/dashboard.test.ts tests/final-integration.test.ts tests/hysteria-config-ui.test.ts tests/xray-management.test.ts tests/ui-polish.test.ts",
     "lint:eslint": "eslint  --fix --ext .ts,.js,.vue ./src ",
     "lint:prettier": "prettier --write \"**/*.{js,cjs,ts,json,tsx,css,less,scss,vue,html,md}\"",
     "lint:stylelint": "stylelint  \"**/*.{css,scss,vue}\" --fix"

@@ -8,7 +8,7 @@ export interface AccountUpdateDto extends IdDto {
   username: string;
   pass?: string;
   conPass: string;
-  quota: number;
+  quota?: number;
   expireTime: number;
   deviceNo: number;
   deleted: number;
