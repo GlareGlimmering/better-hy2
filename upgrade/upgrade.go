@@ -652,7 +652,18 @@ func activateCandidate(candidate, target string, wasActive bool, snap snapshot, 
 }
 
 func rollback(previous, binary string, wasActive bool, snap snapshot, opts Options, deps Dependencies) error {
-	_, _ = deps.Command("systemctl", "stop", opts.ServiceName)
+	if output, err := deps.Command("systemctl", "stop", opts.ServiceName); err != nil {
+		return fmt.Errorf("stop service before restoring files: %w: %s", err, strings.TrimSpace(string(output)))
+	}
+	// SQLite snapshots contain the database state without its sidecars. Remove
+	// the candidate's journals while the service is stopped, before restoring
+	// the previous database, so SQLite cannot replay candidate writes into it.
+	database := filepath.Join(opts.DataDir, filepath.FromSlash(constant.SqliteDBPath))
+	for _, suffix := range []string{"-wal", "-shm", "-journal"} {
+		if err := os.Remove(database + suffix); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("remove candidate SQLite sidecar %s: %w", suffix, err)
+		}
+	}
 	failed := binary + ".failed"
 	_ = os.Remove(failed)
 	if err := os.Rename(binary, failed); err != nil && !os.IsNotExist(err) {
