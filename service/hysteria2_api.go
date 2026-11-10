@@ -15,8 +15,8 @@ import (
 	"time"
 )
 
-func Hysteria2Auth(conPass string) (int64, string, int64, error) {
-	return authenticateHysteria2(conPass, Hysteria2IsRunning, dao.FindHysteria2AuthAccount, time.Now().UnixMilli())
+func Hysteria2Auth(conPass string, bandwidth *bo.AccountBandwidth) (int64, string, int64, error) {
+	return authenticateHysteria2(conPass, Hysteria2IsRunning, dao.FindHysteria2AuthAccount, time.Now().UnixMilli(), bandwidth)
 }
 
 // Hysteria2AuthError deliberately contains only a fixed classification, never
@@ -26,7 +26,7 @@ type Hysteria2AuthError struct{ Reason string }
 func (e *Hysteria2AuthError) Error() string { return e.Reason }
 
 func authenticateHysteria2(password string, running func() bool,
-	find func(string) (entity.Account, bool, error), now int64,
+	find func(string) (entity.Account, bool, error), now int64, bandwidth ...*bo.AccountBandwidth,
 ) (int64, string, int64, error) {
 	reject := func(reason string) (int64, string, int64, error) {
 		return 0, "", 0, &Hysteria2AuthError{Reason: reason}
@@ -46,6 +46,9 @@ func authenticateHysteria2(password string, running func() bool,
 	}
 	if *account.DeviceNo < 1 {
 		return reject("device_limit_invalid")
+	}
+	if len(bandwidth) != 0 && bandwidth[0] != nil {
+		*bandwidth[0] = accountBandwidth(account)
 	}
 	return *account.Id, *account.Username, *account.DeviceNo, nil
 }

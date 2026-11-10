@@ -15,6 +15,8 @@ type AccountOutboundOptions struct {
 type AccountVo struct {
 	BaseVo
 	Username     string `json:"username"`
+	UploadMbps   int64  `json:"uploadMbps"`
+	DownloadMbps int64  `json:"downloadMbps"`
 	Quota        int64  `json:"quota"`
 	Download     int64  `json:"download"`
 	Upload       int64  `json:"upload"`

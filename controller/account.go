@@ -70,6 +70,8 @@ func PageAccount(c *gin.Context) {
 		accountVo := vo.AccountVo{
 			Username:     *item.Username,
 			Quota:        *item.Quota,
+			UploadMbps:   *item.UploadMbps,
+			DownloadMbps: *item.DownloadMbps,
 			Download:     *item.Download,
 			Upload:       *item.Upload,
 			ExpireTime:   *item.ExpireTime,
@@ -101,8 +103,9 @@ func PageAccount(c *gin.Context) {
 }
 
 func SaveAccount(c *gin.Context) {
-	accountSaveDto, err := validateField(c, dto.AccountSaveDto{})
-	if err != nil {
+	var accountSaveDto dto.AccountSaveDto
+	if c.ShouldBindJSON(&accountSaveDto) != nil || validate.Struct(&accountSaveDto) != nil {
+		vo.Fail(constant.InvalidError, c)
 		return
 	}
 
@@ -114,15 +117,17 @@ func SaveAccount(c *gin.Context) {
 	conPass := fmt.Sprintf("%s.%s", *accountSaveDto.Username, *accountSaveDto.ConPass)
 	emptyLoginPassword := ""
 	account := entity.Account{
-		Username:   accountSaveDto.Username,
-		Pass:       &emptyLoginPassword,
-		ConPass:    &conPass,
-		Quota:      accountSaveDto.Quota,
-		ExpireTime: accountSaveDto.ExpireTime,
-		DeviceNo:   accountSaveDto.DeviceNo,
-		Deleted:    accountSaveDto.Deleted,
-		Remark:     accountSaveDto.Remark,
-		Outbound:   accountSaveDto.Outbound,
+		Username:     accountSaveDto.Username,
+		Pass:         &emptyLoginPassword,
+		ConPass:      &conPass,
+		Quota:        accountSaveDto.Quota,
+		UploadMbps:   accountSaveDto.UploadMbps,
+		DownloadMbps: accountSaveDto.DownloadMbps,
+		ExpireTime:   accountSaveDto.ExpireTime,
+		DeviceNo:     accountSaveDto.DeviceNo,
+		Deleted:      accountSaveDto.Deleted,
+		Remark:       accountSaveDto.Remark,
+		Outbound:     accountSaveDto.Outbound,
 	}
 	result, err := service.SaveAccountWithResult(account)
 	if err != nil {
@@ -156,8 +161,9 @@ func DeleteAccount(c *gin.Context) {
 }
 
 func UpdateAccount(c *gin.Context) {
-	accountUpdateDto, err := validateField(c, dto.AccountUpdateDto{})
-	if err != nil {
+	var accountUpdateDto dto.AccountUpdateDto
+	if c.ShouldBindJSON(&accountUpdateDto) != nil || validate.Struct(&accountUpdateDto) != nil {
+		vo.Fail(constant.InvalidError, c)
 		return
 	}
 
@@ -194,15 +200,17 @@ func UpdateAccount(c *gin.Context) {
 	}
 
 	account := entity.Account{
-		Username:   accountUpdateDto.Username,
-		Pass:       passEncrypt,
-		ConPass:    accountUpdateDto.ConPass,
-		Quota:      accountUpdateDto.Quota,
-		ExpireTime: accountUpdateDto.ExpireTime,
-		DeviceNo:   accountUpdateDto.DeviceNo,
-		Deleted:    accountUpdateDto.Deleted,
-		Remark:     accountUpdateDto.Remark,
-		Outbound:   accountUpdateDto.Outbound,
+		Username:     accountUpdateDto.Username,
+		Pass:         passEncrypt,
+		ConPass:      accountUpdateDto.ConPass,
+		Quota:        accountUpdateDto.Quota,
+		UploadMbps:   accountUpdateDto.UploadMbps,
+		DownloadMbps: accountUpdateDto.DownloadMbps,
+		ExpireTime:   accountUpdateDto.ExpireTime,
+		DeviceNo:     accountUpdateDto.DeviceNo,
+		Deleted:      accountUpdateDto.Deleted,
+		Remark:       accountUpdateDto.Remark,
+		Outbound:     accountUpdateDto.Outbound,
 		BaseEntity: entity.BaseEntity{
 			Id: accountUpdateDto.Id,
 		},
@@ -261,16 +269,18 @@ func GetAccount(c *gin.Context) {
 			Id:         *account.Id,
 			CreateTime: *account.CreateTime,
 		},
-		Username:   *account.Username,
-		Quota:      *account.Quota,
-		Download:   *account.Download,
-		Upload:     *account.Upload,
-		ExpireTime: *account.ExpireTime,
-		DeviceNo:   *account.DeviceNo,
-		Role:       *account.Role,
-		Deleted:    *account.Deleted,
-		Remark:     *account.Remark,
-		Outbound:   service.AccountOutbound(account),
+		Username:     *account.Username,
+		Quota:        *account.Quota,
+		UploadMbps:   *account.UploadMbps,
+		DownloadMbps: *account.DownloadMbps,
+		Download:     *account.Download,
+		Upload:       *account.Upload,
+		ExpireTime:   *account.ExpireTime,
+		DeviceNo:     *account.DeviceNo,
+		Role:         *account.Role,
+		Deleted:      *account.Deleted,
+		Remark:       *account.Remark,
+		Outbound:     service.AccountOutbound(account),
 	}
 	vo.Success(accountVo, c)
 }

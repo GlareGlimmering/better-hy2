@@ -102,6 +102,10 @@ func InitSqliteSchema() error {
 		_ = CloseSqliteDB()
 		return err
 	}
+	if err := initBandwidthSchema(); err != nil {
+		_ = CloseSqliteDB()
+		return err
+	}
 	if err := initAccountConsistencySchema(); err != nil {
 		_ = CloseSqliteDB()
 		return err
