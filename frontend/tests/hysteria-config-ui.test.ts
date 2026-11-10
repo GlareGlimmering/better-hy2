@@ -116,3 +116,14 @@ test("HY2 page uses fixed groups and does not expose managed userOutbounds", () 
   assert.match(component, /catch \{[\s\S]*setConfig\(\);[\s\S]*setRoutingStatus\(\);/);
   assert.match(component, /type="password"[\s\S]*v-model="dataForm\.obfs\.salamander\.password"|v-model="dataForm\.obfs\.salamander\.password"[\s\S]*type="password"/);
 });
+
+test("ACME DNS copy requests a secret only after confirmation", async () => {
+  const { copyConfirmedDNSValue } = await import("../src/views/hysteria/list/dns-copy.ts");
+  const calls: string[] = [];
+  const read = async () => { calls.push("read"); return "fixture"; };
+  const copy = async (value: string) => { calls.push(value); };
+  assert.equal(await copyConfirmedDNSValue(async () => false, read, copy), false);
+  assert.deepEqual(calls, []);
+  assert.equal(await copyConfirmedDNSValue(async () => true, read, copy), true);
+  assert.deepEqual(calls, ["read", "fixture"]);
+});

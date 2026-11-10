@@ -12,6 +12,7 @@ func initConfigRouter(configApi *gin.RouterGroup) {
 		config.GET("/getConfig", controller.GetConfig)
 		config.POST("/listConfig", controller.ListConfig)
 		config.GET("/getHysteria2Config", controller.GetHysteria2Config)
+		config.POST("/readACMEDNSValue", controller.ReadACMEDNSValue)
 		config.POST("/updateHysteria2Config", controller.UpdateHysteria2Config)
 		config.POST("/exportHysteria2Config", controller.ExportHysteria2Config)
 		config.POST("/importHysteria2Config", controller.ImportHysteria2Config)

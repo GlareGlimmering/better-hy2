@@ -129,3 +129,7 @@ export function uploadCertFileApi(data: FormData): AxiosPromise<string> {
     headers: { "Content-Type": "multipart/form-data" },
   });
 }
+
+export function readACMEDNSValueApi(provider: string, key: string): AxiosPromise<string> {
+  return request({ url: "/config/readACMEDNSValue", method: "post", data: { provider, key } });
+}

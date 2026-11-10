@@ -219,6 +219,7 @@ func GetHysteria2Config(c *gin.Context) {
 	if config.TrafficStats != nil {
 		config.TrafficStats.Secret = nil
 	}
+	service.RedactACMEDNS(&config)
 	vo.Success(config, c)
 }
 
@@ -284,6 +285,8 @@ func ExportHysteria2Config(c *gin.Context) {
 		hysteria2ServerConfig.TrafficStats.Secret = nil
 	}
 
+	service.RedactACMEDNS(&hysteria2ServerConfig)
+	c.Header("Cache-Control", "no-store")
 	fileName := fmt.Sprintf("Hysteria2Config-%s.yaml", time.Now().Format("20060102150405"))
 	data, err := yaml.Marshal(hysteria2ServerConfig)
 	if err != nil {

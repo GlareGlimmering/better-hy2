@@ -256,6 +256,10 @@ export default {
     },
   },
   hysteria: {
+    copyDNSKey: "复制键",
+    copyDNSValue: "复制值",
+    copyDNSWarning: "此内容为 DNS 服务商 API 密钥，复制后将进入系统剪贴板。请确认当前环境安全。",
+    copyDNSFailed: "无法复制 DNS 凭据，请检查浏览器剪贴板权限。",
     tlsFilesMissing: "请同时配置 TLS 证书和私钥。",
     acmeDomainsMissing: "请填写 ACME 证书域名。",
     acmeDNSMissing: "请选择 DNS 服务商并配置所需凭据。",
