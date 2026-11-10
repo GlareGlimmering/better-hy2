@@ -143,15 +143,15 @@
       >
         <div class="config-workspace">
           <el-collapse v-model="expandedGroups" class="config-navigation">
-            <el-collapse-item :title="$t('hysteria.groups.basic')" name="basic">
-              <button type="button" :class="configNavClass('extension')" @click="activeName = 'extension'">{{ $t("hysteria.extension") }}</button>
-              <button type="button" :class="configNavClass('listen')" @click="activeName = 'listen'">{{ $t("hysteria.listen") }}</button>
-            </el-collapse-item>
             <el-collapse-item :title="$t('hysteria.groups.tls')" name="tls">
               <button type="button" :class="configNavClass('tls')" @click="activeName = 'tls'">{{ $t("hysteria.tls") }}</button>
               <button type="button" :class="configNavClass('ech')" @click="activeName = 'ech'">
                 <span>{{ $t("hysteria.ech") }}</span><el-switch v-model="ech" @click.stop @change="handleOptionalToggle('ech', $event)" />
               </button>
+            </el-collapse-item>
+            <el-collapse-item :title="$t('hysteria.groups.basic')" name="basic">
+              <button type="button" :class="configNavClass('extension')" @click="activeName = 'extension'">{{ $t("hysteria.extension") }}</button>
+              <button type="button" :class="configNavClass('listen')" @click="activeName = 'listen'">{{ $t("hysteria.listen") }}</button>
             </el-collapse-item>
             <el-collapse-item :title="$t('hysteria.groups.authTraffic')" name="authTraffic">
               <button type="button" :class="configNavClass('http')" @click="activeName = 'http'">{{ $t("hysteria.http") }}</button>
@@ -198,48 +198,8 @@
             </el-collapse-item>
           </el-collapse>
           <el-tabs v-model="activeName" class="tabs config-editor">
-          <el-tab-pane :label="$t('hysteria.extension')" name="extension">
-            <el-tooltip
-              :content="$t('hysteria.config.remark')"
-              placement="bottom"
-            >
-              <el-form-item label="remark" prop="remark">
-                <el-input v-model="configForm.remark" clearable />
-              </el-form-item>
-            </el-tooltip>
-            <el-tooltip
-              :content="$t('hysteria.config.portHopping')"
-              placement="bottom"
-            >
-              <el-form-item label="portHopping" prop="portHopping">
-                <el-input v-model="configForm.portHopping" clearable />
-              </el-form-item>
-            </el-tooltip>
-            <el-tooltip
-              :content="$t('hysteria.config.clashExtension')"
-              placement="bottom"
-            >
-              <el-form-item label="clashExtension" prop="clashExtension">
-                <el-input
-                  v-model="configForm.clashExtension"
-                  type="textarea"
-                  :autosize="{ minRows: 3 }"
-                  @keydown="(e:KeyboardEvent) => e.stopPropagation()"
-                />
-              </el-form-item>
-            </el-tooltip>
-          </el-tab-pane>
-          <el-tab-pane :label="$t('hysteria.listen')" name="listen">
-            <el-tooltip
-              :content="$t('hysteria.config.listen')"
-              placement="bottom"
-            >
-              <el-form-item label="listen" prop="listen">
-                <el-input v-model="dataForm.listen" clearable />
-              </el-form-item>
-            </el-tooltip>
-          </el-tab-pane>
           <el-tab-pane :label="$t('hysteria.tls')" name="tls">
+            <el-alert v-if="tlsMissing" :title="tlsMissing" type="warning" :closable="false" show-icon class="mb-3" />
             <el-tooltip
               :content="$t('hysteria.config.tlsType')"
               placement="bottom"
@@ -506,6 +466,47 @@
                   v-model.number="dataForm.acme.altTLSALPNPort"
                   clearable
                 />
+              </el-form-item>
+            </el-tooltip>
+          </el-tab-pane>
+          <el-tab-pane :label="$t('hysteria.extension')" name="extension">
+            <el-tooltip
+              :content="$t('hysteria.config.remark')"
+              placement="bottom"
+            >
+              <el-form-item label="remark" prop="remark">
+                <el-input v-model="configForm.remark" clearable />
+              </el-form-item>
+            </el-tooltip>
+            <el-tooltip
+              :content="$t('hysteria.config.portHopping')"
+              placement="bottom"
+            >
+              <el-form-item label="portHopping" prop="portHopping">
+                <el-input v-model="configForm.portHopping" clearable />
+              </el-form-item>
+            </el-tooltip>
+            <el-tooltip
+              :content="$t('hysteria.config.clashExtension')"
+              placement="bottom"
+            >
+              <el-form-item label="clashExtension" prop="clashExtension">
+                <el-input
+                  v-model="configForm.clashExtension"
+                  type="textarea"
+                  :autosize="{ minRows: 3 }"
+                  @keydown="(e:KeyboardEvent) => e.stopPropagation()"
+                />
+              </el-form-item>
+            </el-tooltip>
+          </el-tab-pane>
+          <el-tab-pane :label="$t('hysteria.listen')" name="listen">
+            <el-tooltip
+              :content="$t('hysteria.config.listen')"
+              placement="bottom"
+            >
+              <el-form-item label="listen" prop="listen">
+                <el-input v-model="dataForm.listen" clearable />
               </el-form-item>
             </el-tooltip>
           </el-tab-pane>
@@ -1353,7 +1354,7 @@ const state = reactive({
     clashExtension: "",
   },
   dataForm: { ...defaultHysteria2ServerConfig } as Hysteria2ServerConfig,
-  activeName: "extension",
+  activeName: "tls",
   expandedGroups: ["basic", "tls", "authTraffic", "performance"],
   tlsType: "acme",
   aclType: "inline",
@@ -1417,6 +1418,19 @@ const {
   routingStatus,
   lifecycleLoading,
 } = toRefs(state);
+
+const tlsMissing = computed(() => {
+  if (state.tlsType === "tls") {
+    return state.dataForm.tls?.cert?.trim() && state.dataForm.tls?.key?.trim()
+      ? "" : t("hysteria.tlsFilesMissing");
+  }
+  const acme = state.dataForm.acme;
+  if (!acme?.domains?.some((domain) => domain.trim())) return t("hysteria.acmeDomainsMissing");
+  if (acme.type === "dns" && (!acme.dns?.name || !Object.keys(acme.dns.config ?? {}).length)) {
+    return t("hysteria.acmeDNSMissing");
+  }
+  return "";
+});
 
 const routingStatusDescription = computed(() => {
   const parts = [
@@ -1518,7 +1532,7 @@ const handleReset = () => {
     clashExtension: "",
   };
   state.dataForm = deepCopy(defaultHysteria2ServerConfig);
-  state.activeName = "extension";
+  state.activeName = "tls";
   state.tlsType = "acme";
   state.aclType = "inline";
   state.ech = false;
@@ -1595,7 +1609,7 @@ const setConfig = () => {
   getHysteria2ConfigApi().then((response) => {
     const data = response.data;
     if (data) {
-      state.tlsType = data?.tls?.cert && data?.tls?.key ? "tls" : "acme";
+      state.tlsType = data?.tls ? "tls" : "acme";
       state.aclType = data?.acl?.inline ? "inline" : "file";
 
       state.ech = !!data?.ech;

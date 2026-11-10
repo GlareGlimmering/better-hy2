@@ -260,6 +260,9 @@ export default {
     },
   },
   hysteria: {
+    tlsFilesMissing: "Укажите сертификат TLS и закрытый ключ.",
+    acmeDomainsMissing: "Укажите домен ACME.",
+    acmeDNSMissing: "Выберите DNS-провайдера и укажите его учётные данные.",
     enable: "Включить",
     disable: "Отключить",
     addConfigItem: "Добавить элемент конфигурации",
