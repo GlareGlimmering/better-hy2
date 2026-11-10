@@ -17,14 +17,18 @@ type Hysteria2RoutingStatusVo struct {
 }
 
 type hysteria2Result struct {
-	Ok bool   `json:"ok"`
-	Id string `json:"id"`
+	Ok          bool   `json:"ok"`
+	Id          string `json:"id"`
+	DeviceLimit int64  `json:"deviceLimit,omitempty"`
+	AccountID   int64  `json:"accountId,omitempty"`
 }
 
-func Hysteria2AuthSuccess(id string, c *gin.Context) {
+func Hysteria2AuthSuccess(id string, deviceLimit, accountID int64, c *gin.Context) {
 	c.JSON(http.StatusOK, hysteria2Result{
-		Ok: true,
-		Id: id,
+		Ok:          true,
+		Id:          id,
+		DeviceLimit: deviceLimit,
+		AccountID:   accountID,
 	})
 }
 

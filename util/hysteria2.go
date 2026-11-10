@@ -182,7 +182,7 @@ func Hysteria2VersionAt(path string) (string, error) {
 }
 
 func parseHysteria2Version(output string) (string, error) {
-	pattern := regexp.MustCompile(`v\d+\.\d+\.\d+(?:-hui\.\d+)?`)
+	pattern := regexp.MustCompile(`v\d+\.\d+\.\d+(?:-hui\.\d+(?:-dev)?)?`)
 	version := pattern.FindString(output)
 	if version == "" {
 		return "", errors.New("Hysteria2 version output is not recognized")

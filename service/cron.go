@@ -5,6 +5,7 @@ import (
 	"h-ui/dao"
 	"h-ui/model/bo"
 	"h-ui/model/constant"
+	"h-ui/model/entity"
 	"h-ui/proxy"
 	"h-ui/util"
 	"strconv"
@@ -21,22 +22,18 @@ func CronHandleAccount() {
 		if err != nil {
 			return
 		}
-		if hysteriaEnable.Value != nil && *hysteriaEnable.Value == "1" {
-			apiPort, err := GetHysteria2ApiPort()
-			if err != nil {
-				return
-			}
+		if hysteriaEnable.Value != nil && *hysteriaEnable.Value == "1" && Hysteria2IsRunning() {
+			apiPort := hysteria2RuntimeStatsPort.Load()
 
 			secret, err := trafficStatsSecret()
 			if err != nil {
 				return
 			}
 
-			// 保存流量数据
-			go saveAccountTraffic(apiPort, secret)
-
-			// 踢下线
-			go kickAccount(apiPort, secret)
+			if err := saveAccountTraffic(apiPort, secret); err != nil {
+				logrus.Warnf("traffic settlement deferred: %v", err)
+			}
+			kickAccount(apiPort, secret)
 		}
 	}()
 }
@@ -58,42 +55,57 @@ func CronResetTraffic() {
 	}
 }
 
-func saveAccountTraffic(apiPort int64, jwtSecret string) {
+func saveAccountTraffic(apiPort int64, secret string) error {
 	if !trafficMutex.TryLock() {
-		return
+		return nil
 	}
 	defer trafficMutex.Unlock()
+	return settleManagedTraffic(apiPort, secret)
+}
 
+func settleManagedTraffic(apiPort int64, secret string) error {
 	hysteria2TrafficTime, err := dao.GetConfig("key = ?", constant.Hysteria2TrafficTime)
 	if err != nil {
-		return
+		return err
 	}
 	hysteria2TrafficTimeFloat, err := strconv.ParseFloat(*hysteria2TrafficTime.Value, 64)
 	if err != nil {
-		logrus.Errorf("hysteria2TrafficTime string conv int64 err: %v", err)
+		return err
+	}
+	return settleTraffic(proxy.NewHysteria2Api(apiPort), secret, hysteria2TrafficTimeFloat)
+}
+
+// ReconcileAccountConnections handles committed administrative changes
+// without waiting for the next scheduled quota/expiry reconciliation.
+func ReconcileAccountConnections() {
+	if !Hysteria2IsRunning() {
 		return
 	}
-
-	users, err := proxy.NewHysteria2Api(apiPort).ListUsers(true, jwtSecret)
+	port := hysteria2RuntimeStatsPort.Load()
+	secret, err := trafficStatsSecret()
 	if err != nil {
 		return
 	}
-	if len(users) > 0 {
-		userLists := util.SplitMap(users, 10)
-		var wg sync.WaitGroup
-		for _, userList := range userLists {
-			wg.Add(1)
-			go func(userList map[string]bo.Hysteria2UserTraffic) {
-				defer wg.Done()
-				for username, traffic := range userList {
-					if err = dao.UpdateAccountTraffic(username, int64(float64(traffic.Rx)*hysteria2TrafficTimeFloat), int64(float64(traffic.Tx)*hysteria2TrafficTimeFloat)); err != nil {
-						continue
-					}
-				}
-			}(userList)
-		}
-		wg.Wait()
+	if err := proxy.NewHysteria2Api(port).FenceAdmissions(secret); err != nil {
+		logrus.Warnf("account admission fence failed; reconciliation will retry: %v", err)
 	}
+	kickAccount(port, secret)
+}
+
+type trafficBatchAPI interface {
+	TrafficBatch(string) (bo.Hysteria2TrafficBatch, error)
+	AcknowledgeTrafficBatch(string, bo.Hysteria2TrafficReceipt) error
+}
+
+func settleTraffic(api trafficBatchAPI, secret string, multiplier float64) error {
+	batch, err := api.TrafficBatch(secret)
+	if err != nil {
+		return err
+	}
+	if err := dao.SettleTrafficBatch(batch, multiplier); err != nil {
+		return err
+	}
+	return api.AcknowledgeTrafficBatch(secret, batch.Hysteria2TrafficReceipt)
 }
 
 func kickAccount(apiPort int64, jwtSecret string) {
@@ -114,27 +126,32 @@ func kickAccount(apiPort int64, jwtSecret string) {
 			i++
 		}
 		usernameLists := util.SplitArr(usernames, 10)
-		var wg sync.WaitGroup
 		for _, usernameList := range usernameLists {
-			wg.Add(1)
-			go func(usernameList []string) {
-				defer wg.Done()
-				now := time.Now().UnixMilli()
-				accounts, err := dao.ListAccount("username in ? and (deleted = 1 or (quota > 0 and quota < download + upload)) or ? > expire_time or ? < kick_util_time", usernameList, now, now)
-				if err != nil {
-					return
+			accounts, err := dao.ListAccount("username in ?", usernameList)
+			if err != nil {
+				logrus.Warn("account reconciliation could not read account state")
+				continue
+			}
+			toKick := connectionsToKick(usernameList, accounts, time.Now().UnixMilli())
+			if len(toKick) != 0 {
+				if err := proxy.NewHysteria2Api(apiPort).KickUsers(toKick, jwtSecret); err != nil {
+					logrus.Warnf("account connection reconciliation deferred: %v", err)
 				}
-				kickUsernames := make([]string, len(accounts))
-				j := 0
-				for _, item := range accounts {
-					kickUsernames[j] = *item.Username
-					j++
-				}
-				if err = proxy.NewHysteria2Api(apiPort).KickUsers(kickUsernames, jwtSecret); err != nil {
-					return
-				}
-			}(usernameList)
+			}
 		}
-		wg.Wait()
 	}
+}
+
+func connectionsToKick(online []string, accounts []entity.Account, now int64) []string {
+	allowed := make(map[string]bool, len(accounts))
+	for _, account := range accounts {
+		allowed[*account.Username] = accountTrafficPolicy(account, now) == ""
+	}
+	var result []string
+	for _, username := range online {
+		if !allowed[username] {
+			result = append(result, username)
+		}
+	}
+	return result
 }

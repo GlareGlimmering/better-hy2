@@ -83,11 +83,29 @@ func TestPasswordResetRevokesPreviousAdministratorJWT(t *testing.T) {
 			t.Error("inactive administrator token accepted")
 		}
 	}
+	if err := dao.UpdateAccount([]int64{secondID}, map[string]interface{}{"role": "admin", "deleted": 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := dao.CloseSqliteDB(); err != nil {
+		t.Fatal(err)
+	}
+	if err := dao.InitSqliteSchema(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.ParseToken(second); err == nil {
+		t.Error("restoring administrator privileges revived a revoked token")
+	}
 	if err := dao.DeleteAccount([]int64{secondID}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := service.ParseToken(second); err == nil {
 		t.Error("deleted administrator token accepted")
+	}
+	if _, err := dao.SaveAccount(entity.Account{BaseEntity: entity.BaseEntity{Id: &secondID}, Username: &secondName, Pass: &secondPass, Role: &role}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.ParseToken(second); err == nil {
+		t.Error("recreating an administrator with the same ID revived the token")
 	}
 }
 
