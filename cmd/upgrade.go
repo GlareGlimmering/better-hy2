@@ -13,6 +13,7 @@ import (
 
 var (
 	upgradePrerelease bool
+	upgradeChannel    string
 	upgradeYes        bool
 	upgradeHealthURL  string
 )
@@ -25,7 +26,16 @@ var upgradeCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opts := upgradeop.DefaultOptions()
 		opts.CurrentVersion = installedVersion(opts.InstallDir, "unknown")
-		opts.Prerelease = upgradePrerelease
+		switch upgradeChannel {
+		case "stable":
+			if cmd.Flags().Changed("channel") && upgradePrerelease {
+				return fmt.Errorf("--prerelease conflicts with --channel stable")
+			}
+		case "prerelease":
+		default:
+			return fmt.Errorf("unknown update channel %q; use stable or prerelease", upgradeChannel)
+		}
+		opts.Prerelease = upgradePrerelease || upgradeChannel == "prerelease"
 		opts.Yes = upgradeYes
 		opts.HealthURL = upgradeHealthURL
 		if len(args) == 1 {
@@ -53,6 +63,7 @@ func installedVersion(installDir, fallback string) string {
 }
 
 func init() {
+	upgradeCmd.Flags().StringVar(&upgradeChannel, "channel", "stable", "release channel for automatic updates (stable or prerelease)")
 	upgradeCmd.Flags().BoolVar(&upgradePrerelease, "prerelease", false, "use the latest prerelease channel")
 	upgradeCmd.Flags().BoolVarP(&upgradeYes, "yes", "y", false, "skip the confirmation prompt")
 	upgradeCmd.Flags().StringVar(&upgradeHealthURL, "health-url", "", "override the loopback panel health URL")

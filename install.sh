@@ -94,7 +94,7 @@ preflight_environment() {
 }
 
 allowed_version() {
-  [[ "$1" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-custom\.(0|[1-9][0-9]*)(-rc\.(0|[1-9][0-9]*))?)?$ ]]
+  [[ "$1" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-custom\.(0|[1-9][0-9]*)(-rc\.(0|[1-9][0-9]*))?|-rc\.(0|[1-9][0-9]*))?$ ]]
 }
 
 version_is_older() {
@@ -115,6 +115,10 @@ version_components() {
   local version="$1" release_rank=1 rc_number=0
   if [[ "$version" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
     printf '%d %d %d 2147483647 1 0\n' "$((10#${BASH_REMATCH[1]}))" "$((10#${BASH_REMATCH[2]}))" "$((10#${BASH_REMATCH[3]}))"
+    return
+  fi
+  if [[ "$version" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)-rc\.([0-9]+)$ ]]; then
+    printf '%d %d %d 2147483647 0 %d\n' "$((10#${BASH_REMATCH[1]}))" "$((10#${BASH_REMATCH[2]}))" "$((10#${BASH_REMATCH[3]}))" "$((10#${BASH_REMATCH[4]}))"
     return
   fi
   [[ "$version" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)-custom\.([0-9]+)(-rc\.([0-9]+))?$ ]] || return 1
@@ -138,13 +142,16 @@ select_latest_prerelease() {
     printf '%s\n' "$releases_json" \
       | grep -oE '"tag_name"[[:space:]]*:[[:space:]]*"[^"]+"' \
       | sed -E 's/^.*"([^"]+)"$/\1/' \
-      | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-custom\.[0-9]+-rc\.[0-9]+$' || true
+      | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+(-custom\.[0-9]+)?-rc\.[0-9]+$' || true
   )
   printf '%s\n' "$candidate"
 }
 
 ensure_no_automatic_downgrade() {
   local target="$1" current="$2"
+  if [[ "$current" == *-rc.* && "$target" != *-rc.* ]] && allowed_version "$current" && version_is_older "$target" "$current"; then
+    fail "refusing prerelease-to-stable downgrade; restore the matching pre-upgrade snapshot"
+  fi
   if [[ "$requested_version" == "latest" ]] && allowed_version "$current" && version_is_older "$target" "$current"; then
     fail "refusing automatic downgrade from ${current} to ${target}"
   fi

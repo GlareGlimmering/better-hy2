@@ -128,8 +128,8 @@
         </el-table-column>
         <el-table-column key="traffic" :label="$t('account.trafficUsed')" align="center" min-width="130">
           <template #default="scope">
-            <el-tooltip :content="`${$t('account.upload')}: ${formatBytes(scope.row.upload)} · ${$t('account.download')}: ${formatBytes(scope.row.download)}`">
-              <span>{{ formatBytes(scope.row.upload + scope.row.download) }}</span>
+            <el-tooltip :content="`${$t('account.upload')}: ${formatGB(scope.row.upload)} · ${$t('account.download')}: ${formatGB(scope.row.download)}`">
+              <span>{{ formatGB(scope.row.upload + scope.row.download) }} / {{ scope.row.quota < 0 ? "∞" : formatGB(scope.row.quota) }}</span>
             </el-tooltip>
           </template>
         </el-table-column>
@@ -240,7 +240,7 @@
           class="account-usage"
           type="info"
           :closable="false"
-          :title="`${$t('account.trafficUsed')}: ${formatBytes(drawerAccount.upload + drawerAccount.download)} · ${$t('account.device')}: ${drawerAccount.device}/${drawerAccount.deviceNo}`"
+          :title="`${$t('account.trafficUsed')}: ${formatGB(drawerAccount.upload + drawerAccount.download)} · ${$t('account.device')}: ${drawerAccount.device}/${drawerAccount.deviceNo}`"
         />
         <el-form-item :label="$t('account.username')" prop="username">
           <el-input
@@ -308,7 +308,8 @@
           <div v-if="outboundExcludedCount > 0" class="form-tip">{{ $t('account.outboundHistoricalExcluded') }}</div>
         </el-form-item>
         <el-form-item :label="$t('account.quota')" prop="quota">
-          <unit-select :setValue="setQuota" :valueTmp="quotaTmp" />
+          <el-input v-model="quotaTmp" inputmode="decimal" />
+          <div>{{ $t("account.quotaGBHelp") }}</div>
         </el-form-item>
         <el-form-item :label="$t('account.deviceNo')" prop="deviceNo">
           <el-input-number
@@ -477,7 +478,7 @@ import {
   getHourLater,
   getDayLater,
 } from "@/utils/time";
-import { formatBytes } from "@/utils/byte";
+import { bytesToGB, parseQuotaGB, quotaInput } from "@/utils/account-quota";
 
 import {
   hysteria2KickApi,
@@ -506,6 +507,7 @@ import {
   hasUnavailableBinding,
 } from "./outbound-form";
 
+const formatGB = (bytes: number) => `${bytesToGB(bytes)} GB`;
 const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
@@ -672,7 +674,7 @@ const state = reactive({
     pageNum: 1,
     pageSize: 10,
   } as AccountPageDto,
-  quotaTmp: 0,
+  quotaTmp: "0",
   fileList: [] as UploadFile[],
   qrCodeDialog: {
     title: "QR Code",
@@ -744,7 +746,7 @@ const resetDataForm = () => {
     deleted: 0,
     ...newAccountOutboundFields(),
   });
-  quotaTmp.value = 0;
+  quotaTmp.value = "0";
 };
 
 const loadOutboundOptions = (): Promise<void> => {
@@ -820,15 +822,11 @@ const handleUpdate = async (row: { [key: string]: any }) => {
   const id = row.id;
   const { data } = await getAccountApi({ id: id });
   Object.assign(state.dataForm, data);
-  quotaTmp.value = data.quota;
+  quotaTmp.value = quotaInput(data.quota);
   dialog.value = {
     title: t("common.update"),
     visible: true,
   };
-};
-
-const setQuota = (newQuota: number) => {
-  state.dataForm.quota = newQuota;
 };
 
 /**
@@ -837,12 +835,18 @@ const setQuota = (newQuota: number) => {
 const submitForm = async () => {
   const valid = await dataFormRef.value?.validate().catch(() => false);
   if (!valid) return;
+  const unchangedQuota = state.dataForm.id && quotaTmp.value === quotaInput(state.dataForm.quota);
+  const quota = unchangedQuota ? undefined : parseQuotaGB(quotaTmp.value);
+  if (!unchangedQuota && quota === undefined) {
+    ElMessage.error(t("account.quotaGBInvalid"));
+    return;
+  }
   accountSaving.value = true;
   try {
-    const accountUpdateDto: AccountUpdateDto = { ...state.dataForm };
+    const accountUpdateDto: AccountUpdateDto = { ...state.dataForm, quota };
     const { data } = state.dataForm.id
       ? await updateAccountApi(accountUpdateDto)
-      : await saveAccountApi(accountUpdateDto);
+      : await saveAccountApi({ ...state.dataForm, quota: quota! });
     if (data.outboundChanged && !data.runtimeApplied) {
       ElMessage.warning(t("account.outboundSavedHy2Stopped"));
     } else {
