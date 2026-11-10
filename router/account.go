@@ -10,6 +10,7 @@ func initAccountAdminRouter(accountApi *gin.RouterGroup) {
 	{
 		account.GET("/pageAccount", controller.PageAccount)
 		account.GET("/outboundOptions", controller.AccountOutboundOptions)
+		account.POST("/generateConnectionPassword", controller.GenerateConnectionPassword)
 		account.POST("/saveAccount", controller.SaveAccount)
 		account.POST("/deleteAccount", controller.DeleteAccount)
 		account.POST("/updateAccount", controller.UpdateAccount)

@@ -279,7 +279,12 @@
             type="password"
             show-password
             ref="dataFormConPassRef"
-          />
+            @input="passwordRequest++"
+          >
+            <template v-if="!dataForm.id" #append>
+              <el-button @click="generatePassword">{{ $t("account.generatePassword") }}</el-button>
+            </template>
+          </el-input>
         </el-form-item>
         <el-form-item :label="$t('account.outbound')" prop="outbound">
           <el-select
@@ -480,6 +485,7 @@ import {
   importAccountApi,
   resetTrafficApi,
   getAccountOutboundOptionsApi,
+  generateConnectionPasswordApi,
 } from "@/api/account";
 import { Search, Plus, Refresh } from "@element-plus/icons-vue";
 import {
@@ -561,11 +567,6 @@ const dataFormAddRules = {
     },
   ],
   conPass: [
-    {
-      required: true,
-      message: "Required",
-      trigger: ["change", "blur"],
-    },
     {
       pattern: /^[a-zA-Z0-9!@#$%^&*()_+-=]{6,32}$/,
       message: "ConPass format is incorrect",
@@ -823,6 +824,22 @@ const resetQuery = () => {
 /**
  * 保存
  **/
+let passwordRequest = 0;
+const generatePassword = async () => {
+  const request = ++passwordRequest;
+  const before = state.dataForm.conPass;
+  try {
+    const { data } = await generateConnectionPasswordApi();
+    if (request === passwordRequest && dialog.value.visible && !state.dataForm.id && state.dataForm.conPass === before) {
+      state.dataForm.conPass = data;
+    }
+  } catch {
+    if (request === passwordRequest && dialog.value.visible) {
+      ElMessage.error(t("account.generatePasswordFailed"));
+    }
+  }
+};
+
 const handleAdd = async () => {
   resetDataForm();
   await loadOutboundOptions();
@@ -830,6 +847,7 @@ const handleAdd = async () => {
     title: t("common.add"),
     visible: true,
   };
+  if (!state.dataForm.conPass) void generatePassword();
 };
 
 /**
@@ -1009,6 +1027,7 @@ const handleAccountCommand = (
  * 关闭用户弹窗
  */
 const closeDialog = () => {
+  passwordRequest++;
   dialog.value.visible = false;
   dataFormRef.value?.resetFields();
   dataFormRef.value?.clearValidate();

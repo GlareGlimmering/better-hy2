@@ -167,3 +167,7 @@ export function verifyDefaultPassApi(): AxiosPromise {
     method: "get",
   });
 }
+
+export function generateConnectionPasswordApi(): AxiosPromise<string> {
+  return request({ url: "/account/generateConnectionPassword", method: "post" });
+}

@@ -125,6 +125,8 @@ export default {
     downloadMbps: "Download limit (Mbps)",
     bandwidthHelp: "Client perspective. Use 0 for unlimited. Limits apply to proxy payload.",
     bandwidthNotApplied: "Account saved. Hysteria2 has not confirmed the bandwidth policy.",
+    generatePassword: "Generate",
+    generatePasswordFailed: "Could not generate a connection password.",
     quotaGBHelp: "1 GB = 1,000,000,000 bytes. Enter -1 for unlimited or 0 for no allowance.",
     quotaGBInvalid: "Enter -1 or a non-negative GB value with at most 9 decimals.",
     download: "Download",

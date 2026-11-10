@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -114,7 +115,18 @@ func SaveAccount(c *gin.Context) {
 		return
 	}
 
-	conPass := fmt.Sprintf("%s.%s", *accountSaveDto.Username, *accountSaveDto.ConPass)
+	var password string
+	if accountSaveDto.ConPass == nil || *accountSaveDto.ConPass == "" {
+		var err error
+		password, err = generateConnectionPassword(rand.Reader)
+		if err != nil {
+			vo.Fail("could not generate connection password", c)
+			return
+		}
+	} else {
+		password = *accountSaveDto.ConPass
+	}
+	conPass := fmt.Sprintf("%s.%s", *accountSaveDto.Username, password)
 	emptyLoginPassword := ""
 	account := entity.Account{
 		Username:     accountSaveDto.Username,

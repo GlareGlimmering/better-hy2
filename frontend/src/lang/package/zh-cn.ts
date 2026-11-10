@@ -124,6 +124,8 @@ export default {
     downloadMbps: "下载上限（Mbps）",
     bandwidthHelp: "以客户端为准。0 表示不限速，仅限制代理有效载荷。",
     bandwidthNotApplied: "账户已保存，Hysteria2 尚未确认限速策略生效。",
+    generatePassword: "生成密码",
+    generatePasswordFailed: "无法生成连接密码。",
     quotaGBHelp: "1 GB = 1,000,000,000 字节。-1 表示不限流量，0 表示无可用额度。",
     quotaGBInvalid: "请输入 -1，或最多含 9 位小数的非负 GB 数值。",
     download: "下载",
