@@ -168,8 +168,23 @@ func Run(ctx context.Context, opts Options, deps Dependencies) error {
 	if err := downloadReleaseAssets(ctx, release, candidate, checksumPath, deps); err != nil {
 		return err
 	}
+	if standardRCTag.MatchString(release.TagName) {
+		if !release.Prerelease || release.Draft {
+			return errors.New("standard RC must be published as a prerelease")
+		}
+		if err := verifyPairExecutable(candidate); err != nil {
+			return fmt.Errorf("panel candidate: %w", err)
+		}
+	}
 	if err := verifyCandidate(candidate, checksumPath, release.TagName, deps); err != nil {
 		return err
+	}
+
+	if standardRCTag.MatchString(release.TagName) {
+		if err := preflightReleasePair(ctx, release, candidate, checksumPath, workDir, deps); err != nil {
+			return fmt.Errorf("paired upgrade preflight: %w", err)
+		}
+		return errors.New("paired candidates verified; joint activation and recovery are not available")
 	}
 
 	channel := "stable"
@@ -512,6 +527,7 @@ func createSnapshot(opts Options, target string, deps Dependencies) (snapshot, e
 	snap := snapshot{Dir: dir, Files: map[string]string{}, Metadata: map[string]fileMetadata{}}
 	paths := []string{
 		filepath.Join(opts.InstallDir, "h-ui"),
+		filepath.Join(opts.DataDir, util.GetHysteria2BinPath()),
 		opts.SystemdUnitPath,
 		filepath.Join(opts.DataDir, constant.Hysteria2ConfigPath),
 		filepath.Join(opts.StateDir, "xray", "config.json"),
