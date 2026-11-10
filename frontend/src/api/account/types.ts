@@ -11,6 +11,8 @@ export interface AccountUpdateDto extends IdDto {
   quota?: number;
   expireTime: number;
   deviceNo: number;
+  uploadMbps?: number;
+  downloadMbps?: number;
   deleted: number;
   remark: string;
   outbound: string;
@@ -20,6 +22,7 @@ export interface AccountUpdateResult {
   outboundChanged: boolean;
   hysteria2Running: boolean;
   runtimeApplied: boolean;
+  bandwidthStatus?: "applied" | "stopped" | "unsupported" | "unconfirmed";
 }
 
 export interface AccountSaveDto {
@@ -28,6 +31,8 @@ export interface AccountSaveDto {
   quota: number;
   expireTime: number;
   deviceNo: number;
+  uploadMbps?: number;
+  downloadMbps?: number;
   deleted: number;
   remark: string;
   outbound: string;
@@ -46,6 +51,8 @@ export interface AccountVo extends IdDto {
   expireTime: number;
   kickUtilTime: number;
   deviceNo: number;
+  uploadMbps?: number;
+  downloadMbps?: number;
   role: string;
   deleted: number;
   createTime: string;
@@ -77,6 +84,8 @@ export interface AccountForm extends IdDto {
   quota: number;
   expireTime: number;
   deviceNo: number;
+  uploadMbps?: number;
+  downloadMbps?: number;
   deleted: number;
   remark: string;
   outbound: string;

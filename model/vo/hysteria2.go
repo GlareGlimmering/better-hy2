@@ -2,6 +2,7 @@ package vo
 
 import (
 	"github.com/gin-gonic/gin"
+	"h-ui/model/bo"
 	"net/http"
 )
 
@@ -17,14 +18,20 @@ type Hysteria2RoutingStatusVo struct {
 }
 
 type hysteria2Result struct {
-	Ok          bool   `json:"ok"`
-	Id          string `json:"id"`
-	DeviceLimit int64  `json:"deviceLimit,omitempty"`
-	AccountID   int64  `json:"accountId,omitempty"`
+	Ok          bool                 `json:"ok"`
+	Id          string               `json:"id"`
+	DeviceLimit int64                `json:"deviceLimit,omitempty"`
+	Bandwidth   *bo.AccountBandwidth `json:"bandwidth,omitempty"`
+	AccountID   int64                `json:"accountId,omitempty"`
 }
 
-func Hysteria2AuthSuccess(id string, deviceLimit, accountID int64, c *gin.Context) {
+func Hysteria2AuthSuccess(id string, deviceLimit, accountID int64, bandwidth bo.AccountBandwidth, c *gin.Context) {
+	var policy *bo.AccountBandwidth
+	if bandwidth.Version != 0 {
+		policy = &bandwidth
+	}
 	c.JSON(http.StatusOK, hysteria2Result{
+		Bandwidth:   policy,
 		Ok:          true,
 		Id:          id,
 		DeviceLimit: deviceLimit,

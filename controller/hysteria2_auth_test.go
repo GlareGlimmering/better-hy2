@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	"h-ui/model/bo"
 	"h-ui/model/entity"
 	"h-ui/service"
 	"net/http/httptest"
@@ -33,7 +34,7 @@ func TestHysteria2HTTPAuthProtocolAndSafeDiagnostics(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			logs.Reset()
 			called := false
-			authenticateHysteria2 = func(string) (int64, string, int64, error) {
+			authenticateHysteria2 = func(string, *bo.AccountBandwidth) (int64, string, int64, error) {
 				called = true
 				if tc.name == "bad password" {
 					return 0, "", 0, &service.Hysteria2AuthError{Reason: tc.reason}

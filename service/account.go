@@ -14,9 +14,10 @@ import (
 )
 
 type AccountUpdateResult struct {
-	OutboundChanged  bool `json:"outboundChanged"`
-	Hysteria2Running bool `json:"hysteria2Running"`
-	RuntimeApplied   bool `json:"runtimeApplied"`
+	OutboundChanged  bool   `json:"outboundChanged"`
+	Hysteria2Running bool   `json:"hysteria2Running"`
+	BandwidthStatus  string `json:"bandwidthStatus,omitempty"`
+	RuntimeApplied   bool   `json:"runtimeApplied"`
 }
 
 var accountHysteria2IsRunning = Hysteria2IsRunning
@@ -57,6 +58,9 @@ func SaveAccountWithResult(account entity.Account) (AccountUpdateResult, error) 
 
 	hysteria2ConfigApplyMutex.Lock()
 	defer hysteria2ConfigApplyMutex.Unlock()
+	if err := validateBandwidth(account); err != nil {
+		return result, err
+	}
 	before, err := dao.ListAccount("role = ? and deleted = 0", "user")
 	if err != nil {
 		return result, err
@@ -67,6 +71,9 @@ func SaveAccountWithResult(account entity.Account) (AccountUpdateResult, error) 
 	}
 	result, err = applyAccountRoutingMutation(before)
 	if err == nil {
+		if account.UploadMbps != nil || account.DownloadMbps != nil {
+			applyAccountBandwidth(id, &result)
+		}
 		return result, nil
 	}
 	if restoreErr := dao.DeleteAccount([]int64{id}); restoreErr != nil {
@@ -178,16 +185,29 @@ func UpdateAccountWithResult(account entity.Account) (AccountUpdateResult, error
 	if account.Outbound != nil {
 		updates["outbound"] = *account.Outbound
 	}
-	if account.Outbound == nil && account.Username == nil && account.Deleted == nil {
+	hasBandwidth := account.UploadMbps != nil || account.DownloadMbps != nil
+	if account.UploadMbps != nil {
+		updates["upload_mbps"] = *account.UploadMbps
+	}
+	if account.DownloadMbps != nil {
+		updates["download_mbps"] = *account.DownloadMbps
+	}
+	if account.Outbound == nil && account.Username == nil && account.Deleted == nil && !hasBandwidth {
 		return result, dao.UpdateAccount([]int64{*account.Id}, updates)
 	}
 
 	hysteria2ConfigApplyMutex.Lock()
 	defer hysteria2ConfigApplyMutex.Unlock()
 
+	if err := validateBandwidth(account); err != nil {
+		return result, err
+	}
 	current, err := GetAccount(*account.Id)
 	if err != nil {
 		return result, err
+	}
+	if hasBandwidth && *current.Role != "user" {
+		return result, errors.New("bandwidth can only be configured for proxy accounts")
 	}
 	previous := accountUpdateSnapshot(current, updates)
 	if err := dao.UpdateAccount([]int64{*account.Id}, updates); err != nil {
@@ -210,7 +230,16 @@ func UpdateAccountWithResult(account entity.Account) (AccountUpdateResult, error
 		if restoreErr := dao.UpdateAccount([]int64{*account.Id}, previous); restoreErr != nil {
 			return result, fmt.Errorf("apply Hysteria2 user outbound: %v; restore account failed: %w", err, restoreErr)
 		}
+		if hasBandwidth {
+			applyAccountBandwidth(*account.Id, &result)
+			if result.BandwidthStatus == "unconfirmed" {
+				return result, fmt.Errorf("apply Hysteria2 user outbound: %w; account restored but runtime bandwidth could not be confirmed", err)
+			}
+		}
 		return result, fmt.Errorf("apply Hysteria2 user outbound: %w; previous account binding restored", err)
+	}
+	if hasBandwidth {
+		applyAccountBandwidth(*account.Id, &result)
 	}
 	return result, nil
 }
@@ -264,6 +293,10 @@ func accountUpdateSnapshot(account entity.Account, updates map[string]interface{
 			values[key] = *account.Pass
 		case "con_pass":
 			values[key] = *account.ConPass
+		case "upload_mbps":
+			values[key] = accountBandwidth(account).UploadMbps
+		case "download_mbps":
+			values[key] = accountBandwidth(account).DownloadMbps
 		case "quota":
 			values[key] = *account.Quota
 		case "expire_time":

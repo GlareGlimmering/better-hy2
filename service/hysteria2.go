@@ -230,6 +230,14 @@ func startHysteria2Runtime() error {
 		_ = instance.StopHysteria2()
 		return fmt.Errorf("initialize traffic settlement: %w", settlementErr)
 	}
+	bandwidthReady := proxy.NewHysteria2Api(apiPort).BandwidthReady(secret)
+	if !bandwidthReady {
+		if _, err := dao.GetAccount("upload_mbps > 0 OR download_mbps > 0"); err == nil || err.Error() != constant.WrongPassword {
+			_ = instance.StopHysteria2()
+			return errors.New("incompatible Hysteria2 kernel: account bandwidth capability required")
+		}
+	}
+	hysteria2BandwidthReady.Store(bandwidthReady)
 	hysteria2RuntimeStatsPort.Store(apiPort)
 	hysteria2RuntimeReady.Store(true)
 	return nil

@@ -126,6 +126,11 @@
             <el-tag v-else type="info">{{ $t("account.unbound") }}</el-tag>
           </template>
         </el-table-column>
+        <el-table-column :label="$t('account.bandwidth')" min-width="120">
+          <template #default="{ row }">
+            <span v-if="row.role !== 'admin'">↑ {{ row.uploadMbps || "∞" }} · ↓ {{ row.downloadMbps || "∞" }} Mbps</span>
+          </template>
+        </el-table-column>
         <el-table-column key="traffic" :label="$t('account.trafficUsed')" align="center" min-width="130">
           <template #default="scope">
             <el-tooltip :content="`${$t('account.upload')}: ${formatGB(scope.row.upload)} · ${$t('account.download')}: ${formatGB(scope.row.download)}`">
@@ -311,6 +316,15 @@
           <el-input v-model="quotaTmp" inputmode="decimal" />
           <div>{{ $t("account.quotaGBHelp") }}</div>
         </el-form-item>
+        <template v-if="dataForm.role !== 'admin'">
+          <el-form-item :label="$t('account.uploadMbps')" prop="uploadMbps">
+            <el-input-number v-model="dataForm.uploadMbps" :min="0" :max="100000" :precision="0" />
+          </el-form-item>
+          <el-form-item :label="$t('account.downloadMbps')" prop="downloadMbps">
+            <el-input-number v-model="dataForm.downloadMbps" :min="0" :max="100000" :precision="0" />
+            <div class="form-tip">{{ $t("account.bandwidthHelp") }}</div>
+          </el-form-item>
+        </template>
         <el-form-item :label="$t('account.deviceNo')" prop="deviceNo">
           <el-input-number
             v-model="dataForm.deviceNo"
@@ -659,6 +673,8 @@ const state = reactive({
   } as DialogType,
   dataForm: {
     quota: 0,
+    uploadMbps: 0,
+    downloadMbps: 0,
     expireTime: getMonthLater(),
     deviceNo: 6,
     deleted: 0,
@@ -742,6 +758,8 @@ const resetDataForm = () => {
   Object.assign(state.dataForm, {
     id: undefined,
     quota: 0,
+    uploadMbps: 0,
+    downloadMbps: 0,
     expireTime: getMonthLater(),
     deleted: 0,
     ...newAccountOutboundFields(),
@@ -843,12 +861,16 @@ const submitForm = async () => {
   }
   accountSaving.value = true;
   try {
-    const accountUpdateDto: AccountUpdateDto = { ...state.dataForm, quota };
+    const { uploadMbps, downloadMbps, ...fields } = state.dataForm;
+    const bandwidth = state.dataForm.role === "admin" ? {} : { uploadMbps, downloadMbps };
+    const accountUpdateDto: AccountUpdateDto = { ...fields, ...bandwidth, quota };
     const { data } = state.dataForm.id
       ? await updateAccountApi(accountUpdateDto)
-      : await saveAccountApi({ ...state.dataForm, quota: quota! });
+      : await saveAccountApi({ ...fields, ...bandwidth, quota: quota! });
     if (data.outboundChanged && !data.runtimeApplied) {
       ElMessage.warning(t("account.outboundSavedHy2Stopped"));
+    } else if (data.bandwidthStatus && data.bandwidthStatus !== "applied" && (uploadMbps || downloadMbps || data.bandwidthStatus === "unconfirmed")) {
+      ElMessage.warning(t("account.bandwidthNotApplied"));
     } else {
       ElMessage.success(t("common.success"));
     }

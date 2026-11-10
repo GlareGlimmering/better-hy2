@@ -77,3 +77,21 @@ func (h *Hysteria2Api) ResumeTraffic(secret string) error {
 func (h *Hysteria2Api) FenceAdmissions(secret string) error {
 	return h.accountStatsRequest(http.MethodPost, "/admission/fence", secret, nil, 204, nil)
 }
+
+func (h *Hysteria2Api) BandwidthReady(secret string) bool {
+	var capabilities struct {
+		Bandwidth int `json:"accountBandwidth"`
+	}
+	return h.accountStatsRequest(http.MethodGet, "/capabilities", secret, nil, 200, &capabilities) == nil && capabilities.Bandwidth == 1
+}
+
+func (h *Hysteria2Api) UpdateBandwidth(id int64, policy bo.AccountBandwidth, secret string) error {
+	body, err := json.Marshal(struct {
+		AccountID int64 `json:"accountId"`
+		bo.AccountBandwidth
+	}{id, policy})
+	if err != nil {
+		return err
+	}
+	return h.accountStatsRequest(http.MethodPut, "/bandwidth/policy", secret, body, 204, nil)
+}
