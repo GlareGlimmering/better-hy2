@@ -571,3 +571,63 @@ func containsCommand(commands []string, expected string) bool {
 	}
 	return false
 }
+
+func TestRollbackDoesNotRestoreWhileServiceCannotStop(t *testing.T) {
+	fixture := newUpgradeFixture(t, "")
+	binary := filepath.Join(fixture.opts.InstallDir, "h-ui")
+	fixture.deps.Command = func(name string, args ...string) ([]byte, error) {
+		if name != "systemctl" || len(args) != 2 || args[0] != "stop" {
+			t.Fatalf("unexpected command: %s %v", name, args)
+		}
+		return nil, errors.New("stop failed")
+	}
+	err := rollback(binary+".previous", binary, true, snapshot{}, fixture.opts, fixture.deps)
+	if err == nil || !strings.Contains(err.Error(), "stop failed") {
+		t.Fatalf("expected stop failure, got %v", err)
+	}
+	content, err := os.ReadFile(binary)
+	if err != nil || string(content) != "old-binary" {
+		t.Fatalf("active binary changed: %q, %v", content, err)
+	}
+}
+
+func TestRollbackRemovesCandidateSQLiteSidecars(t *testing.T) {
+	fixture := newUpgradeFixture(t, "")
+	database := filepath.Join(fixture.opts.DataDir, "data", "h_ui.db")
+	if err := os.MkdirAll(filepath.Dir(database), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(database, []byte("previous database"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	snap, err := createSnapshot(fixture.opts, fixture.opts.Version, fixture.deps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := os.ReadFile(snap.Files[database])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(database, []byte("candidate database"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	suffixes := []string{"-wal", "-shm", "-journal"}
+	for _, suffix := range suffixes {
+		if err := os.WriteFile(database+suffix, []byte("candidate journal"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	binary := filepath.Join(fixture.opts.InstallDir, "h-ui")
+	if err := rollback(binary+".previous", binary, false, snap, fixture.opts, fixture.deps); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(database)
+	if err != nil || string(got) != string(want) {
+		t.Fatalf("snapshot database was not restored: %v", err)
+	}
+	for _, suffix := range suffixes {
+		if _, err := os.Stat(database + suffix); !os.IsNotExist(err) {
+			t.Errorf("candidate sidecar %s remains after recovery: %v", suffix, err)
+		}
+	}
+}
