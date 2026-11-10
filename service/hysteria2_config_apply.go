@@ -38,6 +38,9 @@ func ApplyHysteria2Config(config bo.Hysteria2ServerConfig) error {
 func applyHysteria2ConfigSerialized(config bo.Hysteria2ServerConfig, ops hysteria2ConfigApplyOps) error {
 	hysteria2ConfigApplyMutex.Lock()
 	defer hysteria2ConfigApplyMutex.Unlock()
+	if err := restoreACMEDNS(&config, ops.readDB); err != nil {
+		return err
+	}
 	return applyHysteria2Config(config, ops)
 }
 

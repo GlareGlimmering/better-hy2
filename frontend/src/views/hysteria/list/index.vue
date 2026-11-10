@@ -417,7 +417,7 @@
               placement="bottom"
             >
               <el-form-item label="acme.dns.config" prop="acme.dns.config">
-                <map-add :map-object="dataForm.acme.dns.config" />
+                <dns-credentials v-model="dataForm.acme.dns.config" :provider="dataForm.acme.dns.name" />
               </el-form-item>
             </el-tooltip>
             <el-tooltip
@@ -1265,6 +1265,7 @@ export default {
 </script>
 
 <script setup lang="ts">
+import DnsCredentials from "./dns-credentials.vue";
 import {
   ConfigsUpdateDto,
   defaultHysteria2ServerConfig,

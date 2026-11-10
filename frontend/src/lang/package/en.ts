@@ -258,6 +258,10 @@ export default {
     },
   },
   hysteria: {
+    copyDNSKey: "Copy key",
+    copyDNSValue: "Copy value",
+    copyDNSWarning: "This is a DNS provider API credential. It will be placed on the system clipboard. Confirm that your environment is secure.",
+    copyDNSFailed: "Could not copy the DNS credential. Check your browser clipboard permissions.",
     tlsFilesMissing: "Select both a TLS certificate and its private key.",
     acmeDomainsMissing: "Enter an ACME domain.",
     acmeDNSMissing: "Select a DNS provider and enter its credentials.",
