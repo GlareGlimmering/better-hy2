@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -423,6 +424,22 @@ func TestHTTPHealthFailureRollsBackAfterCheckingFrontendAsset(t *testing.T) {
 		return http.StatusOK
 	})
 	fixture := newUpgradeFixture(t, health.URL)
+	kernel := filepath.Join(fixture.opts.DataDir, "bin", "hysteria-"+runtime.GOOS+"-"+runtime.GOARCH)
+	if err := os.MkdirAll(filepath.Dir(kernel), 0750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(kernel, []byte("old-kernel"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	command := fixture.deps.Command
+	fixture.deps.Command = func(name string, args ...string) ([]byte, error) {
+		if name == "systemctl" && len(args) > 0 && args[0] == "start" && fixture.startCall == 0 {
+			if err := os.WriteFile(kernel, []byte("candidate-kernel"), 0755); err != nil {
+				return nil, err
+			}
+		}
+		return command(name, args...)
+	}
 	err := Run(context.Background(), fixture.opts, fixture.deps)
 	if err == nil || !strings.Contains(err.Error(), "rollback successful") {
 		t.Fatalf("expected health rollback, got %v", err)
@@ -430,6 +447,10 @@ func TestHTTPHealthFailureRollsBackAfterCheckingFrontendAsset(t *testing.T) {
 	content, _ := os.ReadFile(filepath.Join(fixture.opts.InstallDir, "h-ui"))
 	if string(content) != "old-binary" {
 		t.Fatalf("old binary was not restored: %q", content)
+	}
+	kernelContent, kernelErr := os.ReadFile(kernel)
+	if kernelErr != nil || string(kernelContent) != "old-kernel" {
+		t.Fatalf("old kernel was not restored: %q, %v", kernelContent, kernelErr)
 	}
 	unit, unitErr := os.ReadFile(fixture.opts.SystemdUnitPath)
 	if unitErr != nil || string(unit) != oldSystemdUnit {
