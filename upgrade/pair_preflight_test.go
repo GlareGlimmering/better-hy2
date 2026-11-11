@@ -20,8 +20,12 @@ func TestPairPreflightRejectsMissingManifestAndIncompatibleCapabilities(t *testi
 	}
 	id := strings.Repeat("a", 40)
 	digest := strings.Repeat("b", 64)
+	version := os.Getenv("HUI_PAIR_TEST_PANEL_VERSION")
+	if version == "" {
+		version = "v1.1.0-rc.1"
+	}
 	p := releasePair{
-		Panel:  pairArtifact{"v1.1.0-rc.1", id, digest},
+		Panel:  pairArtifact{version, id, digest},
 		Kernel: pairArtifact{"v2.13.0-hui.5", id, digest},
 		OS:     "linux", Arch: "amd64", AccountConsistency: 2, AccountBandwidth: 1,
 	}
@@ -57,8 +61,12 @@ func TestPairPreflightCompiledArtifacts(t *testing.T) {
 		return b
 	}
 	panelDigest, kernelDigest := fmt.Sprintf("%x", sha256.Sum256(read(panel))), fmt.Sprintf("%x", sha256.Sum256(read(kernel)))
+	version := os.Getenv("HUI_PAIR_TEST_PANEL_VERSION")
+	if version == "" {
+		version = "v1.1.0-rc.1"
+	}
 	p := releasePair{
-		Panel:  pairArtifact{"v1.1.0-rc.1", os.Getenv("HUI_PAIR_TEST_PANEL_COMMIT"), panelDigest},
+		Panel:  pairArtifact{version, os.Getenv("HUI_PAIR_TEST_PANEL_COMMIT"), panelDigest},
 		Kernel: pairArtifact{"v2.13.0-hui.5-dev", os.Getenv("HUI_PAIR_TEST_KERNEL_COMMIT"), kernelDigest},
 		OS:     "linux", Arch: "amd64", AccountConsistency: 2, AccountBandwidth: 1,
 	}
