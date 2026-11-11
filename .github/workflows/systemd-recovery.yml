@@ -1,0 +1,90 @@
+name: Better HY2 systemd recovery integration
+
+on:
+  push:
+    branches:
+      - feat/account-bandwidth-controls
+    paths:
+      - '.github/workflows/systemd-recovery.yml'
+      - 'scripts/test-systemd-recovery.sh'
+
+permissions:
+  contents: read
+
+jobs:
+  recovery:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        state: [active, stopped]
+    env:
+      KERNEL_SHA: 54a51aaac00fa53a1378e20f207d54f7ac8d2b7e
+      KERNEL_VERSION: v2.13.0-hui.5-dev
+    steps:
+      - name: Require a real systemd VM
+        run: |
+          test "$(cat /proc/1/comm)" = systemd
+          sudo -n systemctl show --property=SystemState
+
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          repository: GlareGlimmering/hysteria
+          ref: ${{ env.KERNEL_SHA }}
+          path: kernel-source
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: kernel-source/app/go.mod
+          cache: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/package.json
+          package-manager-cache: false
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          package_json_file: frontend/package.json
+          run_install: false
+
+      - name: Build the candidate pair
+        env:
+          CGO_ENABLED: '0'
+          GOOS: linux
+          GOARCH: amd64
+        run: |
+          pnpm --dir frontend install --frozen-lockfile
+          pnpm --dir frontend run build:prod
+          git restore -- frontend/src/types/auto-imports.d.ts frontend/src/types/components.d.ts
+          artifacts="$RUNNER_TEMP/hui-recovery-artifacts"
+          mkdir "$artifacts"
+          mv kernel-source "$RUNNER_TEMP/kernel-source"
+          go build -trimpath -ldflags='-X h-ui/model/constant.Version=v1.1.0-rc.1' -o "$artifacts/h-ui-linux-amd64" .
+          (
+            cd "$RUNNER_TEMP/kernel-source"
+            test "$(git rev-parse HEAD)" = "$KERNEL_SHA"
+            go build -trimpath -ldflags="-X github.com/apernet/hysteria/app/v2/cmd.appVersion=$KERNEL_VERSION -X github.com/apernet/hysteria/app/v2/cmd.appCommit=$KERNEL_SHA" -o "$artifacts/hysteria-linux-amd64" ./app
+          )
+          HUI_PAIR_TEST_PANEL="$artifacts/h-ui-linux-amd64" \
+          HUI_PAIR_TEST_KERNEL="$artifacts/hysteria-linux-amd64" \
+          HUI_PAIR_TEST_PANEL_COMMIT="$GITHUB_SHA" \
+          HUI_PAIR_TEST_KERNEL_COMMIT="$KERNEL_SHA" \
+          go test ./upgrade -run '^TestPairPreflightCompiledArtifacts$' -count=1 -v
+
+      - name: Fetch and verify the stable rollback fixtures
+        working-directory: ${{ runner.temp }}/hui-recovery-artifacts
+        run: |
+          curl -fsSL --retry 3 -o old-panel https://github.com/GlareGlimmering/better-hy2/releases/download/v1.0.0/h-ui-linux-amd64
+          curl -fsSL --retry 3 -o old-kernel https://github.com/GlareGlimmering/hysteria/releases/download/v2.13.0-hui.4/hysteria-linux-amd64-v2.13.0-hui.4
+          printf '%s\n' \
+            '2323bf6d838a48f56d3c77a1b45bf7926be1ec04db0c905352b65bed24f2bd0f  old-panel' \
+            'f1577bff290f5591a651b88596103045390581a6c0a6e999611cab8baa653d9e  old-kernel' > SHA256SUMS
+          sha256sum -c SHA256SUMS
+          sha256sum h-ui-linux-amd64 hysteria-linux-amd64 >> SHA256SUMS
+          chmod 0755 old-panel old-kernel
+
+      - name: Exercise offline recovery
+        run: sudo -n env HUI_DISPOSABLE_VM=1 bash scripts/test-systemd-recovery.sh "$RUNNER_TEMP/hui-recovery-artifacts" "${{ matrix.state }}"
