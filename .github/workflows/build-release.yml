@@ -25,6 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       is-release-tag: ${{ steps.release-tag.outputs.match }}
+      is-paired-tag: ${{ steps.release-tag.outputs.paired }}
       is-prerelease-tag: ${{ steps.release-tag.outputs.prerelease }}
 
     steps:
@@ -38,7 +39,11 @@ jobs:
         shell: bash
         run: |
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            if [[ "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-custom\.[0-9]+-rc\.[0-9]+$ ]]; then
+            if [[ "${GITHUB_REF_NAME}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-rc\.(0|[1-9][0-9]*)$ ]]; then
+              echo "match=true" >> "${GITHUB_OUTPUT}"
+              echo "prerelease=true" >> "${GITHUB_OUTPUT}"
+              echo "paired=true" >> "${GITHUB_OUTPUT}"
+            elif [[ "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-custom\.[0-9]+-rc\.[0-9]+$ ]]; then
               echo "match=true" >> "${GITHUB_OUTPUT}"
               echo "prerelease=true" >> "${GITHUB_OUTPUT}"
             elif [[ "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-custom\.[0-9]+$ ]]; then
@@ -124,6 +129,9 @@ jobs:
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             build_version="${GITHUB_REF_NAME}"
           fi
+          if [[ "${{ steps.release-tag.outputs.paired }}" == "true" ]]; then
+            git restore -- frontend/src/types/auto-imports.d.ts frontend/src/types/components.d.ts
+          fi
           go build -trimpath -ldflags="-s -w -X h-ui/model/constant.Version=${build_version}" -o "build/${BINARY_NAME}" .
           chmod +x "build/${BINARY_NAME}"
           cp install.sh build/install.sh
@@ -160,6 +168,69 @@ jobs:
           sha256sum "${BINARY_NAME}" install.sh > SHA256SUMS
           sha256sum --check SHA256SUMS
 
+      - name: Check out the paired kernel
+        if: steps.release-tag.outputs.paired == 'true'
+        uses: actions/checkout@v7
+        with:
+          repository: GlareGlimmering/hysteria
+          ref: 54a51aaac00fa53a1378e20f207d54f7ac8d2b7e
+          path: kernel-source
+          persist-credentials: false
+
+      - name: Set up the kernel Go toolchain
+        if: steps.release-tag.outputs.paired == 'true'
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: kernel-source/app/go.mod
+          cache: false
+
+      - name: Build and verify the paired RC assets
+        if: steps.release-tag.outputs.paired == 'true'
+        env:
+          CGO_ENABLED: '0'
+          GOOS: linux
+          GOARCH: amd64
+          KERNEL_VERSION: v2.13.0-hui.5-dev
+        shell: bash
+        run: |
+          kernel_sha=$(git -C kernel-source rev-parse HEAD)
+          export PANEL_SHA=$(git rev-parse HEAD)
+          (
+            cd kernel-source
+            go build -trimpath -ldflags="-X github.com/apernet/hysteria/app/v2/cmd.appVersion=$KERNEL_VERSION -X github.com/apernet/hysteria/app/v2/cmd.appCommit=$kernel_sha" -o ../build/hysteria-linux-amd64 ./app
+          )
+          python3 - "$kernel_sha" <<'PYTHON'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import sys
+
+          def artifact(filename, version, commit):
+              with (Path("build") / filename).open("rb") as binary:
+                  digest = hashlib.file_digest(binary, "sha256").hexdigest()
+              return {"version": version, "commit": commit, "sha256": digest}
+
+          pair = {
+              "panel": artifact("h-ui-linux-amd64", os.environ["GITHUB_REF_NAME"], os.environ["PANEL_SHA"]),
+              "kernel": artifact("hysteria-linux-amd64", os.environ["KERNEL_VERSION"], sys.argv[1]),
+              "os": "linux",
+              "arch": "amd64",
+              "accountConsistency": 2,
+              "accountBandwidth": 1,
+          }
+          Path("build/HY2-PAIR.json").write_text(json.dumps(pair, indent=2) + "\n")
+          PYTHON
+          HUI_PAIR_TEST_PANEL="$PWD/build/h-ui-linux-amd64" \
+          HUI_PAIR_TEST_KERNEL="$PWD/build/hysteria-linux-amd64" \
+          HUI_PAIR_TEST_PANEL_VERSION="$GITHUB_REF_NAME" \
+          HUI_PAIR_TEST_PANEL_COMMIT="$PANEL_SHA" \
+          HUI_PAIR_TEST_KERNEL_COMMIT="$kernel_sha" \
+          go test ./upgrade -run '^TestPairPreflightCompiledArtifacts$' -count=1 -v
+          cd build
+          sha256sum h-ui-linux-amd64 hysteria-linux-amd64 HY2-PAIR.json > SHA256SUMS
+          sha256sum --check SHA256SUMS
+
       - name: Upload build artifact
         uses: actions/upload-artifact@v7
         with:
@@ -168,14 +239,26 @@ jobs:
             build/h-ui-linux-amd64
             build/SHA256SUMS
             build/install.sh
+            build/hysteria-linux-amd64
+            build/HY2-PAIR.json
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
 
+  paired-recovery:
+    needs: build
+    if: needs.build.outputs.is-paired-tag == 'true'
+    uses: ./.github/workflows/systemd-recovery.yml
+    with:
+      artifact: h-ui-linux-amd64-${{ github.sha }}
+
   release:
     name: Publish GitHub Release
-    needs: build
-    if: needs.build.outputs.is-release-tag == 'true'
+    needs: [build, paired-recovery]
+    if: >-
+      always() && needs.build.result == 'success' &&
+      needs.build.outputs.is-release-tag == 'true' &&
+      (needs.build.outputs.is-paired-tag != 'true' || needs.paired-recovery.result == 'success')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -220,12 +303,16 @@ jobs:
             "${GITHUB_REF_NAME}"
             "release-assets/${BINARY_NAME}"
             "release-assets/SHA256SUMS"
-            "release-assets/install.sh"
             --verify-tag
             --title "${release_title}"
           )
+          if [[ "${{ needs.build.outputs.is-paired-tag }}" == "true" ]]; then
+            release_args+=("release-assets/hysteria-linux-amd64" "release-assets/HY2-PAIR.json")
+          else
+            release_args+=("release-assets/install.sh")
+          fi
           if [[ "${{ needs.build.outputs.is-prerelease-tag }}" == "true" ]]; then
-            release_args+=(--prerelease --notes-from-tag)
+            release_args+=(--prerelease --latest=false --notes-from-tag)
           else
             release_args+=(--latest --notes-from-tag)
           fi
