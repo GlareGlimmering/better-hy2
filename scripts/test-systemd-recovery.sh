@@ -139,10 +139,16 @@ config = f"""listen: 127.0.0.1:18443
 tls:
   cert: {root}/cert.pem
   key: {root}/key.pem
+auth:
+  type: http
+  http:
+    url: http://127.0.0.1:8000/hui/hysteria2/auth
 trafficStats:
   listen: 127.0.0.1:19090
+  secret: fixture-stats-secret
 """
 with sqlite3.connect(db) as conn:
+    assert conn.execute("UPDATE config SET value=? WHERE key='JWT_SECRET'", ("fixture-stats-secret",)).rowcount == 1
     assert conn.execute("UPDATE config SET value=? WHERE key='HYSTERIA2_CONFIG'", (config,)).rowcount == 1
     assert conn.execute("UPDATE config SET value='1' WHERE key='HYSTERIA2_ENABLE'").rowcount == 1
     conn.execute("INSERT INTO account(username, con_pass, quota, expire_time) VALUES(?, ?, -1, 253370736000000)",
