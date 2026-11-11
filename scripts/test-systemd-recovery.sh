@@ -43,7 +43,7 @@ trap cleanup EXIT
 
 check_proxy() {
   local kernel=$1 i result
-  "$kernel" client -c "$root/client.yaml" >"$root/client.log" 2>&1 &
+  HYSTERIA_DISABLE_UPDATE_CHECK=1 "$kernel" client -c "$root/client.yaml" >"$root/client.log" 2>&1 &
   client=$!
   result=1
   for ((i=0; i<40; i++)); do
@@ -106,6 +106,7 @@ python3 -m http.server 18080 --bind 127.0.0.1 --directory "$root/http" >"$root/h
 echo_server=$!
 cat >"$root/client.yaml" <<'EOF'
 server: 127.0.0.1:18443
+lazy: true
 auth: smokeuser.fixture-credential
 tls:
   insecure: true
