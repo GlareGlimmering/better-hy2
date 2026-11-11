@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - "feature/**"
+      - "release-retry/v1.1.0-rc.1"
     tags:
       - "v*.*.*"
 
@@ -24,6 +25,7 @@ jobs:
     name: Test and build Linux AMD64
     runs-on: ubuntu-latest
     outputs:
+      release-tag: ${{ steps.release-tag.outputs.tag }}
       is-release-tag: ${{ steps.release-tag.outputs.match }}
       is-paired-tag: ${{ steps.release-tag.outputs.paired }}
       is-prerelease-tag: ${{ steps.release-tag.outputs.prerelease }}
@@ -32,28 +34,37 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v7
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Validate release tag
         id: release-tag
         shell: bash
         run: |
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            if [[ "${GITHUB_REF_NAME}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-rc\.(0|[1-9][0-9]*)$ ]]; then
+          release_tag=""
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            release_tag="$GITHUB_REF_NAME"
+          elif [[ "$GITHUB_REF" == refs/heads/release-retry/v1.1.0-rc.1 ]]; then
+            release_tag="${GITHUB_REF_NAME#release-retry/}"
+            git checkout --detach "refs/tags/$release_tag"
+          fi
+          if [[ -n "$release_tag" ]]; then
+            echo "tag=$release_tag" >> "$GITHUB_OUTPUT"
+            if [[ "$release_tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-rc\.(0|[1-9][0-9]*)$ ]]; then
               echo "match=true" >> "${GITHUB_OUTPUT}"
               echo "prerelease=true" >> "${GITHUB_OUTPUT}"
               echo "paired=true" >> "${GITHUB_OUTPUT}"
-            elif [[ "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-custom\.[0-9]+-rc\.[0-9]+$ ]]; then
+            elif [[ "$release_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-custom\.[0-9]+-rc\.[0-9]+$ ]]; then
               echo "match=true" >> "${GITHUB_OUTPUT}"
               echo "prerelease=true" >> "${GITHUB_OUTPUT}"
-            elif [[ "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-custom\.[0-9]+$ ]]; then
+            elif [[ "$release_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-custom\.[0-9]+$ ]]; then
               echo "match=true" >> "${GITHUB_OUTPUT}"
               echo "prerelease=false" >> "${GITHUB_OUTPUT}"
-            elif [[ "${GITHUB_REF_NAME}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            elif [[ "$release_tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
               echo "match=true" >> "${GITHUB_OUTPUT}"
               echo "prerelease=false" >> "${GITHUB_OUTPUT}"
             else
-              echo "Invalid release tag: ${GITHUB_REF_NAME}" >&2
+              echo "Invalid release tag: $release_tag" >&2
               exit 1
             fi
           else
@@ -126,13 +137,29 @@ jobs:
         run: |
           mkdir -p build
           build_version="dev-${GITHUB_SHA::12}"
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            build_version="${GITHUB_REF_NAME}"
+          release_tag="${{ steps.release-tag.outputs.tag }}"
+          if [[ -n "$release_tag" ]]; then
+            build_version="$release_tag"
           fi
+          source="$PWD"
           if [[ "${{ steps.release-tag.outputs.paired }}" == "true" ]]; then
-            git restore -- frontend/src/types/auto-imports.d.ts frontend/src/types/components.d.ts
+            source="$RUNNER_TEMP/hui-release-source"
+            git clone --no-hardlinks --local . "$source"
+            git -C "$source" checkout --detach "$(git rev-parse HEAD)"
+            mkdir -p "$source/frontend/dist"
+            cp -a frontend/dist/. "$source/frontend/dist/"
+            test -z "$(git -C "$source" status --porcelain)"
           fi
-          go build -trimpath -ldflags="-s -w -X h-ui/model/constant.Version=${build_version}" -o "build/${BINARY_NAME}" .
+          binary="$PWD/build/$BINARY_NAME"
+          (
+            cd "$source"
+            go build -trimpath -ldflags="-s -w -X h-ui/model/constant.Version=$build_version" -o "$binary" .
+          )
+          if [[ "${{ steps.release-tag.outputs.paired }}" == "true" ]]; then
+            go version -m "$binary" > "$RUNNER_TEMP/hui-build-info"
+            grep -F "vcs.revision=$(git rev-parse HEAD)" "$RUNNER_TEMP/hui-build-info"
+            grep -F 'vcs.modified=false' "$RUNNER_TEMP/hui-build-info"
+          fi
           chmod +x "build/${BINARY_NAME}"
           cp install.sh build/install.sh
           chmod +x build/install.sh
@@ -191,6 +218,7 @@ jobs:
           GOOS: linux
           GOARCH: amd64
           KERNEL_VERSION: v2.13.0-hui.5-dev
+          PANEL_VERSION: ${{ steps.release-tag.outputs.tag }}
         shell: bash
         run: |
           kernel_sha=$(git -C kernel-source rev-parse HEAD)
@@ -212,7 +240,7 @@ jobs:
               return {"version": version, "commit": commit, "sha256": digest}
 
           pair = {
-              "panel": artifact("h-ui-linux-amd64", os.environ["GITHUB_REF_NAME"], os.environ["PANEL_SHA"]),
+              "panel": artifact("h-ui-linux-amd64", os.environ["PANEL_VERSION"], os.environ["PANEL_SHA"]),
               "kernel": artifact("hysteria-linux-amd64", os.environ["KERNEL_VERSION"], sys.argv[1]),
               "os": "linux",
               "arch": "amd64",
@@ -223,7 +251,7 @@ jobs:
           PYTHON
           HUI_PAIR_TEST_PANEL="$PWD/build/h-ui-linux-amd64" \
           HUI_PAIR_TEST_KERNEL="$PWD/build/hysteria-linux-amd64" \
-          HUI_PAIR_TEST_PANEL_VERSION="$GITHUB_REF_NAME" \
+          HUI_PAIR_TEST_PANEL_VERSION="$PANEL_VERSION" \
           HUI_PAIR_TEST_PANEL_COMMIT="$PANEL_SHA" \
           HUI_PAIR_TEST_KERNEL_COMMIT="$kernel_sha" \
           go test ./upgrade -run '^TestPairPreflightCompiledArtifacts$' -count=1 -v
@@ -264,12 +292,13 @@ jobs:
       contents: write
     env:
       GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ needs.build.outputs.release-tag }}
 
     steps:
       - name: Check out release tag
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.ref }}
+          ref: refs/tags/${{ needs.build.outputs.release-tag }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -288,8 +317,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
-            echo "Release ${GITHUB_REF_NAME} already exists; refusing to overwrite it." >&2
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "Release ${RELEASE_TAG} already exists; refusing to overwrite it." >&2
             exit 1
           fi
 
@@ -298,9 +327,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          release_title="Better HY2 ${GITHUB_REF_NAME}"
+          release_title="Better HY2 ${RELEASE_TAG}"
           release_args=(
-            "${GITHUB_REF_NAME}"
+            "${RELEASE_TAG}"
             "release-assets/${BINARY_NAME}"
             "release-assets/SHA256SUMS"
             --verify-tag
