@@ -26,6 +26,10 @@ cleanup() {
   if [[ -n $echo_server ]]; then kill "$echo_server" 2>/dev/null || true; fi
   if ((status != 0)); then
     systemctl status "$unit" --no-pager --lines=0 || true
+    journalctl -u "$unit" -n 70 --no-pager || true
+    for log in "$live/logs/h-ui.log" "$live/logs/hysteria2.log" "$root/client.log"; do
+      if [[ -f $log ]]; then tail -n 30 "$log"; fi
+    done
     printf 'Recovery test failed. Fixture preserved at %s for this job.\n' "$root" >&2
   fi
   systemctl stop "$unit" || true
@@ -94,7 +98,9 @@ restore() {
   if [[ $state == active ]]; then systemctl start "$unit"; fi
 }
 
-mkdir -p "$live/bin" "$root/http"
+mkdir -p "$live/bin" "$live/logs" "$live/export" "$root/http"
+install -d -m 0750 /var/lib/h-ui /var/lib/h-ui/backups /var/lib/h-ui/xray /var/lib/h-ui/xray/certs
+install -d -m 0755 /var/lib/hui
 printf '%s\n' recovery-fixture >"$root/http/probe"
 python3 -m http.server 18080 --bind 127.0.0.1 --directory "$root/http" >"$root/http.log" 2>&1 &
 echo_server=$!
