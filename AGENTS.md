@@ -7,6 +7,12 @@
 - Preserve `main` and the stable release tags as rollback points unless the user explicitly requests changing them.
 - Develop each iteration on an appropriate non-`main` development or feature branch.
 
+## Implementation and acceptance
+
+- The implementation Codex writes code, fixes bugs, and runs the relevant automated checks. The operator and review assistant review changes, propose features, and conduct acceptance testing. The operator relays instructions and results between sessions.
+- Use [the acceptance record](docs/ACCEPTANCE_ZH.md) when resuming this work. Record the exact versions tested, reproducible steps, observed results, and open cases. Keep implementation expectations, CI evidence, and manual observations distinct.
+- Before handing off a feature or fix for acceptance, identify its commit and any paired kernel revision, outline the shortest real-client test, and report checks run and known limitations. Scrub passwords, tokens, subscription URLs, and production details from shared notes.
+
 ## Required delivery workflow
 
 For every completed iteration in this repository:

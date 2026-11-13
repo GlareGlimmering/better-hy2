@@ -57,6 +57,8 @@ curl -fsSL https://raw.githubusercontent.com/GlareGlimmering/better-hy2/main/ins
 
 [安装、首次设置、HY2 配置、Xray 出站、账户绑定、备份恢复及故障排查](docs/OPERATIONS_ZH.md)。
 
+[预发布验收记录与测试进度](docs/ACCEPTANCE_ZH.md)。
+
 为保持兼容，内部 Go module、二进制、数据库和服务继续使用 `h-ui` 名称。本项目不修改 HY2 / Xray 代理协议。匹配内核固定为 **v2.13.0-hui.4**，独立发布于 [GlareGlimmering/hysteria](https://github.com/GlareGlimmering/hysteria)。启用用户路由时不得换成不兼容官方内核。
 
 ## 验证与限制

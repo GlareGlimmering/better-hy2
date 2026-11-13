@@ -55,6 +55,8 @@ It verifies the new candidate and delegates to that candidate's compatible upgra
 
 [Installation, first-time setup, HY2 configuration, Xray outbounds, account routing, backup/recovery and troubleshooting](docs/OPERATIONS.md).
 
+[Prerelease acceptance record and test status (Chinese)](docs/ACCEPTANCE_ZH.md).
+
 The internal Go module, binary filename, database and service names retain `h-ui` for compatibility. This project does not change the Hysteria2/Xray proxy protocols. The managed HY2 kernel is **v2.13.0-hui.4**; it is independently released at [GlareGlimmering/hysteria](https://github.com/GlareGlimmering/hysteria). Do not replace it with an incompatible upstream binary when managed user routing is enabled.
 
 ## Validation and limitations
