@@ -180,11 +180,23 @@ func Run(ctx context.Context, opts Options, deps Dependencies) error {
 		return err
 	}
 
+	verifyInstalledKernel := func() error { return nil }
 	if standardRCTag.MatchString(release.TagName) {
-		if err := preflightReleasePair(ctx, release, candidate, checksumPath, workDir, deps); err != nil {
+		kernelDigest, err := preflightReleasePair(ctx, release, candidate, checksumPath, workDir, deps)
+		if err != nil {
 			return fmt.Errorf("paired upgrade preflight: %w", err)
 		}
-		return errors.New("paired candidates verified; joint activation and recovery are not available")
+		kernelPath := filepath.Join(opts.DataDir, util.GetHysteria2BinPath())
+		verifyInstalledKernel = func() error {
+			if err := verifyFileDigest(kernelPath, kernelDigest); err != nil {
+				return fmt.Errorf("installed HY2 kernel does not match the target RC pair: %w; automatic joint activation is unavailable; use a verified maintenance-mode installation", err)
+			}
+			return nil
+		}
+		if err := verifyInstalledKernel(); err != nil {
+			return err
+		}
+		fmt.Fprintln(opts.Output, "Installed HY2 kernel matches the target pair; upgrading the panel only.")
 	}
 
 	channel := "stable"
@@ -198,6 +210,12 @@ func Run(ctx context.Context, opts Options, deps Dependencies) error {
 		answer = strings.ToLower(strings.TrimSpace(answer))
 		if answer != "y" && answer != "yes" {
 			return errors.New("upgrade cancelled")
+		}
+	}
+
+	if !opts.Yes {
+		if err := verifyInstalledKernel(); err != nil {
+			return err
 		}
 	}
 
