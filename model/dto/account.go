@@ -13,7 +13,7 @@ type LoginDto struct {
 }
 
 type AccountSaveDto struct {
-	Username     *string `json:"username" form:"username" validate:"required,min=6,max=32,validateStr"`
+	Username     *string `json:"username" form:"username" validate:"required,min=2,max=32,validateUsername"`
 	ConPass      *string `json:"conPass" form:"conPass" validate:"omitempty,min=6,max=32,validateStr"`
 	Quota        *int64  `json:"quota" form:"quota" validate:"required,min=-1"`
 	ExpireTime   *int64  `json:"expireTime" form:"expireTime" validate:"required,min=0"`
@@ -27,7 +27,7 @@ type AccountSaveDto struct {
 
 type AccountUpdateDto struct {
 	IdDto
-	Username     *string `json:"username" form:"username" validate:"omitempty,min=6,max=32,validateStr"`
+	Username     *string `json:"username" form:"username" validate:"omitempty,min=2,max=32,validateUsername"`
 	Pass         *string `json:"pass" form:"pass" validate:"omitempty,min=6,max=32,validateStr"`
 	ConPass      *string `json:"conPass" form:"conPass" validate:"omitempty,min=6,max=32,validateStr"`
 	Quota        *int64  `json:"quota" form:"quota" validate:"omitempty,min=-1"`

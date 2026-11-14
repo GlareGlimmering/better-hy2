@@ -1,19 +1,23 @@
-const bytesPerGB = 1_000_000_000;
+const bytesPerG = 1_000_000_000;
+const bytesPerTenthG = bytesPerG / 10;
 
-export function bytesToGB(bytes: number): string {
-  return (bytes / bytesPerGB).toFixed(9).replace(/\.?0+$/, "");
+export function formatTrafficG(bytes: number): string {
+  if (bytes <= 0) return "0G";
+  if (bytes < bytesPerTenthG) return "<0.1G";
+  return `${(bytes / bytesPerG).toFixed(1).replace(/\.0$/, "")}G`;
 }
 
-// Preserve the existing API sentinels as literal values, even in a GB field.
-export function quotaInput(bytes: number): string {
-  return bytes < 0 ? String(bytes) : bytesToGB(bytes);
+export function quotaInput(bytes: number): number {
+  if (bytes < 0) return -1;
+  if (bytes === 0) return 0;
+  return Math.max(1, Math.round(bytes / bytesPerTenthG)) / 10;
 }
 
-export function parseQuotaGB(input: string): number | undefined {
-  const value = input.trim();
-  if (value === "-1") return -1;
-  const match = /^(\d+)(?:\.(\d{1,9}))?$/.exec(value);
-  if (!match) return undefined;
-  const bytes = Number(match[1]) * bytesPerGB + Number((match[2] ?? "").padEnd(9, "0"));
+export function quotaInputBytes(input: number | undefined): number | undefined {
+  if (input === -1) return -1;
+  if (input === undefined || input < 0 || !Number.isFinite(input)) return undefined;
+  const tenths = Math.round(input * 10);
+  if (tenths / 10 !== input) return undefined;
+  const bytes = tenths * bytesPerTenthG;
   return Number.isSafeInteger(bytes) ? bytes : undefined;
 }

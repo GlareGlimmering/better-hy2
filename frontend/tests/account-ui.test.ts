@@ -35,3 +35,19 @@ test("account actions use a compact fixed operation column", () => {
   assert.match(accountPage, /command="reset-traffic"/);
   assert.match(accountPage, /command="delete"/);
 });
+
+test("account drawer uses tenths of G and omits unchanged legacy quota", () => {
+  assert.match(accountPage, /:step="0\.1"/);
+  assert.match(accountPage, /:precision="1"/);
+  assert.match(accountPage, /unchangedQuota = [^\n]+quotaInput\(state\.dataForm\.quota\)/);
+  assert.match(accountPage, /unchangedQuota \? undefined : quotaInputBytes/);
+  assert.match(accountPage, /\{2,32\}/);
+});
+
+test("navbar keeps language and account actions in narrow and wide layouts", () => {
+  const navbar = readFileSync(new URL("../src/layout/components/Navbar.vue", import.meta.url), "utf8");
+  assert.match(navbar, /<lang-select/);
+  assert.match(navbar, /navbar.logout/);
+  assert.match(navbar, /\.navbar-actions\s*\{\s*flex: none/);
+  assert.doesNotMatch(navbar, /[Ff]ullscreen|size-select|device !== 'mobile'/);
+});

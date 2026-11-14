@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -39,4 +40,35 @@ func TestSaveRegularAccountWithoutLoginPassword(t *testing.T) {
 	if got := *account.ConPass; got != "new-user.connection-secret" {
 		t.Fatalf("connection password = %q", got)
 	}
+}
+
+func TestShortProxyUsernameCreateAndEdit(t *testing.T) {
+	setupControllerSubscriptionTestDatabase(t)
+	gin.SetMode(gin.TestMode)
+	request := func(handler gin.HandlerFunc, body string, success bool) {
+		t.Helper()
+		response := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(response)
+		c.Request = httptest.NewRequest("POST", "/", strings.NewReader(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+		handler(c)
+		if strings.Contains(response.Body.String(), `"type":"ok"`) != success {
+			t.Fatalf("unexpected account response: %s", response.Body.String())
+		}
+	}
+	create := `{"username":%q,"quota":1073741824,"expireTime":4102444800000,"deviceNo":3,"deleted":0}`
+	request(SaveAccount, fmt.Sprintf(create, "a"), false)
+	request(SaveAccount, fmt.Sprintf(create, "ab"), true)
+	account, err := dao.GetAccount("username = ?", "ab")
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := *account.Id
+	request(UpdateAccount, fmt.Sprintf(`{"id":%d,"username":"a"}`, id), false)
+	request(UpdateAccount, fmt.Sprintf(`{"id":%d,"username":"ab","remark":"edited"}`, id), true)
+	account, err = dao.GetAccount("id = ?", id)
+	if err != nil || *account.Remark != "edited" || *account.Quota != 1073741824 {
+		t.Fatalf("remark update must preserve legacy quota: %v", err)
+	}
+	request(UpdateAccount, `{"id":1,"username":"xy"}`, false)
 }

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { storeToRefs } from "pinia";
 import { useRoute, useRouter } from "vue-router";
 import { useAppStore } from "@/store/modules/app";
 import { useAccountStore } from "@/store/modules/account";
@@ -10,19 +9,12 @@ const accountStore = useAccountStore();
 const route = useRoute();
 const router = useRouter();
 
-const { device } = storeToRefs(appStore); // 设备类型：desktop-宽屏设备 || mobile-窄屏设备
-
 /**
  * 左侧菜单栏显示/隐藏
  */
 function toggleSideBar() {
   appStore.toggleSidebar(true);
 }
-
-/**
- * vueUse 全屏
- */
-const { isFullscreen, toggle } = useFullscreen();
 
 /**
  * 注销
@@ -44,7 +36,7 @@ function logout() {
   <!-- 顶部导航栏 -->
   <div class="navbar">
     <!-- 左侧面包屑 -->
-    <div class="flex">
+    <div class="navbar-navigation flex">
       <hamburger
         :is-active="appStore.sidebar.opened"
         @toggleClick="toggleSideBar"
@@ -53,20 +45,8 @@ function logout() {
     </div>
 
     <!-- 右侧导航设置 -->
-    <div class="flex">
-      <!-- 导航栏设置(窄屏隐藏)-->
-      <div class="setting-container" v-if="device !== 'mobile'">
-        <!--全屏 -->
-        <div class="setting-item" @click="toggle">
-          <svg-icon
-            :icon-class="isFullscreen ? 'exit-fullscreen' : 'fullscreen'"
-          />
-        </div>
-        <!-- 布局大小 -->
-        <el-tooltip content="布局大小" effect="dark" placement="bottom">
-          <size-select class="setting-item" />
-        </el-tooltip>
-        <!--语言选择-->
+    <div class="navbar-actions flex">
+      <div class="setting-container">
         <lang-select class="setting-item" />
       </div>
 
@@ -96,6 +76,15 @@ function logout() {
   height: 50px;
   background-color: #fff;
   box-shadow: 0 0 1px #0003;
+
+  .navbar-navigation {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .navbar-actions {
+    flex: none;
+  }
 
   .setting-container {
     display: flex;

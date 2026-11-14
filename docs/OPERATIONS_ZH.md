@@ -4,7 +4,7 @@
 
 使用 [README](../README_ZH.md) 中的一行安装命令。安装器从官方仓库解析精确稳定 Tag，校验 SHA256 和实际版本，安装定制 HY2，在启动服务前初始化 schema 和随机管理员，再创建 systemd 并检查首页及入口 JS。无有效程序/服务的半安装环境会安全续装；有效旧安装交给新版候选程序升级。Release 不包含数据库或凭据。
 
-保留 `h-ui.service`、`/usr/local/h-ui/h-ui`、`HUI_DATA=/usr/local/h-ui/`、`/usr/local/h-ui/data/h_ui.db` 和 `/var/lib/h-ui`。`/usr/local/bin/hui` 是指向旧二进制路径的链接，绝不覆盖其他软件的同名命令。手工卸载时只在核实链接目标后删除该链接，不提供自动清空数据功能。
+保留 `h-ui.service`、`/usr/local/h-ui/h-ui`、`HUI_DATA=/usr/local/h-ui/`、`/usr/local/h-ui/data/h_ui.db` 和 `/var/lib/h-ui`。`/usr/local/bin/hui` 是指向旧二进制路径的链接，绝不覆盖其他软件的同名命令。
 
 面板仅监听 `http://127.0.0.1:8000`，通过 Caddy/Nginx HTTPS 或 Cloudflare Tunnel 转发到本机地址。首次访问也可通过 SSH 本地转发。不要将裸 HTTP 暴露公网；安装器不会设置防火墙或反向代理。品牌更名不要求更换证书、数据库和配置目录。
 
@@ -35,6 +35,14 @@ DIRECT 内置；原生 SOCKS5 无需 Xray。VLESS/HTTP 节点在「出站节点�
 升级快照位于 `/var/lib/h-ui/backups/upgrade-*`，包含 SQLite 一致性备份、旧程序、systemd unit、HY2 YAML、相关 Xray 配置/CA 及文件所有权信息，保留最新五份。启动或 HTTP/入口资源检查失败会自动恢复快照与原运行状态；回滚失败会明确报错。v1.0.0 不改变匹配的 HY2/Xray 内核版本，保留配置、账户绑定和证书路径。
 
 升级前仍建议额外私密备份 `/usr/local/h-ui`、`/var/lib/h-ui` 和 unit，保留权限；原始文件拷贝应停服务以确保一致性，或使用 SQLite 专用备份。备份含敏感数据，不要公开上传。手工恢复时停止 `h-ui.service`，另存失败状态，依照 `manifest.json` 恢复每个文件到原路径并恢复权限、所有权，daemon-reload 后恢复原服务状态。数据库恢复会丢弃快照之后的修改。链接仍指向恢复后的程序，旧版本无 `update` 时使用 `hui upgrade`。
+
+## 卸载
+
+执行 `sudo hui uninstall`，也可使用 `sudo /usr/local/h-ui/h-ui uninstall`。核对清单后输入 `UNINSTALL`，停止并禁用标准面板服务，移除 unit、面板程序及指向该程序的链接。直接回车取消。默认保留数据库、配置、日志和备份。
+
+执行 `sudo hui uninstall --purge` 并输入 `PURGE`，还会清除清单中的面板数据、日志、导出目录及升级备份。如需稍后单独清除，请先把程序复制到这些目录之外的私密位置。遇到自定义或被覆盖的面板 unit 以及不安全的数据路径，命令会拒绝操作。面板管理的 HY2 子进程随面板停止。现有 HY2 程序和配置、Xray 服务及文件、外部证书及独立安装的命令和服务会保留，现有安装没有独占归属记录。
+
+卸载中途失败时，命令返回错误并列出剩余项。处理错误后用保留的程序或私密副本重试。
 
 ## 故障排查
 

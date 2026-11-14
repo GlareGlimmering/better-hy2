@@ -11,10 +11,14 @@ import (
 )
 
 var validate *validator.Validate
+var usernameCharacters = regexp.MustCompile("^[a-zA-Z0-9!@#$%^&*()_+-=]+$")
 
 func init() {
 	validate = validator.New()
 	_ = validate.RegisterValidation("validateStr", validateStr)
+	_ = validate.RegisterValidation("validateUsername", func(f validator.FieldLevel) bool {
+		return f.Field().String() == "" || usernameCharacters.MatchString(f.Field().String())
+	})
 }
 
 func validateStr(f validator.FieldLevel) bool {

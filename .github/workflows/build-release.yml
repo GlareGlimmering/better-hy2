@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - "feature/**"
+      - feat/account-bandwidth-controls
       - "release-retry/v1.1.0-rc.1"
     tags:
       - "v*.*.*"
@@ -177,6 +178,10 @@ jobs:
             embedded_path="${asset_path#frontend/}"
             grep -aFq "${embedded_path}" "build/${BINARY_NAME}"
           done < <(find frontend/dist/assets -type f -name '_*' -print)
+
+      - name: Exercise uninstall on the disposable systemd runner
+        if: github.ref == 'refs/heads/feat/account-bandwidth-controls'
+        run: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_ENVIRONMENT bash scripts/test-systemd-uninstall.sh "$PWD/build/$BINARY_NAME"
 
       - name: Refuse environment-specific release contamination
         shell: bash
