@@ -259,7 +259,7 @@ jobs:
           HUI_PAIR_TEST_PANEL_VERSION="$PANEL_VERSION" \
           HUI_PAIR_TEST_PANEL_COMMIT="$PANEL_SHA" \
           HUI_PAIR_TEST_KERNEL_COMMIT="$kernel_sha" \
-          go test ./upgrade -run '^TestPairPreflightCompiledArtifacts$' -count=1 -v
+          go test ./upgrade -run '^TestPairPreflightCompiledArtifacts(UpgradesWithMatchingInstalledKernel)?$' -count=1 -v
           cd build
           sha256sum h-ui-linux-amd64 hysteria-linux-amd64 HY2-PAIR.json > SHA256SUMS
           sha256sum --check SHA256SUMS

@@ -52,75 +52,75 @@ func (p releasePair) validate(tag string) error {
 	return nil
 }
 
-func preflightReleasePair(ctx context.Context, release releaseInfo, panel, sums, dir string, deps Dependencies) error {
+func preflightReleasePair(ctx context.Context, release releaseInfo, panel, sums, dir string, deps Dependencies) (string, error) {
 	assets := map[string]string{}
 	for _, asset := range release.Assets {
 		if asset.Name != pairManifestAsset && asset.Name != pairKernelAsset {
 			continue
 		}
 		if assets[asset.Name] != "" {
-			return errors.New("duplicate paired release asset")
+			return "", errors.New("duplicate paired release asset")
 		}
 		assets[asset.Name] = asset.URL
 	}
 	if assets[pairManifestAsset] == "" || assets[pairKernelAsset] == "" {
-		return errors.New("release lacks verified paired kernel assets")
+		return "", errors.New("release lacks verified paired kernel assets")
 	}
 	manifest := filepath.Join(dir, pairManifestAsset)
 	if err := downloadFile(ctx, assets[pairManifestAsset], manifest, deps); err != nil {
-		return fmt.Errorf("download paired release manifest: %w", err)
+		return "", fmt.Errorf("download paired release manifest: %w", err)
 	}
 	if err := verifyPairChecksum(manifest, sums); err != nil {
-		return err
+		return "", err
 	}
 	file, err := os.Open(manifest)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer file.Close()
 	if info, err := file.Stat(); err != nil || info.Size() > 4096 {
-		return errors.New("invalid paired release manifest size")
+		return "", errors.New("invalid paired release manifest size")
 	}
 	decoder := json.NewDecoder(file)
 	decoder.DisallowUnknownFields()
 	var pair releasePair
 	if err := decoder.Decode(&pair); err != nil {
-		return errors.New("invalid paired release manifest")
+		return "", errors.New("invalid paired release manifest")
 	}
 	if err := decoder.Decode(new(any)); err != io.EOF {
-		return errors.New("invalid trailing content in paired release manifest")
+		return "", errors.New("invalid trailing content in paired release manifest")
 	}
 	if err := pair.validate(release.TagName); err != nil {
-		return err
+		return "", err
 	}
 	for name, digest := range map[string]string{BinaryAsset: pair.Panel.SHA256, pairKernelAsset: pair.Kernel.SHA256} {
 		expected, err := expectedChecksum(sums, name)
 		if err != nil || expected != digest {
-			return fmt.Errorf("manifest and SHA256SUMS disagree for %s", name)
+			return "", fmt.Errorf("manifest and SHA256SUMS disagree for %s", name)
 		}
 	}
 	if err := verifyPairExecutable(panel); err != nil {
-		return fmt.Errorf("panel candidate: %w", err)
+		return "", fmt.Errorf("panel candidate: %w", err)
 	}
 	if err := verifyPanelBuildCommit(panel, pair.Panel.Commit); err != nil {
-		return err
+		return "", err
 	}
 	kernel := filepath.Join(dir, pairKernelAsset)
 	if err := downloadFile(ctx, assets[pairKernelAsset], kernel, deps); err != nil {
-		return fmt.Errorf("download paired kernel: %w", err)
+		return "", fmt.Errorf("download paired kernel: %w", err)
 	}
 	if err := verifyPairChecksum(kernel, sums); err != nil {
-		return err
+		return "", err
 	}
 	if err := verifyPairExecutable(kernel); err != nil {
-		return fmt.Errorf("kernel candidate: %w", err)
+		return "", fmt.Errorf("kernel candidate: %w", err)
 	}
 	if err := os.Chmod(kernel, 0700); err != nil {
-		return err
+		return "", err
 	}
 	output, err := deps.Command(kernel, "version", "--json")
 	if err != nil {
-		return errors.New("kernel candidate did not provide build and capability information")
+		return "", errors.New("kernel candidate did not provide build and capability information")
 	}
 	var info struct {
 		Version            string `json:"version"`
@@ -133,17 +133,20 @@ func preflightReleasePair(ctx context.Context, release releaseInfo, panel, sums,
 	if json.Unmarshal(output, &info) != nil || info.Version != pair.Kernel.Version || info.Commit != pair.Kernel.Commit ||
 		info.OS != pair.OS || info.Arch != pair.Arch || info.AccountConsistency != pair.AccountConsistency ||
 		info.AccountBandwidth != pair.AccountBandwidth {
-		return errors.New("kernel build or capabilities do not match release manifest")
+		return "", errors.New("kernel build or capabilities do not match release manifest")
 	}
-	return nil
+	return pair.Kernel.SHA256, nil
 }
 
 func verifyPairChecksum(path, sums string) error {
-	name := filepath.Base(path)
-	want, err := expectedChecksum(sums, name)
+	want, err := expectedChecksum(sums, filepath.Base(path))
 	if err != nil {
 		return err
 	}
+	return verifyFileDigest(path, want)
+}
+
+func verifyFileDigest(path, want string) error {
 	f, err := os.Open(path)
 	if err != nil {
 		return err
@@ -154,7 +157,7 @@ func verifyPairChecksum(path, sums string) error {
 		return err
 	}
 	if !strings.EqualFold(fmt.Sprintf("%x", h.Sum(nil)), want) {
-		return fmt.Errorf("SHA256 mismatch for %s", name)
+		return fmt.Errorf("SHA256 mismatch for %s", filepath.Base(path))
 	}
 	return nil
 }
