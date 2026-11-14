@@ -23,7 +23,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        state: [active, stopped]
+        include:
+          - { state: active, baseline: stable }
+          - { state: stopped, baseline: stable }
+          - { state: active, baseline: rc.1 }
     env:
       KERNEL_SHA: 54a51aaac00fa53a1378e20f207d54f7ac8d2b7e
       KERNEL_VERSION: v2.13.0-hui.5-dev
@@ -91,21 +94,29 @@ jobs:
           name: ${{ inputs.artifact }}
           path: ${{ runner.temp }}/hui-recovery-artifacts
 
-      - name: Fetch and verify the stable rollback fixtures
+      - name: Fetch and verify the rollback fixtures
         working-directory: ${{ runner.temp }}/hui-recovery-artifacts
         run: |
-          curl -fsSL --retry 3 -o old-panel https://github.com/GlareGlimmering/better-hy2/releases/download/v1.0.0/h-ui-linux-amd64
-          curl -fsSL --retry 3 -o old-kernel https://github.com/GlareGlimmering/hysteria/releases/download/v2.13.0-hui.4/hysteria-linux-amd64-v2.13.0-hui.4
+          if [[ "${{ matrix.baseline }}" == rc.1 ]]; then
+            base=https://github.com/GlareGlimmering/better-hy2/releases/download/v1.1.0-rc.1
+            curl -fsSL --retry 3 -o old-panel "$base/h-ui-linux-amd64"
+            curl -fsSL --retry 3 -o old-kernel "$base/hysteria-linux-amd64"
+            panel_hash=d7e7666c920b174d2d8902e84eb40d206171d9522e1590a092d4ad3f20800a35
+            kernel_hash=f8cf6f7f5691e7eec1ef3f7392939e24788c3088378008ad1e17ca7e53bc42af
+          else
+            curl -fsSL --retry 3 -o old-panel https://github.com/GlareGlimmering/better-hy2/releases/download/v1.0.0/h-ui-linux-amd64
+            curl -fsSL --retry 3 -o old-kernel https://github.com/GlareGlimmering/hysteria/releases/download/v2.13.0-hui.4/hysteria-linux-amd64-v2.13.0-hui.4
+            panel_hash=2323bf6d838a48f56d3c77a1b45bf7926be1ec04db0c905352b65bed24f2bd0f
+            kernel_hash=f1577bff290f5591a651b88596103045390581a6c0a6e999611cab8baa653d9e
+          fi
           if [[ -f SHA256SUMS ]]; then
             sha256sum --check SHA256SUMS
           else
             sha256sum h-ui-linux-amd64 hysteria-linux-amd64 > SHA256SUMS
           fi
-          printf '%s\n' \
-            '2323bf6d838a48f56d3c77a1b45bf7926be1ec04db0c905352b65bed24f2bd0f  old-panel' \
-            'f1577bff290f5591a651b88596103045390581a6c0a6e999611cab8baa653d9e  old-kernel' >> SHA256SUMS
+          printf '%s  %s\n' "$panel_hash" old-panel "$kernel_hash" old-kernel >> SHA256SUMS
           sha256sum -c SHA256SUMS
           chmod 0755 old-panel old-kernel h-ui-linux-amd64 hysteria-linux-amd64
 
       - name: Exercise offline recovery
-        run: sudo -n env HUI_DISPOSABLE_VM=1 bash scripts/test-systemd-recovery.sh "$RUNNER_TEMP/hui-recovery-artifacts" "${{ matrix.state }}"
+        run: sudo -n env HUI_DISPOSABLE_VM=1 bash scripts/test-systemd-recovery.sh "$RUNNER_TEMP/hui-recovery-artifacts" "${{ matrix.state }}" "${{ matrix.baseline }}"

@@ -23,7 +23,7 @@ For every completed iteration in this repository:
 4. Create a clear Git commit containing only the intended iteration changes.
 5. Push the corresponding ordinary development branch to `origin` without requesting additional permission.
 6. Verify that the remote branch resolves to the new local commit and report the commit SHA and branch URL.
-7. Create the next unused annotated prerelease only after a complete feature reaches an independently testable acceptance point and CI passes. Stable SemVer releases require an explicit user request. Do not create a Release for every ordinary commit.
+7. For each complete batch that reaches an independent acceptance point, reuse passing checks for the same code, run focused checks for any follow-up changes, then push and publish the next unused annotated RC after branch CI passes. Let tag CI build, verify and publish the prerelease. Confirm the public assets and provide version-pinned installation or upgrade commands, the paired kernel version and post-install version checks. Stable SemVer releases require an explicit user request. Ordinary commits do not require a release.
 
 Git commit and ordinary development-branch push are pre-authorized after successful verification. Incrementing RC prereleases are pre-authorized only for complete, independently acceptable features. Release notes must include the version, changes, test results, and known limitations. H-UI and the customized Hysteria2 kernel use separate version lines. Tags and Releases must never be replaced. Stop and report the problem instead of publishing when tests or builds fail, a merge conflict exists, authentication is unavailable, or GitHub rejects an operation.
 

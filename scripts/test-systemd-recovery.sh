@@ -7,6 +7,11 @@ trap 'printf "Recovery check failed at line %s\n" "$LINENO" >&2' ERR
 [[ $(cat /proc/1/comm) == systemd ]]
 systemctl show --property=SystemState >/dev/null
 [[ ${2:-} == active || ${2:-} == stopped ]]
+case ${3:-stable} in
+  stable) old_version=v1.0.0 ;;
+  rc.1) old_version=v1.1.0-rc.1 ;;
+  *) echo "Unsupported recovery baseline: $3" >&2; exit 1 ;;
+esac
 artifacts=$(realpath "$1")
 (cd "$artifacts" && sha256sum --check SHA256SUMS)
 root=$(mktemp -d /var/tmp/hui-recovery.XXXXXX)
@@ -129,7 +134,7 @@ WantedBy=multi-user.target
 EOF
 systemctl daemon-reload
 install_pair "$artifacts/old-panel" "$artifacts/old-kernel"
-[[ $("$live/h-ui" version) == 'Better HY2 version v1.0.0' ]]
+[[ $("$live/h-ui" version) == "Better HY2 version $old_version" ]]
 (cd "$live" && HUI_DATA="$live/" ./h-ui reset >"$root/reset.log")
 python3 - "$live/data/h_ui.db" "$root" <<'PY'
 import sqlite3
@@ -219,7 +224,7 @@ if systemctl start "$unit"; then
   exit 1
 fi
 restore "$2"
-[[ $("$live/h-ui" version) == 'Better HY2 version v1.0.0' ]]
+[[ $("$live/h-ui" version) == "Better HY2 version $old_version" ]]
 cmp "$live/bin/hysteria-linux-amd64" "$artifacts/old-kernel"
 if [[ $2 == active ]]; then
   systemctl is-enabled --quiet "$unit"
