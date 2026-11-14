@@ -4,7 +4,7 @@
 
 Use the [README installer](../README.md). The script selects an exact stable tag from the official repository API, verifies SHA256 and executable version, installs HY2, initializes schema/admin without starting the server, then installs systemd and checks HTML plus the entry JavaScript. A partial installation without a valid binary/unit resumes fresh initialization. An existing valid installation uses the candidate's upgrader. No credentials or databases are shipped in releases.
 
-The service remains `h-ui.service`, executable `/usr/local/h-ui/h-ui`, data root `HUI_DATA=/usr/local/h-ui/`, SQLite `/usr/local/h-ui/data/h_ui.db`, runtime data `/var/lib/h-ui`. The new `/usr/local/bin/hui` is a symlink to that binary. An unrelated existing `hui` command is never overwritten. Remove only this symlink if manually uninstalling after verifying its target; there is no automatic purge command.
+The service remains `h-ui.service`, executable `/usr/local/h-ui/h-ui`, data root `HUI_DATA=/usr/local/h-ui/`, SQLite `/usr/local/h-ui/data/h_ui.db`, runtime data `/var/lib/h-ui`. The new `/usr/local/bin/hui` is a symlink to that binary. An unrelated existing `hui` command is never overwritten.
 
 Panel endpoint: `http://127.0.0.1:8000`. Provide HTTPS through Caddy/Nginx or a Cloudflare Tunnel; it must forward to the loopback address. For private initial access, an SSH local forward is another option. Do not expose raw HTTP publicly. Retain reverse-proxy trust and access restrictions appropriate to your environment. Changing panel paths or certificates is not required by the rename.
 
@@ -35,6 +35,14 @@ Use `sudo hui update`; stable is the default. The legacy `upgrade` command remai
 Upgrade snapshots under `/var/lib/h-ui/backups/upgrade-*` contain a SQLite-consistent database copy, previous binary, systemd unit, HY2 YAML, and relevant Xray config/CA files, with ownership metadata. Five newest snapshots are retained. Startup/HTTP/frontend failure restores the snapshot and prior running state; an unsuccessful rollback is reported explicitly. HY2 kernel pin and Xray version are unchanged by v1.0.0. Existing configuration, bindings and certificate paths are retained.
 
 Before upgrading, additionally keep a private off-host copy of `/usr/local/h-ui`, `/var/lib/h-ui` and the service unit, preserving permissions; stop services for a consistent raw file copy, or use SQLite-aware backup. Do not publish the backup: it contains credentials. For manual recovery, stop `h-ui.service`, preserve the failed state separately, inspect the snapshot `manifest.json`, restore each mapped file to its original path with recorded permissions/ownership, reload systemd, then restore the previous service state. Database rollback discards changes made after the snapshot. The symlink continues to point at the restored binary; for an old version lacking `update`, use `hui upgrade`.
+
+## Uninstall
+
+Run `sudo hui uninstall` (or `sudo /usr/local/h-ui/h-ui uninstall`). Review the displayed plan, then type `UNINSTALL` to stop and disable the standard systemd panel service and remove its unit, executable and matching symlink. Enter alone cancels the operation. The database, configuration, logs and backups are retained by default.
+
+Use `sudo hui uninstall --purge` and type `PURGE` to additionally remove the displayed panel data, log and export directories and upgrade backups. Copy the executable to a private location outside these directories first if you need to run a separate purge later. The command refuses custom or overridden panel units and unsafe data paths. The managed HY2 child stops with the panel. Existing HY2 binaries/configuration, Xray services and their files, external certificates and independently installed commands/services are preserved because their exclusive ownership is not recorded.
+
+An incomplete uninstall returns an error and lists remaining items. Correct the reported issue and re-run the same command using the retained executable or your private copy.
 
 ## Troubleshooting
 

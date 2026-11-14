@@ -133,8 +133,8 @@
         </el-table-column>
         <el-table-column key="traffic" :label="$t('account.trafficUsed')" align="center" min-width="130">
           <template #default="scope">
-            <el-tooltip :content="`${$t('account.upload')}: ${formatGB(scope.row.upload)} · ${$t('account.download')}: ${formatGB(scope.row.download)}`">
-              <span>{{ formatGB(scope.row.upload + scope.row.download) }} / {{ scope.row.quota < 0 ? "∞" : formatGB(scope.row.quota) }}</span>
+            <el-tooltip :content="`${$t('account.upload')}: ${formatTrafficG(scope.row.upload)} · ${$t('account.download')}: ${formatTrafficG(scope.row.download)}`">
+              <span>{{ formatTrafficG(scope.row.upload + scope.row.download) }} / {{ scope.row.quota < 0 ? "∞" : formatTrafficG(scope.row.quota) }}</span>
             </el-tooltip>
           </template>
         </el-table-column>
@@ -245,13 +245,13 @@
           class="account-usage"
           type="info"
           :closable="false"
-          :title="`${$t('account.trafficUsed')}: ${formatGB(drawerAccount.upload + drawerAccount.download)} · ${$t('account.device')}: ${drawerAccount.device}/${drawerAccount.deviceNo}`"
+          :title="`${$t('account.trafficUsed')}: ${formatTrafficG(drawerAccount.upload + drawerAccount.download)} · ${$t('account.trafficRemaining')}: ${drawerAccount.quota < 0 ? '∞' : formatTrafficG(drawerAccount.quota - drawerAccount.upload - drawerAccount.download)} · ${$t('account.device')}: ${drawerAccount.device}/${drawerAccount.deviceNo}`"
         />
         <el-form-item :label="$t('account.username')" prop="username">
           <el-input
             v-model="dataForm.username"
             :placeholder="$t('account.username')"
-            maxlength="50"
+            maxlength="32"
             clearable
           />
         </el-form-item>
@@ -318,7 +318,18 @@
           <div v-if="outboundExcludedCount > 0" class="form-tip">{{ $t('account.outboundHistoricalExcluded') }}</div>
         </el-form-item>
         <el-form-item :label="$t('account.quota')" prop="quota">
-          <el-input v-model="quotaTmp" inputmode="decimal" />
+          <el-switch
+            v-model="unlimitedQuota"
+            :inactive-text="$t('account.quotaUnlimited')"
+            :active-text="$t('account.quotaUnlimited')"
+          />
+          <el-input-number
+            v-if="!unlimitedQuota"
+            v-model="quotaTmp"
+            :min="0"
+            :step="0.1"
+            :precision="1"
+          />
           <div>{{ $t("account.quotaGBHelp") }}</div>
         </el-form-item>
         <template v-if="dataForm.role !== 'admin'">
@@ -498,7 +509,7 @@ import {
   getHourLater,
   getDayLater,
 } from "@/utils/time";
-import { bytesToGB, parseQuotaGB, quotaInput } from "@/utils/account-quota";
+import { formatTrafficG, quotaInputBytes, quotaInput } from "@/utils/account-quota";
 
 import {
   hysteria2KickApi,
@@ -527,7 +538,7 @@ import {
   hasUnavailableBinding,
 } from "./outbound-form";
 
-const formatGB = (bytes: number) => `${bytesToGB(bytes)} GB`;
+
 const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
@@ -561,7 +572,7 @@ const dataFormAddRules = {
       trigger: ["change", "blur"],
     },
     {
-      pattern: /^[a-zA-Z0-9!@#$%^&*()_+-=]{6,32}$/,
+      pattern: /^[a-zA-Z0-9!@#$%^&*()_+-=]{2,32}$/,
       message: "Username format is incorrect",
       trigger: ["change", "blur"],
     },
@@ -607,8 +618,12 @@ const dataFormUpdateRules = {
   ],
   username: [
     {
-      pattern: /^[a-zA-Z0-9!@#$%^&*()_+-=]{6,32}$/,
-      message: "Username format is incorrect",
+      validator: (_rule: unknown, value: string, done: (error?: Error) => void) => {
+        const valid = state.dataForm.role === "admin"
+          ? /^[a-zA-Z0-9!@#$%^&*()_+-=]{6,32}$/.test(value)
+          : /^[a-zA-Z0-9!@#$%^&*()_+-=]{2,32}$/.test(value);
+        done(valid ? undefined : new Error("Username format is incorrect"));
+      },
       trigger: ["change", "blur"],
     },
   ],
@@ -691,7 +706,8 @@ const state = reactive({
     pageNum: 1,
     pageSize: 10,
   } as AccountPageDto,
-  quotaTmp: "0",
+  quotaTmp: 0 as number | undefined,
+  unlimitedQuota: false,
   fileList: [] as UploadFile[],
   qrCodeDialog: {
     title: "QR Code",
@@ -721,6 +737,7 @@ const {
   kickForm,
   queryParams,
   quotaTmp,
+  unlimitedQuota,
   fileList,
   qrCodeDialog,
   qrCodeSrc,
@@ -765,7 +782,8 @@ const resetDataForm = () => {
     deleted: 0,
     ...newAccountOutboundFields(),
   });
-  quotaTmp.value = "0";
+  quotaTmp.value = 0;
+  unlimitedQuota.value = false;
 };
 
 const loadOutboundOptions = (): Promise<void> => {
@@ -858,7 +876,9 @@ const handleUpdate = async (row: { [key: string]: any }) => {
   const id = row.id;
   const { data } = await getAccountApi({ id: id });
   Object.assign(state.dataForm, data);
-  quotaTmp.value = quotaInput(data.quota);
+  const input = quotaInput(data.quota);
+  unlimitedQuota.value = input < 0;
+  quotaTmp.value = Math.max(0, input);
   dialog.value = {
     title: t("common.update"),
     visible: true,
@@ -871,8 +891,9 @@ const handleUpdate = async (row: { [key: string]: any }) => {
 const submitForm = async () => {
   const valid = await dataFormRef.value?.validate().catch(() => false);
   if (!valid) return;
-  const unchangedQuota = state.dataForm.id && quotaTmp.value === quotaInput(state.dataForm.quota);
-  const quota = unchangedQuota ? undefined : parseQuotaGB(quotaTmp.value);
+  const quotaValue = unlimitedQuota.value ? -1 : quotaTmp.value;
+  const unchangedQuota = state.dataForm.id && quotaValue === quotaInput(state.dataForm.quota);
+  const quota = unchangedQuota ? undefined : quotaInputBytes(quotaValue);
   if (!unchangedQuota && quota === undefined) {
     ElMessage.error(t("account.quotaGBInvalid"));
     return;

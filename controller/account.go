@@ -179,9 +179,22 @@ func UpdateAccount(c *gin.Context) {
 		return
 	}
 
-	if accountUpdateDto.Username != nil && *accountUpdateDto.Username != "" && service.ExistAccountUsername(*accountUpdateDto.Username, *accountUpdateDto.Id) {
-		vo.Fail(fmt.Sprintf("username %s already exists", *accountUpdateDto.Username), c)
-		return
+	if accountUpdateDto.Username != nil && *accountUpdateDto.Username != "" {
+		if len(*accountUpdateDto.Username) < 6 {
+			target, err := service.GetAccount(*accountUpdateDto.Id)
+			if err != nil {
+				vo.Fail(err.Error(), c)
+				return
+			}
+			if target.Role != nil && *target.Role == "admin" {
+				vo.Fail(constant.InvalidError, c)
+				return
+			}
+		}
+		if service.ExistAccountUsername(*accountUpdateDto.Username, *accountUpdateDto.Id) {
+			vo.Fail(fmt.Sprintf("username %s already exists", *accountUpdateDto.Username), c)
+			return
+		}
 	}
 
 	if accountUpdateDto.Deleted != nil && *accountUpdateDto.Deleted == 1 {

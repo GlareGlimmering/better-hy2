@@ -92,15 +92,15 @@
     <section v-loading="trafficLoading" class="metric-grid traffic-grid">
       <el-card shadow="never" class="metric-card traffic-card upload-card">
         <span class="metric-label">{{ $t("dashboard.totalUpload") }}</span>
-        <strong>{{ formatBytes(trafficMonitor.upload) }}</strong>
+        <strong>{{ formatTrafficG(trafficMonitor.upload) }}</strong>
       </el-card>
       <el-card shadow="never" class="metric-card traffic-card download-card">
         <span class="metric-label">{{ $t("dashboard.totalDownload") }}</span>
-        <strong>{{ formatBytes(trafficMonitor.download) }}</strong>
+        <strong>{{ formatTrafficG(trafficMonitor.download) }}</strong>
       </el-card>
       <el-card shadow="never" class="metric-card traffic-card total-card">
         <span class="metric-label">{{ $t("dashboard.totalTraffic") }}</span>
-        <strong>{{ formatBytes(trafficMonitor.total) }}</strong>
+        <strong>{{ formatTrafficG(trafficMonitor.total) }}</strong>
       </el-card>
     </section>
 
@@ -135,7 +135,7 @@
           min-width="120"
           align="right"
         >
-          <template #default="scope">{{ formatBytes(scope.row.upload) }}</template>
+          <template #default="scope">{{ formatTrafficG(scope.row.upload) }}</template>
         </el-table-column>
         <el-table-column
           prop="download"
@@ -143,7 +143,7 @@
           min-width="120"
           align="right"
         >
-          <template #default="scope">{{ formatBytes(scope.row.download) }}</template>
+          <template #default="scope">{{ formatTrafficG(scope.row.download) }}</template>
         </el-table-column>
         <el-table-column
           prop="total"
@@ -152,7 +152,7 @@
           align="right"
         >
           <template #default="scope">
-            <strong>{{ formatBytes(scope.row.total) }}</strong>
+            <strong>{{ formatTrafficG(scope.row.total) }}</strong>
           </template>
         </el-table-column>
       </el-table>
@@ -176,7 +176,7 @@ import {
 } from "@/api/monitor/types";
 import { verifyDefaultPassApi } from "@/api/account";
 import { useAccountStore } from "@/store/modules/account";
-import { formatBytes } from "@/utils/byte";
+import { formatTrafficG } from "@/utils/account-quota";
 import { timestampToCompactDateTime } from "@/utils/time";
 import { createDashboardPolling } from "./polling";
 
