@@ -15,27 +15,12 @@
 
 ## Required delivery workflow
 
-For every completed iteration in this repository:
+1. When the change meets the request, reuse checks already passed for the same commit and run focused checks for affected changes. Before committing, quickly review the diff and file list for unrelated changes, secrets, and generated artifacts, and run `git diff --check`.
+2. Commit and push the change to the development branch directly. Verify the remote branch SHA.
+3. When a complete batch reaches an independent acceptance point, create and push the next unused annotated RC tag and follow the existing release CI through publication. Let that CI run its configured build and checks once. Run additional installation, upgrade, or rollback checks only when the changes touch those paths or CI reports a failure. Investigate failures in the affected area.
+4. Confirm the GitHub prerelease and required download assets are available. Reuse CI's artifact checksums. Routine releases require no fresh download or checksum pass after publication. Report the release and CI links, version-pinned installation or upgrade commands, and the paired kernel version when applicable.
 
-1. Inspect the branch, `git status`, relevant diffs, and configured remotes.
-2. Run the tests, builds, static checks, and `git diff --check` appropriate to the changes.
-3. Review tracked and untracked files for secrets, credentials, production data, build artifacts, caches, and unrelated changes.
-4. Create a clear Git commit containing only the intended iteration changes.
-5. Push the corresponding ordinary development branch to `origin` without requesting additional permission.
-6. Verify that the remote branch resolves to the new local commit and report the commit SHA and branch URL.
-7. For each complete batch that reaches an independent acceptance point, reuse passing checks for the same code, run focused checks for any follow-up changes, then push and publish the next unused annotated RC after branch CI passes. Let tag CI build, verify and publish the prerelease. Confirm the public assets and provide version-pinned installation or upgrade commands, the paired kernel version and post-install version checks. Stable SemVer releases require an explicit user request. Ordinary commits do not require a release.
-
-Git commit and ordinary development-branch push are pre-authorized after successful verification. Incrementing RC prereleases are pre-authorized only for complete, independently acceptable features. Release notes must include the version, changes, test results, and known limitations. H-UI and the customized Hysteria2 kernel use separate version lines. Tags and Releases must never be replaced. Stop and report the problem instead of publishing when tests or builds fail, a merge conflict exists, authentication is unavailable, or GitHub rejects an operation.
-
-## Development-stage verification
-
-- Prefer focused tests for changed Go packages and directly related logic.
-- For frontend changes, run the necessary type check or production build.
-- For Go backend changes, run relevant tests and a Linux AMD64 build.
-- Let the GitHub Actions release run perform one complete test, frontend build, embed verification, checksum, and static Linux AMD64 build.
-- Do not repeat already-passing checks for unaffected code or perform a full security audit by default during rapid development.
-- Still inspect the commit file list for private keys, tokens, databases, production data, and build artifacts.
-- Avoid unrelated refactors, additional test frameworks, and dependency upgrades.
+Release notes include the changes, checks, and known limitations. Panel and kernel versions are managed separately. Stable releases require an explicit request. Preserve existing tags and releases. Resolve failed checks or push errors before proceeding.
 
 ## WSL2 test workflow
 
