@@ -12,6 +12,8 @@ on:
     paths:
       - '.github/workflows/systemd-recovery.yml'
       - 'scripts/test-systemd-recovery.sh'
+      - 'scripts/test-cross-generation-migration.sh'
+      - 'scripts/write-pair-manifest.py'
       - 'scripts/test-panel-admin-migration.py'
       - 'scripts/test-auth-isolation.py'
 
@@ -27,6 +29,7 @@ jobs:
       matrix:
         include:
           - { state: active, baseline: stable }
+          - { state: migration, baseline: stable }
           - { state: stopped, baseline: stable }
           - { state: active, baseline: rc.1 }
           - { state: active, baseline: rc.3 }
@@ -35,6 +38,7 @@ jobs:
     env:
       KERNEL_SHA: 54a51aaac00fa53a1378e20f207d54f7ac8d2b7e
       KERNEL_VERSION: v2.13.0-hui.5-dev
+      PANEL_TEST_VERSION: v2.0.1-rc.1
     steps:
       - name: Require a real systemd VM
         run: |
@@ -80,14 +84,17 @@ jobs:
           artifacts="$RUNNER_TEMP/hui-recovery-artifacts"
           mkdir "$artifacts"
           mv kernel-source "$RUNNER_TEMP/kernel-source"
-          go build -trimpath -ldflags='-X h-ui/model/constant.Version=v1.1.0-rc.1' -o "$artifacts/h-ui-linux-amd64" .
+          go build -trimpath -ldflags="-X h-ui/model/constant.Version=$PANEL_TEST_VERSION" -o "$artifacts/h-ui-linux-amd64" .
           (
             cd "$RUNNER_TEMP/kernel-source"
             test "$(git rev-parse HEAD)" = "$KERNEL_SHA"
             go build -trimpath -ldflags="-X github.com/apernet/hysteria/app/v2/cmd.appVersion=$KERNEL_VERSION -X github.com/apernet/hysteria/app/v2/cmd.appCommit=$KERNEL_SHA" -o "$artifacts/hysteria-linux-amd64" ./app
           )
+          python3 scripts/write-pair-manifest.py "$artifacts" "$PANEL_TEST_VERSION" "$GITHUB_SHA" "$KERNEL_VERSION" "$KERNEL_SHA"
+          (cd "$artifacts" && sha256sum h-ui-linux-amd64 hysteria-linux-amd64 HY2-PAIR.json > SHA256SUMS)
           HUI_PAIR_TEST_PANEL="$artifacts/h-ui-linux-amd64" \
           HUI_PAIR_TEST_KERNEL="$artifacts/hysteria-linux-amd64" \
+          HUI_PAIR_TEST_PANEL_VERSION="$PANEL_TEST_VERSION" \
           HUI_PAIR_TEST_PANEL_COMMIT="$GITHUB_SHA" \
           HUI_PAIR_TEST_KERNEL_COMMIT="$KERNEL_SHA" \
           go test ./upgrade -run '^TestPairPreflightCompiledArtifacts$' -count=1 -v
@@ -132,4 +139,4 @@ jobs:
           chmod 0755 old-panel old-kernel h-ui-linux-amd64 hysteria-linux-amd64
 
       - name: Exercise offline recovery
-        run: sudo -n env HUI_DISPOSABLE_VM=1 bash scripts/test-systemd-recovery.sh "$RUNNER_TEMP/hui-recovery-artifacts" "${{ matrix.state }}" "${{ matrix.baseline }}"
+        run: sudo -n env HUI_DISPOSABLE_VM=1 GITHUB_ACTIONS=true bash scripts/test-systemd-recovery.sh "$RUNNER_TEMP/hui-recovery-artifacts" "${{ matrix.state }}" "${{ matrix.baseline }}"

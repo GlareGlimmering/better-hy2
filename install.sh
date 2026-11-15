@@ -10,6 +10,7 @@ readonly HUI_CHECKSUM_ASSET="SHA256SUMS"
 
 requested_version="latest"
 use_prerelease=0
+migrate_v1=0
 readonly panel_port="8000"
 installer_work_dir=""
 
@@ -23,11 +24,12 @@ usage() {
 Install or upgrade Better HY2 on Linux AMD64 with systemd.
 
 Usage:
-  install.sh [version] [--version VERSION] [--prerelease] [--yes]
+  install.sh [version] [--version VERSION] [--prerelease] [--yes] [--migrate-v1]
 
 Without a version, the latest stable release is installed. Use --prerelease
 to select the newest RC. Existing installations are upgraded in place. The
-panel always listens on port 8000.
+panel always listens on port 8000. Use --migrate-v1 with an exact v2
+version for the supported v1.0.0 / v2.13.0-hui.4 combination.
 EOF
 }
 
@@ -38,6 +40,10 @@ parse_args() {
         (($# >= 2)) || fail "--version requires a value"
         requested_version="$2"
         shift 2
+        ;;
+      --migrate-v1)
+        migrate_v1=1
+        shift
         ;;
       --prerelease)
         use_prerelease=1
@@ -295,6 +301,15 @@ upgrade_existing() {
   "$candidate" "${arguments[@]}"
 }
 
+migrate_existing_v1() {
+  local version="$1" candidate="$2" assets base
+  assets="$(dirname "$candidate")"
+  base="https://github.com/${HUI_REPOSITORY}/releases/download/${version}"
+  curl -fL --retry 3 --output "$assets/HY2-PAIR.json" "$base/HY2-PAIR.json" || fail "failed to download HY2-PAIR.json"
+  curl -fL --retry 3 --output "$assets/hysteria-linux-amd64" "$base/hysteria-linux-amd64" || fail "failed to download paired HY2 kernel"
+  "$candidate" migrate-v1 "$version" "$assets"
+}
+
 valid_existing_installation() {
   local reported
   [[ -x "${HUI_INSTALL_DIR}/h-ui" ]] || return 1
@@ -316,6 +331,10 @@ create_installer_work_dir() {
 
 main() {
   parse_args "$@"
+  if ((migrate_v1)); then
+    allowed_version "$requested_version" && [[ "$requested_version" == v2.* ]] && ((!use_prerelease)) ||
+      fail "--migrate-v1 requires an explicit --version v2.x.y (or its RC)"
+  fi
   preflight_environment
   validate_cli_link
   local target work_dir candidate sums existing=0
@@ -324,6 +343,10 @@ main() {
     existing=1
   elif [[ -e "${HUI_INSTALL_DIR}/h-ui" || -d "${HUI_INSTALL_DIR}/bin" || -f "/etc/systemd/system/${HUI_SERVICE}" ]]; then
     printf 'Incomplete h-ui installation detected; safely resuming fresh initialization.\n'
+  fi
+
+  if ((migrate_v1 && !existing)); then
+    fail "--migrate-v1 requires an existing standard Better HY2 installation"
   fi
 
   if ((existing)); then
@@ -340,7 +363,9 @@ main() {
   sums="${work_dir}/${HUI_CHECKSUM_ASSET}"
   download_and_verify "$target" "$candidate" "$sums"
 
-  if ((existing)); then
+  if ((migrate_v1)); then
+    migrate_existing_v1 "$target" "$candidate"
+  elif ((existing)); then
     upgrade_existing "$target" "$candidate"
   else
     fresh_install "$target" "$candidate"

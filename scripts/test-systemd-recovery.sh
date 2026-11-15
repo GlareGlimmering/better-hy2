@@ -6,7 +6,7 @@ trap 'printf "Recovery check failed at line %s\n" "$LINENO" >&2' ERR
 [[ $EUID == 0 && ${HUI_DISPOSABLE_VM:-} == 1 ]]
 [[ $(cat /proc/1/comm) == systemd ]]
 systemctl show --property=SystemState >/dev/null
-[[ ${2:-} == active || ${2:-} == stopped ]]
+[[ ${2:-} == active || ${2:-} == stopped || ${2:-} == migration ]]
 case ${3:-stable} in
   stable) old_version=v1.0.0 ;;
   rc.1) old_version=v1.1.0-rc.1 ;;
@@ -21,6 +21,13 @@ root=$(mktemp -d /var/tmp/hui-recovery.XXXXXX)
 live=$root/live
 unit=better-hy2-recovery-test.service
 unitfile=/etc/systemd/system/$unit
+if [[ $2 == migration ]]; then
+  [[ ${GITHUB_ACTIONS:-} == true && $old_version == v1.0.0 ]]
+  live=/usr/local/h-ui
+  unit=h-ui.service
+  unitfile=/etc/systemd/system/$unit
+  [[ ! -e $live && ! -e /var/lib/h-ui && ! -e /usr/local/bin/hui ]]
+fi
 if [[ -e $unitfile ]] || systemctl cat "$unit" >/dev/null 2>&1; then
   rmdir "$root"
   exit 1
@@ -127,6 +134,9 @@ EOF
 openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=localhost \
   -keyout "$root/key.pem" -out "$root/cert.pem" >"$root/openssl.log" 2>&1
 
+if [[ $2 == migration ]]; then
+  (HUI_INSTALLER_TEST=1; source "$(dirname "$0")/../install.sh"; install_systemd_unit)
+else
 cat >"$unitfile" <<EOF
 [Service]
 Type=exec
@@ -139,6 +149,7 @@ ExecStart=$live/h-ui -p 8000
 [Install]
 WantedBy=multi-user.target
 EOF
+fi
 systemctl daemon-reload
 install_pair "$artifacts/old-panel" "$artifacts/old-kernel"
 [[ $("$live/h-ui" version) == "Better HY2 version $old_version" ]]
@@ -166,12 +177,18 @@ with sqlite3.connect(db) as conn:
     assert conn.execute("UPDATE config SET value=? WHERE key='JWT_SECRET'", ("fixture-stats-secret",)).rowcount == 1
     assert conn.execute("UPDATE config SET value=? WHERE key='HYSTERIA2_CONFIG'", (config,)).rowcount == 1
     assert conn.execute("UPDATE config SET value='1' WHERE key='HYSTERIA2_ENABLE'").rowcount == 1
+    conn.execute("UPDATE config SET value='93.184.216.34' WHERE key='SUBSCRIPTION_SERVER_ADDRESS_TEMPLATE'")
     conn.execute("INSERT INTO account(username, con_pass, quota, expire_time, outbound, upload, download) VALUES(?, ?, 1000000000, 253370736000000, 'DIRECT', 12345, 67890)",
                  ("smokeuser", "smokeuser.fixture-credential"))
 PY
 systemctl start "$unit"
 check_panel
 check_proxy "$artifacts/old-kernel"
+if [[ $2 == migration ]]; then
+  source "$(dirname "$0")/test-cross-generation-migration.sh"
+  exercise_cross_generation_migration
+  exit 0
+fi
 if [[ $old_version == v1.1.0-rc.4 ]]; then
   python3 "$(dirname "$0")/test-auth-isolation.py" "$panel_origin$panel_path" legacy
 fi

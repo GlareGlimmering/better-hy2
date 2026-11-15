@@ -572,6 +572,7 @@ func createSnapshot(opts Options, target string, deps Dependencies) (snapshot, e
 		filepath.Join(opts.StateDir, "xray", "config.previous.json"),
 		filepath.Join(opts.StateDir, "xray", "candidate.json"),
 		filepath.Join(opts.StateDir, "xray", "certs", "ca.crt"),
+		filepath.Join(opts.DataDir, constant.Hysteria2ConfigPath) + ".candidate",
 	}
 	hy2Config := filepath.Join(opts.DataDir, constant.Hysteria2ConfigPath)
 	for _, file := range []string{hy2Config, hy2Config + ".candidate"} {

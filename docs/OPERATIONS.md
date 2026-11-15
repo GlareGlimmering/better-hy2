@@ -92,6 +92,20 @@ Upgrade snapshots under `/var/lib/h-ui/backups/upgrade-*` contain a SQLite-consi
 
 Before upgrading, additionally keep a private off-host copy of `/usr/local/h-ui`, `/var/lib/h-ui` and the service unit, preserving permissions; stop services for a consistent raw file copy, or use SQLite-aware backup. Do not publish the backup: it contains credentials. For manual recovery, stop `h-ui.service`, preserve the failed state separately, inspect the snapshot `manifest.json`, restore each mapped file to its original path with recorded permissions/ownership, reload systemd, then restore the previous service state. Database rollback discards changes made after the snapshot. The symlink continues to point at the restored binary; for an old version lacking `update`, use `hui upgrade`.
 
+## Explicit migration from v1.0.0 to a v2 release
+
+This is for the official v1.0.0 panel and official v2.13.0-hui.4 kernel on Linux AMD64. It requires the active, standard root-run h-ui.service on port 8000, standard data directories and no systemd overrides. Keep an independent backup before starting.
+
+```bash
+installer=$(mktemp) &&
+curl -fsSL https://github.com/GlareGlimmering/better-hy2/releases/download/v2.0.1-rc.1/install.sh -o "$installer" &&
+sudo bash "$installer" --version v2.0.1-rc.1 --migrate-v1
+```
+
+The installer stages and checks both binaries and prepares a recovery snapshot while the old service runs. The outage starts when h-ui.service and its HY2 child stop. During the outage it refreshes the SQLite backup, activates the pair, and starts the panel, which migrates the database and managed HY2 configuration. A failed start or health check restores the v1 executables, SQLite and configuration and restarts the original unit. Previously committed usage is preserved. Usage still in the old kernel's in-memory counters at shutdown may be lost. If power loss or a forced kill interrupts the operation, use the printed snapshot and the manual recovery steps above before retrying.
+
+Sign in with the old administrator username. If the password was shared with the proxy credential, complete the required password change. If login recovery is needed, run `sudo hui reset` locally. Users still using the former administrator credential as a proxy credential should switch to an ordinary account before migration. After migration, test one new real HY2 connection and refresh its existing subscription.
+
 ## Uninstall
 
 Run `sudo hui uninstall` (or `sudo /usr/local/h-ui/h-ui uninstall`). Review the displayed plan, then type `UNINSTALL` to stop and disable the standard systemd panel service and remove its unit, executable and matching symlink. Enter alone cancels the operation. The database, configuration, logs and backups are retained by default.

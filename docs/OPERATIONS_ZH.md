@@ -57,6 +57,20 @@ DIRECT 内置；原生 SOCKS5 无需 Xray。VLESS/HTTP 节点在「出站节点�
 
 升级前仍建议额外私密备份 `/usr/local/h-ui`、`/var/lib/h-ui` 和 unit，保留权限；原始文件拷贝应停服务以确保一致性，或使用 SQLite 专用备份。备份含敏感数据，不要公开上传。手工恢复时停止 `h-ui.service`，另存失败状态，依照 `manifest.json` 恢复每个文件到原路径并恢复权限、所有权，daemon-reload 后恢复原服务状态。数据库恢复会丢弃快照之后的修改。链接仍指向恢复后的程序，旧版本无 `update` 时使用 `hui upgrade`。
 
+## 从 v1.0.0 显式迁移到 v2
+
+适用于官方 v1.0.0 面板与官方 v2.13.0-hui.4 内核的 Linux AMD64 标准安装。服务须正在运行，使用标准路径和 8000 端口，且没有 systemd 覆盖配置。请提前额外保留私有备份。
+
+```bash
+installer=$(mktemp) &&
+curl -fsSL https://github.com/GlareGlimmering/better-hy2/releases/download/v2.0.1-rc.1/install.sh -o "$installer" &&
+sudo bash "$installer" --version v2.0.1-rc.1 --migrate-v1
+```
+
+旧服务运行时下载并校验配套制品，准备恢复快照。停机从停止 h-ui.service 及 HY2 子进程开始，随后刷新 SQLite 备份、成对替换程序、迁移数据库和受管配置，并检查面板与 HY2。启动或健康检查失败时恢复旧组合、SQLite 和配置，重新启动原 unit。已落库计数会保留，停止时仍留在旧内核内存中的未结算流量可能丢失。若遇断电或强制终止，先按输出的快照路径进行手工恢复，再重试。
+
+原管理员可用原用户名登录。如果旧密码与代理凭据共用，先按页面提示换密。需要在本机找回登录时执行 `sudo hui reset`。仍用旧管理员凭据代理的客户端应在迁移前换用普通代理账户。迁移后刷新原订阅，并新建一次真实 HY2 连接验证。
+
 ## 卸载
 
 执行 `sudo hui uninstall`，也可使用 `sudo /usr/local/h-ui/h-ui uninstall`。核对清单后输入 `UNINSTALL`，停止并禁用标准面板服务，移除 unit、面板程序及指向该程序的链接。直接回车取消。默认保留数据库、配置、日志和备份。

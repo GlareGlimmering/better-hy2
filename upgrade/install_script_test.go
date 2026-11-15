@@ -220,3 +220,12 @@ func TestInstallerContainsPinnedKernelSystemdAndIdempotentUpgradePaths(t *testin
 func shellQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
 }
+
+func TestMigrationInstallerRequiresAnExplicitV2Target(t *testing.T) {
+	prefix := "HUI_INSTALLER_TEST=1; source " + shellQuote(installerPath(t)) + "; "
+	for _, args := range []string{"--migrate-v1", "--migrate-v1 --version v1.0.0", "--migrate-v1 --prerelease"} {
+		if output, err := runBash(t, prefix+"main "+args); err == nil || !strings.Contains(output, "--migrate-v1 requires an explicit") {
+			t.Fatalf("unsupported invocation %s was not rejected: %v %s", args, err, output)
+		}
+	}
+}
