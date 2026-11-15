@@ -11,6 +11,7 @@ import (
 	"h-ui/dao"
 	"h-ui/model/bo"
 	"h-ui/model/constant"
+	"h-ui/util"
 )
 
 var hysteria2ConfigApplyMutex sync.Mutex
@@ -64,7 +65,9 @@ func defaultHysteria2ConfigApplyOps() hysteria2ConfigApplyOps {
 			}
 			return err
 		},
-		validate:  validateHysteria2Candidate,
+		validate: func(path string) error {
+			return validateHysteria2Candidate(path, util.GetHysteria2BinPath())
+		},
 		isRunning: Hysteria2IsRunning,
 		stop:      stopHysteria2,
 		start:     startHysteria2Runtime,
@@ -149,7 +152,7 @@ func rollbackHysteria2Config(oldDB, oldYAML []byte, oldYAMLExists, wasRunning bo
 	return nil
 }
 
-func validateHysteria2Candidate(path string) error {
+func validateHysteria2Candidate(path, kernelPath string) error {
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -163,6 +166,9 @@ func validateHysteria2Candidate(path string) error {
 	}
 	if config.TrafficStats == nil || config.TrafficStats.Listen == nil {
 		return errors.New("trafficStats.listen is required")
+	}
+	if err := validateACMEWorker(config, kernelPath); err != nil {
+		return err
 	}
 	return ValidateHysteria2OutboundConfig(config)
 }
