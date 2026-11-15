@@ -4,6 +4,7 @@ from pathlib import Path
 import re
 import sqlite3
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -26,10 +27,21 @@ def call(path, data=None, token=None):
     request = urllib.request.Request(
         api + path, None if data is None else json.dumps(data).encode(), headers
     )
-    with urllib.request.urlopen(request, timeout=5) as response:
-        if path == "/" + proxy_credential:
-            return response.read()
-        return json.load(response)
+    # This fixture runs several independent login/change assertions from one
+    # IP. Respect the production limiter between them, with a bounded retry.
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(request, timeout=5) as response:
+                if path == "/" + proxy_credential:
+                    return response.read()
+                return json.load(response)
+        except urllib.error.HTTPError as err:
+            if err.code != 429 or not path.startswith("/auth/") or attempt == 2:
+                raise
+            delay = int(err.headers["Retry-After"])
+            assert 1 <= delay <= 3
+            err.close()
+            time.sleep(delay)
 
 def login(creds):
     return call("/auth/login", creds)
