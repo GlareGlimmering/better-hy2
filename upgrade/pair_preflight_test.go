@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"h-ui/model/constant"
 	"h-ui/util"
 )
 
@@ -104,7 +105,7 @@ func compiledPairFixture(t *testing.T) (string, string, releasePair) {
 	}
 	return panel, kernel, releasePair{
 		Panel:  pairArtifact{version, os.Getenv("HUI_PAIR_TEST_PANEL_COMMIT"), fmt.Sprintf("%x", sha256.Sum256(readPairFixture(t, panel)))},
-		Kernel: pairArtifact{"v2.13.0-hui.5-dev", os.Getenv("HUI_PAIR_TEST_KERNEL_COMMIT"), fmt.Sprintf("%x", sha256.Sum256(readPairFixture(t, kernel)))},
+		Kernel: pairArtifact{constant.Hysteria2AccountConsistencyVersion, os.Getenv("HUI_PAIR_TEST_KERNEL_COMMIT"), fmt.Sprintf("%x", sha256.Sum256(readPairFixture(t, kernel)))},
 		OS:     "linux", Arch: "amd64", AccountConsistency: 2, AccountBandwidth: 1,
 	}
 }
@@ -128,7 +129,9 @@ func TestPairPreflightCompiledArtifactsUpgradesWithMatchingInstalledKernel(t *te
 	f := newUpgradeFixture(t, health.URL)
 	f.opts.Version = pair.Panel.Version
 	f.opts.Prerelease = false // explicit version works with the default channel
-	if pair.Panel.Version == "v2.0.1" {
+	if strings.HasPrefix(pair.Panel.Version, "v2.0.2-") {
+		f.opts.CurrentVersion = "v2.0.1"
+	} else if pair.Panel.Version == "v2.0.1" {
 		f.opts.CurrentVersion = "v2.0.1-rc.1"
 	} else if usesPairedStableLine(pair.Panel.Version) {
 		f.opts.CurrentVersion = "v1.1.0-rc.7"

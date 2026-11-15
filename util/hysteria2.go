@@ -51,7 +51,7 @@ func DownloadHysteria2(version string) error {
 	return downloadHysteria2WithDependencies(version, deps)
 }
 
-const pairedHysteria2SHA256 = "f8cf6f7f5691e7eec1ef3f7392939e24788c3088378008ad1e17ca7e53bc42af"
+const pairedHysteria2SHA256 = "cece1fcd469368887d5eed488407c0720e30950bd3ccd12e70e86ff27e5ae7be"
 
 func ManagedHysteria2Version() string {
 	if strings.HasPrefix(constant.Version, "v2.") {
