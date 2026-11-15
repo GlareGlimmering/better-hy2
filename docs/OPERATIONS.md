@@ -86,7 +86,7 @@ Select an enabled node in the account drawer and save. In strict mode every effe
 
 ## Update, backup and recovery
 
-For RC.7 use the version-pinned v2.0.0 installer in the README. It delegates to the v2 updater, verifies the release pair and refuses a mismatched installed kernel before stopping the service. On v2, `sudo hui update` selects the highest available stable v2 release. The legacy `upgrade` command remains. v1 installations with their original kernel require a separate v2 installation or an independently verified migration.
+For RC.7 use the version-pinned v2.0.1 installer in the README. It delegates to the v2 updater, verifies the release pair and refuses a mismatched installed kernel before stopping the service. On v2, `sudo hui update` selects the highest available stable v2 release. The legacy `upgrade` command remains. v1 installations with their original kernel require a separate v2 installation or an independently verified migration.
 
 Upgrade snapshots under `/var/lib/h-ui/backups/upgrade-*` contain a SQLite-consistent database copy, previous binary, systemd unit, HY2 YAML, and relevant Xray config/CA files, with ownership metadata. Five newest snapshots are retained. Startup/HTTP/frontend failure restores the snapshot and prior running state; an unsuccessful rollback is reported explicitly. Existing configuration, bindings and certificate paths are retained.
 
@@ -98,8 +98,8 @@ This is for the official v1.0.0 panel and official v2.13.0-hui.4 kernel on Linux
 
 ```bash
 installer=$(mktemp) &&
-curl -fsSL https://github.com/GlareGlimmering/better-hy2/releases/download/v2.0.1-rc.1/install.sh -o "$installer" &&
-sudo bash "$installer" --version v2.0.1-rc.1 --migrate-v1
+curl -fsSL https://github.com/GlareGlimmering/better-hy2/releases/download/v2.0.1/install.sh -o "$installer" &&
+sudo bash "$installer" --version v2.0.1 --migrate-v1
 ```
 
 The installer stages and checks both binaries and prepares a recovery snapshot while the old service runs. The outage starts when h-ui.service and its HY2 child stop. During the outage it refreshes the SQLite backup, activates the pair, and starts the panel, which migrates the database and managed HY2 configuration. A failed start or health check restores the v1 executables, SQLite and configuration and restarts the original unit. Previously committed usage is preserved. Usage still in the old kernel's in-memory counters at shutdown may be lost. If power loss or a forced kill interrupts the operation, use the printed snapshot and the manual recovery steps above before retrying.

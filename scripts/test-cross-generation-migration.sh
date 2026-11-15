@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Sourced by test-systemd-recovery.sh in the disposable VM.
 exercise_cross_generation_migration() {
-  local target old_state
+  local target old_state active_pid
   target=$("$artifacts/h-ui-linux-amd64" version)
   target=${target#Better HY2 version }
   [[ $target == v2.* ]]
@@ -91,6 +91,21 @@ SH
   [[ $(systemctl is-enabled "$unit") == "$old_state" ]]
   check_panel
   migration_inspect migrated
+  active_pid=$(systemctl show -p MainPID --value "$unit")
+  [[ $active_pid != 0 ]]
+  if "$live/h-ui" update v1.0.0 --yes >"$root/blocked-update.log" 2>&1; then
+    echo "major downgrade should have been blocked by hui update" >&2
+    exit 1
+  fi
+  grep -Fq 'refusing major-version downgrade' "$root/blocked-update.log"
+  if bash "$(dirname "$0")/../install.sh" --version v1.0.0 --yes >"$root/blocked-install.log" 2>&1; then
+    echo "major downgrade should have been blocked by install.sh" >&2
+    exit 1
+  fi
+  grep -Fq 'refusing major-version downgrade' "$root/blocked-install.log"
+  [[ $(systemctl show -p MainPID --value "$unit") == "$active_pid" ]]
+  cmp "$live/h-ui" "$artifacts/h-ui-linux-amd64"
+  cmp "$live/bin/hysteria-linux-amd64" "$artifacts/hysteria-linux-amd64"
   check_proxy "$artifacts/hysteria-linux-amd64"
   echo "Verified actual installer migration, failed start rollback, admin login, unchanged account and subscription, and real HY2 traffic."
 }

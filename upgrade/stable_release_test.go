@@ -158,3 +158,29 @@ func TestV2StableChannelSelectsItsOwnStableLine(t *testing.T) {
 		}
 	}
 }
+
+func TestMajorDowngradeStopsBeforeReleaseLookupOrServiceOperation(t *testing.T) {
+	for _, current := range []string{"v2.0.1-rc.1", "v2.0.1", "unknown"} {
+		t.Run(current, func(t *testing.T) {
+			f := newUpgradeFixture(t, "")
+			f.opts.CurrentVersion = current
+			f.opts.Version = "v1.0.0"
+			f.deps.HTTPClient = &http.Client{Transport: rejectReleaseLookup{t}}
+			err := Run(context.Background(), f.opts, f.deps)
+			want := "refusing major-version downgrade"
+			if current == "unknown" {
+				want = "cannot determine the installed release version"
+			}
+			if err == nil || !strings.Contains(err.Error(), want) || len(f.commands) != 0 {
+				t.Fatalf("expected %q before changes, got %v; commands %v", want, err, f.commands)
+			}
+		})
+	}
+}
+
+type rejectReleaseLookup struct{ t *testing.T }
+
+func (r rejectReleaseLookup) RoundTrip(req *http.Request) (*http.Response, error) {
+	r.t.Fatalf("downgrade attempted a network request to %s", req.URL)
+	return nil, errors.New("unexpected release lookup")
+}

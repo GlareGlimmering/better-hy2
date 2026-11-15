@@ -229,3 +229,33 @@ func TestMigrationInstallerRequiresAnExplicitV2Target(t *testing.T) {
 		}
 	}
 }
+
+func TestInstallerRejectsMajorDowngradeWithOrWithoutAUnit(t *testing.T) {
+	for _, withUnit := range []bool{false, true} {
+		dir := t.TempDir()
+		binary := filepath.Join(dir, "h-ui")
+		if err := os.WriteFile(binary, []byte("#!/bin/bash\necho 'Better HY2 version v2.0.1-rc.1'\n"), 0755); err != nil {
+			t.Fatal(err)
+		}
+		source, err := os.ReadFile(installerPath(t))
+		if err != nil {
+			t.Fatal(err)
+		}
+		modified := strings.Replace(string(source), "/usr/local/h-ui", dir, 1)
+		installer := filepath.Join(dir, "install.sh")
+		if err := os.WriteFile(installer, []byte(modified), 0600); err != nil {
+			t.Fatal(err)
+		}
+		unitStatus := "return 1"
+		if withUnit {
+			unitStatus = "return 0"
+		}
+		script := "HUI_INSTALLER_TEST=1; source " + shellQuote(installer) + "; preflight_environment(){ :; }; validate_cli_link(){ :; }; " +
+			"systemctl(){ " + unitStatus + "; }; download_and_verify(){ echo reached-download; return 1; }; " +
+			"main --version v1.0.0 --yes"
+		output, err := runBash(t, script)
+		if err == nil || !strings.Contains(output, "refusing major-version downgrade") || strings.Contains(output, "reached-download") {
+			t.Fatalf("unit present %v: expected rejection before download: %v %s", withUnit, err, output)
+		}
+	}
+}

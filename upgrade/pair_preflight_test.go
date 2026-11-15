@@ -128,7 +128,9 @@ func TestPairPreflightCompiledArtifactsUpgradesWithMatchingInstalledKernel(t *te
 	f := newUpgradeFixture(t, health.URL)
 	f.opts.Version = pair.Panel.Version
 	f.opts.Prerelease = false // explicit version works with the default channel
-	if usesPairedStableLine(pair.Panel.Version) {
+	if pair.Panel.Version == "v2.0.1" {
+		f.opts.CurrentVersion = "v2.0.1-rc.1"
+	} else if usesPairedStableLine(pair.Panel.Version) {
 		f.opts.CurrentVersion = "v1.1.0-rc.7"
 	}
 	installedKernel := filepath.Join(f.opts.DataDir, util.GetHysteria2BinPath())
