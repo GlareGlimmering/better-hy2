@@ -20,6 +20,7 @@ import (
 
 func TestGeneratedHY2ConfigurationSeparatesTrafficStatsSecret(t *testing.T) {
 	setupSubscriptionTestDatabase(t)
+	startTestHysteria2AuthListener(t)
 	config, err := GetHysteria2Config()
 	if err != nil {
 		t.Fatal(err)
@@ -72,6 +73,7 @@ func TestRegenerateHY2ConfigurationReplacesLegacySecretAndMode(t *testing.T) {
 		t.Skip("POSIX file modes")
 	}
 	setupSubscriptionTestDatabase(t)
+	startTestHysteria2AuthListener(t)
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)

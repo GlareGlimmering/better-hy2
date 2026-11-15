@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/sirupsen/logrus"
 	"h-ui/util"
+	"net"
 	"net/http"
 	"time"
 )
@@ -19,11 +20,11 @@ func InitServer(addr string, handler http.Handler) {
 	}
 }
 
-func StartServer(crtPath string, keyPath string) error {
+func StartServer(listener net.Listener, crtPath string, keyPath string) error {
 	if crtPath != "" && keyPath != "" {
-		return server.ListenAndServeTLS(crtPath, keyPath)
+		return server.ServeTLS(listener, crtPath, keyPath)
 	}
-	return server.ListenAndServe()
+	return server.Serve(listener)
 }
 
 func StopServer() error {

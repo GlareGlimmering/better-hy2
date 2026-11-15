@@ -186,6 +186,7 @@ func Hysteria2SubscribeUrl(c *gin.Context) {
 }
 
 func Hysteria2Subscribe(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
 	conPass := c.Param("conPass")
 	conPass, err := url.QueryUnescape(conPass)
 	if err != nil {

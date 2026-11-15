@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	"h-ui/controller"
 	"h-ui/dao"
 	"h-ui/middleware"
 	"h-ui/model/constant"
@@ -15,6 +16,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 )
 
 var initializeHysteria2 = service.InitHysteria2
@@ -66,13 +68,6 @@ func runServer(port, bindAddress string) error {
 	if err := middleware.InitCron(); err != nil {
 		return err
 	}
-	// A missing or incompatible Hysteria2 kernel must not lock administrators
-	// out of the panel that is needed to install the managed kernel. Keep HY2
-	// stopped, report the reason, and continue starting the management server.
-	initializeManagedHysteria2()
-	// Install and verify the pinned kernel in the background. Installation does
-	// not apply a configuration or start Xray, preserving fail-closed behavior.
-	initializeManagedXray()
 	if err := service.InitTableAndChain(); err != nil {
 		logrus.Errorf(err.Error())
 	}
@@ -85,19 +80,38 @@ func runServer(port, bindAddress string) error {
 	}
 
 	r := newPanelRouter(config.Value)
+	if err := configurePanelTrustedProxies(r, os.Getenv("HUI_TRUSTED_PROXIES")); err != nil {
+		return fmt.Errorf("invalid HUI_TRUSTED_PROXIES: %w", err)
+	}
 
 	serverPort, crtPath, keyPath, err := service.GetServerPortAndCert()
 	if err != nil {
 		return err
 	}
 
-	service.InitServer(panelListenAddress(bindAddress, serverPort), r)
+	address := panelListenAddress(bindAddress, serverPort)
+	panelListener, err := net.Listen("tcp", address)
+	if err != nil {
+		return fmt.Errorf("bind panel listener: %w", err)
+	}
+	defer panelListener.Close()
+	stopAuth, err := service.StartHysteria2AuthListener(newHysteria2AuthRouter())
+	if err != nil {
+		return fmt.Errorf("bind Hysteria2 authentication listener: %w", err)
+	}
+	defer stopAuth()
+	service.InitServer(address, r)
+
+	// The callback is reachable before the background process generates YAML
+	// and starts HY2. An incompatible HY2 kernel still leaves the panel available.
+	initializeManagedHysteria2()
+	initializeManagedXray()
 	if bindAddress == constant.PanelBindAddress {
 		// Standard installations terminate TLS at a local reverse proxy. Keep
 		// the loopback panel itself on plain HTTP for deterministic health checks.
 		crtPath, keyPath = "", ""
 	}
-	if err := service.StartServer(crtPath, keyPath); err != nil && err != http.ErrServerClosed {
+	if err := service.StartServer(panelListener, crtPath, keyPath); err != nil && err != http.ErrServerClosed {
 		logrus.Errorf("start server err: %v", err)
 		return errors.New("start server err")
 	}
@@ -110,10 +124,34 @@ func newPanelRouter(contextPath *string) *gin.Engine {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	r := gin.New()
+	_ = configurePanelTrustedProxies(r, "")
 	r.Use(middleware.LogHandler(), gin.CustomRecoveryWithWriter(nil, func(c *gin.Context, _ interface{}) {
 		c.AbortWithStatus(http.StatusInternalServerError)
 	}))
 	router.Router(r, contextPath)
+	return r
+}
+
+func configurePanelTrustedProxies(engine *gin.Engine, setting string) error {
+	var proxies []string
+	for _, address := range strings.Split(setting, ",") {
+		if address = strings.TrimSpace(address); address != "" {
+			proxies = append(proxies, address)
+		}
+	}
+	engine.RemoteIPHeaders = []string{"X-Forwarded-For"}
+	return engine.SetTrustedProxies(proxies)
+}
+
+func newHysteria2AuthRouter() http.Handler {
+	r := gin.New()
+	r.Use(gin.CustomRecoveryWithWriter(nil, func(c *gin.Context, _ interface{}) {
+		c.AbortWithStatus(http.StatusInternalServerError)
+	}))
+	r.POST(service.Hysteria2AuthPath, func(c *gin.Context) {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 16<<10)
+		controller.Hysteria2Auth(c)
+	})
 	return r
 }
 

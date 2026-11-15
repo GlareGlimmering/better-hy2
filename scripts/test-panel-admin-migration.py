@@ -59,7 +59,12 @@ with sqlite3.connect(live / "data" / "h_ui.db") as db:
         gated = login(legacy)["data"]
         assert gated == {"passwordChangeRequired": True}
         assert login({"username": "smokeuser", "pass": proxy_credential})["type"] != "ok"
-        assert call("/hysteria2/auth", {"auth": legacy["username"] + "." + legacy["pass"], "addr": "127.0.0.1:23456", "tx": 0})["ok"] is False
+        try:
+            auth = call("/hysteria2/auth", {"auth": legacy["username"] + "." + legacy["pass"], "addr": "127.0.0.1:23456", "tx": 0})
+        except urllib.error.HTTPError as err:
+            assert err.code == 404
+        else:
+            assert auth["ok"] is False
         assert proxy_credential.encode() in call("/" + proxy_credential)
         assert call("/auth/changePassword", {**legacy, "newPassword": legacy["pass"]})["type"] != "ok"
         token = call("/auth/changePassword", {**legacy, "newPassword": new_password})["data"]["accessToken"]

@@ -13,6 +13,7 @@ on:
       - '.github/workflows/systemd-recovery.yml'
       - 'scripts/test-systemd-recovery.sh'
       - 'scripts/test-panel-admin-migration.py'
+      - 'scripts/test-auth-isolation.py'
 
 permissions:
   contents: read
@@ -29,6 +30,7 @@ jobs:
           - { state: stopped, baseline: stable }
           - { state: active, baseline: rc.1 }
           - { state: active, baseline: rc.3 }
+          - { state: active, baseline: rc.4 }
     env:
       KERNEL_SHA: 54a51aaac00fa53a1378e20f207d54f7ac8d2b7e
       KERNEL_VERSION: v2.13.0-hui.5-dev
@@ -100,13 +102,15 @@ jobs:
         working-directory: ${{ runner.temp }}/hui-recovery-artifacts
         run: |
           version="${{ matrix.baseline }}"
-          if [[ "$version" == rc.1 || "$version" == rc.3 ]]; then
+          if [[ "$version" == rc.1 || "$version" == rc.3 || "$version" == rc.4 ]]; then
             base="https://github.com/GlareGlimmering/better-hy2/releases/download/v1.1.0-$version"
             curl -fsSL --retry 3 -o old-panel "$base/h-ui-linux-amd64"
             curl -fsSL --retry 3 -o old-kernel "$base/hysteria-linux-amd64"
             panel_hash=d7e7666c920b174d2d8902e84eb40d206171d9522e1590a092d4ad3f20800a35
             if [[ "$version" == rc.3 ]]; then
               panel_hash=550b4b04bd039b7e0a918dfb72c661fce0aad92059ac946fffcda9a50dd92530
+            elif [[ "$version" == rc.4 ]]; then
+              panel_hash=3b0d4d290157461430593804a0eb1fb25a4f24363ce3b5dd23a6e3835fe25eb6
             fi
             kernel_hash=f8cf6f7f5691e7eec1ef3f7392939e24788c3088378008ad1e17ca7e53bc42af
           else

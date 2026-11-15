@@ -2,7 +2,12 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
+	"h-ui/dao"
 	"net"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -94,5 +99,56 @@ func TestStandardPanelListenAddressIsLoopbackOnly(t *testing.T) {
 	tcpAddress, ok := listener.Addr().(*net.TCPAddr)
 	if !ok || !tcpAddress.IP.IsLoopback() || tcpAddress.IP.IsUnspecified() {
 		t.Fatalf("panel listener is not loopback-only: %v", listener.Addr())
+	}
+}
+
+func TestPanelLoginLimitOnlyTrustsConfiguredProxy(t *testing.T) {
+	t.Setenv("HUI_DATA", t.TempDir())
+	username, password, err := resetAdminCredentials()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := dao.InitSqliteSchema(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dao.CloseSqliteDB() })
+	r := newPanelRouter(nil)
+	if err := configurePanelTrustedProxies(r, "127.0.0.1/32"); err != nil {
+		t.Fatal(err)
+	}
+	send := func(endpoint, remote, forwarded, body string) *httptest.ResponseRecorder {
+		t.Helper()
+		req := httptest.NewRequest("POST", "/hui/auth/"+endpoint, strings.NewReader(body))
+		req.RemoteAddr = remote
+		req.Header.Set("X-Forwarded-For", forwarded)
+		req.Header.Set("X-Real-IP", "192.0.2.2")
+		res := httptest.NewRecorder()
+		r.ServeHTTP(res, req)
+		return res
+	}
+	const bad = "{\"username\":\"unknown\",\"pass\":\"wrong\"}"
+	for i := 0; i < 5; i++ {
+		spoofed := fmt.Sprintf("192.0.2.%d", i+10)
+		if got := send("login", "198.51.100.10:1000", spoofed, bad); got.Code != http.StatusOK {
+			t.Fatalf("unexpected response before consuming login budget: %d", got.Code)
+		}
+	}
+	if got := send("login", "198.51.100.10:1001", "192.0.2.99", bad); got.Code != http.StatusTooManyRequests {
+		t.Fatalf("login did not reject a spoofed address after exhausting the budget: %d", got.Code)
+	}
+	if got := send("changePassword", "198.51.100.10:1001", "192.0.2.100", bad); got.Code != http.StatusTooManyRequests {
+		t.Fatalf("spoofed header or alternate endpoint bypassed the login limit: %d", got.Code)
+	}
+	for i := 0; i < 5; i++ {
+		spoofed := fmt.Sprintf("192.0.2.%d, 198.51.100.12", i+20)
+		send("login", "127.0.0.1:1000", spoofed, bad)
+	}
+	got := send("changePassword", "127.0.0.1:1000", "192.0.2.120, 198.51.100.12", bad)
+	if got.Code != http.StatusTooManyRequests {
+		t.Fatalf("forged hop bypassed limit behind trusted proxy: %d", got.Code)
+	}
+	got = send("login", "127.0.0.1:1000", "198.51.100.11", fmt.Sprintf("{\"username\":%q,\"pass\":%q}", username, password))
+	if got.Code != http.StatusOK || !strings.Contains(got.Body.String(), "\"accessToken\"") {
+		t.Fatalf("normal login behind trusted proxy failed: %d", got.Code)
 	}
 }

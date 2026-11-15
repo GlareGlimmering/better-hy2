@@ -5,12 +5,7 @@ import (
 	"h-ui/controller"
 )
 
-func initHysteria2AuthRouter(hysteria2Api *gin.RouterGroup) {
-	hysteria2 := hysteria2Api.Group("/hysteria2")
-	{
-		hysteria2.POST("/auth", controller.Hysteria2Auth)
-
-	}
+func initHysteria2SubscriptionRouter(hysteria2Api *gin.RouterGroup) {
 	hysteria2Api.GET("/:conPass", controller.Hysteria2Subscribe)
 }
 

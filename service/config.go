@@ -210,15 +210,3 @@ func GetPortAndCert() (int64, string, string, error) {
 
 	return portInt, crtPath, keyPath, nil
 }
-
-func GetAuthHttpUrl() (string, error) {
-	config, err := dao.GetConfig("key = ?", constant.HUIWebContext)
-	if err != nil {
-		return "", err
-	}
-	webContext := ""
-	if config.Value != nil && *config.Value != "/" && strings.HasPrefix(*config.Value, "/") {
-		webContext = *config.Value
-	}
-	return fmt.Sprintf("http://%s:%s%s/hui/hysteria2/auth", constant.PanelBindAddress, constant.PanelPort, webContext), nil
-}
