@@ -78,4 +78,4 @@ sudo /usr/local/h-ui/h-ui version
 
 ## 发布校验
 
-从同一精确版本 Release 下载 `h-ui-linux-amd64`、`SHA256SUMS`、`install.sh`，执行 `sha256sum --check SHA256SUMS`。清单包含程序和安装器。`./h-ui-linux-amd64 version` 必须与 Tag 一致。CI 不连接私人服务器，本地 fixture 不能替代真实 systemd、反向代理及 UDP 验收。
+从同一精确版本下载 `h-ui-linux-amd64`、`hysteria-linux-amd64`、`HY2-PAIR.json`、`install.sh` 和 `SHA256SUMS`。将五个文件放在同一目录，执行 `sha256sum --check SHA256SUMS`。`./h-ui-linux-amd64 version` 的输出应与发布标签一致。CI 使用隔离的 systemd 环境，真实部署请另外验收自己的网络、反代与 HY2 客户端。
