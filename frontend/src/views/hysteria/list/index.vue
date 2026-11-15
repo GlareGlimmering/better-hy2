@@ -401,7 +401,7 @@
               placement="bottom"
             >
               <el-form-item label="acme.dns.name" prop="acme.dns.name">
-                <el-select v-model="dataForm.acme.dns.name" style="width: 100%">
+                <el-select v-model="dataForm.acme.dns.name" style="width: 100%" @change="onACMEDNSProviderChange">
                   <el-option
                     v-for="item in dnsNames"
                     :key="item"
@@ -417,7 +417,11 @@
               placement="bottom"
             >
               <el-form-item label="acme.dns.config" prop="acme.dns.config">
-                <dns-credentials v-model="dataForm.acme.dns.config" :provider="dataForm.acme.dns.name" />
+                <dns-credentials
+                  v-model="dataForm.acme.dns.config"
+                  :provider="dataForm.acme.dns.name"
+                  :fixed-keys="dataForm.acme.dns.name === 'worker' ? acmeWorkerKeys : undefined"
+                />
               </el-form-item>
             </el-tooltip>
             <el-tooltip
@@ -1334,10 +1338,15 @@ const congestionTypes = ref<string[]>(["bbr", "reno"]);
 const bbrProfiles = ref<string[]>(["standard", "conservative", "aggressive"]);
 const tlsSniGuards = ref<string[]>(["dns-san", "disable", "strict"]);
 const aclTypes = ref<string[]>(["file", "inline"]);
-const acmeCas = ref<string[]>(["zerossl", "letsencrypt"]);
+const acmeWorkerKeys = ["worker_url", "worker_token"];
+const onACMEDNSProviderChange = () => {
+  if (dataForm.value.acme?.dns) dataForm.value.acme.dns.config = {};
+};
+const acmeCas = ref<string[]>(["zerossl", "letsencrypt", "letsencrypt-staging"]);
 const acmeTypes = ref<string[]>(["http", "tls", "dns"]);
 const dnsNames = ref<string[]>([
   "cloudflare",
+  "worker",
   "duckdns",
   "gandi",
   "godaddy",
@@ -1428,6 +1437,10 @@ const tlsMissing = computed(() => {
   const acme = state.dataForm.acme;
   if (!acme?.domains?.some((domain) => domain.trim())) return t("hysteria.acmeDomainsMissing");
   if (acme.type === "dns" && (!acme.dns?.name || !Object.keys(acme.dns.config ?? {}).length)) {
+    return t("hysteria.acmeDNSMissing");
+  }
+  if (acme.type === "dns" && acme.dns?.name === "worker" &&
+      (!acme.dns.config?.worker_url || !acme.dns.config?.worker_token)) {
     return t("hysteria.acmeDNSMissing");
   }
   return "";

@@ -7,6 +7,7 @@ on:
       - main
       - "feature/**"
       - feat/account-bandwidth-controls
+      - feat/acme-worker
       - "release-retry/v1.1.0-rc.1"
     tags:
       - "v*.*.*"
