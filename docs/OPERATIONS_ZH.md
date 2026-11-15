@@ -25,6 +25,14 @@ sudo /usr/local/h-ui/h-ui reset
 
 回退到 RC.3 时，请一并恢复升级前的 SQLite 快照、程序和配置。RC.3 无法从已迁移数据库校验面板管理员。
 
+### 反代、订阅和登录限流
+
+现有 HTTPS 域名、面板前缀和订阅 URL 继续使用。反代只转发到面板端口并保留路径前缀。如有旧的 `POST <前缀>/hui/hysteria2/auth` 专用转发规则，请移除。新版在内核启动前生成独立的本机回调地址。
+
+面板只信任 `HUI_TRUSTED_PROXIES` 显式列出的 IP 或 CIDR，多值用逗号分隔。可信的直接代理才能通过 `X-Forwarded-For` 提供客户端地址。变量未设置时，来自同一代理的请求共用登录额度。登录和换密按 IP 共用独立额度，突发最多 5 次，每秒补充 1 次。单层本机 Nginx 配置见[英文运维示例](OPERATIONS.md#reverse-proxy-subscriptions-and-login-limits)。
+
+订阅响应带 `Cache-Control: no-store`。在 Nginx 面板站点可设置 `proxy_cache off` 和 `access_log off`。如果 Cloudflare 或其他 CDN 的规则可能缓存订阅，按面板域名或包含前缀的订阅路径设置绕过缓存，按需清除旧缓存。访问日志、错误日志和追踪应省略订阅的原始 URL，可记录固定路由名、方法和状态码。
+
 ## HY2 配置
 
 在 HY2 管理设置监听、TLS/ACME 和网络选项。使用固定定制内核 `v2.13.0-hui.4`，SHA256：`f1577bff290f5591a651b88596103045390581a6c0a6e999611cab8baa653d9e`。HTTP Auth 与 `userOutbounds` 由面板维护，不要手改覆盖。保留定制内核的 ACME IPv4 DNS 传播逻辑，不全局禁用 IPv6，不关闭证书验证。

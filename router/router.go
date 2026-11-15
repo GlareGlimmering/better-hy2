@@ -15,15 +15,13 @@ func Router(router *gin.Engine, huiWebContext *string) {
 	}
 	globalGroup := router.Group(relativePath)
 	{
-		globalGroup.Use(middleware.FilterHandler(), middleware.RateLimiterHandler())
-
+		globalGroup.Use(middleware.FilterHandler())
 		frontend.InitFrontend(router, relativePath)
 
-		authApi := globalGroup.Group("/hui")
-		{
-			initAuthRouter(authApi)
-			initHysteria2AuthRouter(authApi)
-		}
+		initAuthRouter(globalGroup.Group("/hui"))
+
+		globalGroup.Use(middleware.RateLimiterHandler())
+		initHysteria2SubscriptionRouter(globalGroup.Group("/hui"))
 
 		globalGroup.Use(middleware.JWTHandler())
 

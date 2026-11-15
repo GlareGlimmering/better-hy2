@@ -11,6 +11,7 @@ case ${3:-stable} in
   stable) old_version=v1.0.0 ;;
   rc.1) old_version=v1.1.0-rc.1 ;;
   rc.3) old_version=v1.1.0-rc.3 ;;
+  rc.4) old_version=v1.1.0-rc.4 ;;
   *) echo "Unsupported recovery baseline: $3" >&2; exit 1 ;;
 esac
 artifacts=$(realpath "$1")
@@ -25,6 +26,9 @@ if [[ -e $unitfile ]] || systemctl cat "$unit" >/dev/null 2>&1; then
 fi
 client=
 echo_server=
+panel_origin=http://127.0.0.1:8000
+panel_path=
+if [[ $old_version == v1.1.0-rc.4 ]]; then panel_path=/panel; fi
 cleanup() {
   local status=$?
   trap - EXIT
@@ -71,7 +75,7 @@ check_panel() {
   local i
   for ((i=0; i<40; i++)); do
     if systemctl is-active --quiet "$unit" &&
-       curl -fsS --max-time 2 http://127.0.0.1:8000/ 2>/dev/null | grep -F 'id="app"' >/dev/null; then
+       curl -fsS --max-time 2 "$panel_origin${panel_path:-/}" 2>/dev/null | grep -F 'id="app"' >/dev/null; then
       return
     fi
     sleep .25
@@ -138,11 +142,11 @@ systemctl daemon-reload
 install_pair "$artifacts/old-panel" "$artifacts/old-kernel"
 [[ $("$live/h-ui" version) == "Better HY2 version $old_version" ]]
 (cd "$live" && HUI_DATA="$live/" ./h-ui reset >"$root/reset.log")
-python3 - "$live/data/h_ui.db" "$root" <<'PY'
+python3 - "$live/data/h_ui.db" "$root" "$panel_path" <<'PY'
 import sqlite3
 import sys
 
-db, root = sys.argv[1:]
+db, root, panel_path = sys.argv[1:]
 config = f"""listen: 127.0.0.1:18443
 tls:
   cert: {root}/cert.pem
@@ -150,12 +154,14 @@ tls:
 auth:
   type: http
   http:
-    url: http://127.0.0.1:8000/hui/hysteria2/auth
+    url: http://127.0.0.1:8000{panel_path}/hui/hysteria2/auth
 trafficStats:
   listen: 127.0.0.1:19090
   secret: fixture-stats-secret
 """
 with sqlite3.connect(db) as conn:
+    if panel_path:
+        assert conn.execute("UPDATE config SET value=? WHERE key='H_UI_WEB_CONTEXT'", (panel_path,)).rowcount == 1
     assert conn.execute("UPDATE config SET value=? WHERE key='JWT_SECRET'", ("fixture-stats-secret",)).rowcount == 1
     assert conn.execute("UPDATE config SET value=? WHERE key='HYSTERIA2_CONFIG'", (config,)).rowcount == 1
     assert conn.execute("UPDATE config SET value='1' WHERE key='HYSTERIA2_ENABLE'").rowcount == 1
@@ -165,6 +171,9 @@ PY
 systemctl start "$unit"
 check_panel
 check_proxy "$artifacts/old-kernel"
+if [[ $old_version == v1.1.0-rc.4 ]]; then
+  python3 "$(dirname "$0")/test-auth-isolation.py" "$panel_origin$panel_path" legacy
+fi
 if [[ $old_version == v1.1.0-rc.3 ]]; then
   python3 "$(dirname "$0")/test-panel-admin-migration.py" "$live" "$root" legacy
 fi
@@ -199,12 +208,19 @@ cp -a "$live" "$root/snapshot/live"
 cp -a "$unitfile" "$root/snapshot/unit"
 (cd "$root/snapshot" && find live unit -type f -print0 | sort -z | xargs -0 sha256sum) >"$root/snapshot.sha256"
 (cd "$root/snapshot" && sha256sum --check "$root/snapshot.sha256")
-if [[ $old_version == v1.1.0-rc.3 ]]; then
+if [[ $old_version == v1.1.0-rc.3 || $old_version == v1.1.0-rc.4 ]]; then
   cmp "$live/bin/hysteria-linux-amd64" "$artifacts/hysteria-linux-amd64"
   [[ $(systemctl show -p ActiveState --value "$unit") == inactive ]]
   install -m 0755 "$artifacts/h-ui-linux-amd64" "$live/h-ui"
 else
   install_pair "$artifacts/h-ui-linux-amd64" "$artifacts/hysteria-linux-amd64"
+fi
+if [[ $old_version == v1.1.0-rc.4 ]]; then
+  # The old callback assumed port 8000. The new panel can use a
+  # different HTTP port while keeping the original public prefix and URL.
+  sed -i '/^ExecStart=/s/-p 8000/-p 18001/' "$unitfile"
+  panel_origin=http://127.0.0.1:18001
+  systemctl daemon-reload
 fi
 systemctl start "$unit"
 check_panel
@@ -214,6 +230,9 @@ if [[ $old_version == v1.1.0-rc.3 ]]; then
   python3 "$(dirname "$0")/test-panel-admin-migration.py" "$live" "$root" reset
 fi
 check_proxy "$artifacts/hysteria-linux-amd64"
+if [[ $old_version == v1.1.0-rc.4 ]]; then
+  python3 "$(dirname "$0")/test-auth-isolation.py" "$panel_origin$panel_path" isolated
+fi
 python3 - "$live/data/h_ui.db" <<'PY'
 import json
 import sqlite3
@@ -244,6 +263,7 @@ if systemctl start "$unit"; then
   exit 1
 fi
 restore "$2"
+panel_origin=http://127.0.0.1:8000
 [[ $("$live/h-ui" version) == "Better HY2 version $old_version" ]]
 cmp "$live/bin/hysteria-linux-amd64" "$artifacts/old-kernel"
 if [[ $2 == active ]]; then
