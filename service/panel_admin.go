@@ -15,17 +15,17 @@ var ErrPanelPasswordChangeRequired = errors.New("administrator password change r
 var panelAuthSlots = make(chan struct{}, 4)
 
 func Login(username, password string) (string, error) {
-	return authenticatePanelAdmin(username, password, "")
+	return authenticatePanelAdmin(username, password, "", util.VerifyPanelPassword)
 }
 
 func ChangePanelPassword(username, currentPassword, newPassword string) (string, error) {
 	if len(newPassword) < 12 || len(newPassword) > 128 || currentPassword == newPassword {
 		return "", errors.New("choose a different administrator password of 12 to 128 bytes")
 	}
-	return authenticatePanelAdmin(username, currentPassword, newPassword)
+	return authenticatePanelAdmin(username, currentPassword, newPassword, util.VerifyPanelPassword)
 }
 
-func authenticatePanelAdmin(username, password, newPassword string) (string, error) {
+func authenticatePanelAdmin(username, password, newPassword string, verify func(string, string) bool) (string, error) {
 	select {
 	case panelAuthSlots <- struct{}{}:
 		defer func() { <-panelAuthSlots }()
@@ -37,7 +37,8 @@ func authenticatePanelAdmin(username, password, newPassword string) (string, err
 	if admin.Legacy {
 		input = util.SHA224String(password)
 	}
-	if err != nil || !util.VerifyPanelPassword(admin.PasswordHash, input) {
+	verified := verify(admin.PasswordHash, input)
+	if err != nil || !verified {
 		return "", errors.New(constant.WrongPassword)
 	}
 	if admin.MustChange && newPassword == "" {

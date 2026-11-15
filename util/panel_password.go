@@ -27,13 +27,24 @@ func HashPanelPassword(password string) (string, error) {
 }
 
 func VerifyPanelPassword(encoded, password string) bool {
-	value, ok := strings.CutPrefix(encoded, panelPasswordPrefix)
-	saltText, hashText, valid := strings.Cut(value, "$")
+	return verifyPanelPassword(encoded, password, panelPasswordKey)
+}
+
+func verifyPanelPassword(encoded, password string, derive func(string, []byte) []byte) bool {
+	value, hasPrefix := strings.CutPrefix(encoded, panelPasswordPrefix)
+	saltText, hashText, hasSeparator := strings.Cut(value, "$")
 	enc := base64.RawStdEncoding
-	if !ok || !valid || len(saltText) != enc.EncodedLen(16) || len(hashText) != enc.EncodedLen(32) {
-		return false
+
+	// Use fixed-size dummy buffers when the administrator has no usable hash.
+	// Even a match against dummy data must never authenticate.
+	salt := make([]byte, 16)
+	hash := make([]byte, 32)
+	valid := false
+	if hasPrefix && hasSeparator && len(saltText) == enc.EncodedLen(len(salt)) && len(hashText) == enc.EncodedLen(len(hash)) {
+		_, saltErr := enc.Decode(salt, []byte(saltText))
+		_, hashErr := enc.Decode(hash, []byte(hashText))
+		valid = saltErr == nil && hashErr == nil
 	}
-	salt, saltErr := enc.DecodeString(saltText)
-	hash, hashErr := enc.DecodeString(hashText)
-	return saltErr == nil && hashErr == nil && subtle.ConstantTimeCompare(hash, panelPasswordKey(password, salt)) == 1
+	matches := subtle.ConstantTimeCompare(hash, derive(password, salt)) == 1
+	return valid && matches
 }
