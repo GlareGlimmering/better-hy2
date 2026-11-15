@@ -39,6 +39,11 @@ export default {
   },
   // 登录页面国际化
   login: {
+    changePassword: "修改密码",
+    passwordChangeRequired: "旧密码与代理凭据共用。请先设置新的面板密码。",
+    newPassword: "新面板密码",
+    confirmPassword: "确认新密码",
+    invalidNewPassword: "请输入与旧密码不同的 12 到 128 字节密码，并确认新密码。",
     title: "Better HY2",
     username: "用户名",
     password: "密码",
@@ -83,7 +88,6 @@ export default {
     yes: "是",
     no: "否",
     securityRisk: `安全隐患`,
-    defaultPassTip: `请尽快修改默认登录密码，建议设置强密码以保护您的账户安全。<a href="/#/account/list?focus=change-pass" style="color: #00BFFF">点击这里</a>修改`,
     noHttpsTip: `您的网站未启用 HTTPS，数据传输不安全，请尽快开启 HTTPS 以保护用户信息。<a href="/#/config/list?focus=huiHttps" style="color: #00BFFF">点击这里</a>开启`,
   },
   info: {

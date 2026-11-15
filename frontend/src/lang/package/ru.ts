@@ -39,6 +39,11 @@ export default {
   },
   // 登录页面国际化
   login: {
+    changePassword: "Сменить пароль",
+    passwordChangeRequired: "Старый пароль использовался для прокси. Установите новый пароль панели.",
+    newPassword: "Новый пароль панели",
+    confirmPassword: "Подтвердите пароль",
+    invalidNewPassword: "Введите и подтвердите другой пароль длиной от 12 до 128 байт.",
     title: "Better HY2",
     username: "Имя пользователя",
     password: "Пароль",
@@ -83,7 +88,6 @@ export default {
     yes: "Да",
     no: "Нет",
     securityRisk: "Риски безопасности",
-    defaultPassTip: `Пожалуйста, как можно скорее смените пароль входа по умолчанию. Рекомендуется установить сложный пароль для защиты вашей учетной записи. <a href="/#/account/list?focus=change-pass" style="color: #00BFFF">Нажмите здесь</a>, чтобы изменить`,
     noHttpsTip: `Ваш сайт не использует HTTPS, из-за чего передача данных небезопасна. Пожалуйста, как можно скорее включите HTTPS для защиты пользовательских данных. <a href="/#/config/list?focus=huiHttps" style="color: #00BFFF">Нажмите здесь</a>, чтобы включить`,
   },
   info: {

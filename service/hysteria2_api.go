@@ -136,7 +136,7 @@ func Hysteria2Subscribe(conPass string, clientType string, host string) (string,
 		return "", "", errors.New("hysteria2 config is empty")
 	}
 
-	account, err := dao.GetAccount("con_pass = ?", conPass)
+	account, err := dao.GetAccount("con_pass = ? and role = 'user'", conPass)
 	if err != nil {
 		return "", "", err
 	}

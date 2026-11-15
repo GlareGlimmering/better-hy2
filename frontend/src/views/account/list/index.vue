@@ -47,31 +47,6 @@
             >{{ $t("common.add") }}
           </el-button>
         </el-form-item>
-        <el-form-item>
-          <el-upload
-            v-model:file-list="fileList"
-            :http-request="handleImport"
-            :show-file-list="false"
-            accept=".json"
-            :limit="1"
-            :before-upload="beforeImport"
-          >
-            <el-button>
-              <template #icon>
-                <i-ep-upload />
-              </template>
-              {{ $t("common.import") }}
-            </el-button>
-          </el-upload>
-        </el-form-item>
-        <el-form-item>
-          <el-button @click="handleExport">
-            <template #icon>
-              <i-ep-download />
-            </template>
-            {{ $t("common.export") }}
-          </el-button>
-        </el-form-item>
       </el-form>
     </div>
 
@@ -253,21 +228,6 @@
             :placeholder="$t('account.username')"
             maxlength="32"
             clearable
-          />
-        </el-form-item>
-        <el-form-item
-          v-if="dataForm.role === 'admin'"
-          :label="$t('account.pass')"
-          prop="pass"
-        >
-          <el-input
-            v-model="dataForm.pass"
-            :placeholder="$t('account.pass')"
-            maxlength="50"
-            clearable
-            type="password"
-            show-password
-            ref="dataFormPassRef"
           />
         </el-form-item>
         <el-form-item :label="$t('account.conPass')" prop="conPass">
@@ -491,9 +451,7 @@ import {
   getAccountApi,
   pageAccountApi,
   updateAccountApi,
-  exportAccountApi,
   releaseKickAccountApi,
-  importAccountApi,
   resetTrafficApi,
   getAccountOutboundOptionsApi,
   generateConnectionPasswordApi,
@@ -517,11 +475,6 @@ import {
   hysteria2UrlApi,
   hysteria2RoutingStatusApi,
 } from "@/api/hysteria2";
-import {
-  UploadFile,
-  UploadRawFile,
-  UploadRequestOptions,
-} from "element-plus/lib/components";
 import { useI18n } from "vue-i18n";
 
 import {
@@ -530,7 +483,7 @@ import {
   Hysteria2RoutingStatus,
 } from "@/api/hysteria2/types";
 import copy from "copy-to-clipboard";
-import { useRoute, useRouter } from "vue-router";
+import { useRouter } from "vue-router";
 import {
   AccountOutboundOption,
   buildAccountOutboundFormState,
@@ -540,7 +493,6 @@ import {
 
 
 const { t } = useI18n();
-const route = useRoute();
 const router = useRouter();
 const { width: viewportWidth } = useWindowSize();
 const isMobile = computed(() => viewportWidth.value < 768);
@@ -553,7 +505,6 @@ let outboundOptionsRequest: Promise<void> | undefined;
 const queryFormRef = ref(ElForm); // 查询表单
 const dataFormRef = ref(ElForm); // 用户表单
 const kickFormRef = ref(ElForm); // 下线表单
-const dataFormPassRef = ref();
 const dataFormConPassRef = ref();
 
 const dataFormAddRules = {
@@ -619,18 +570,9 @@ const dataFormUpdateRules = {
   username: [
     {
       validator: (_rule: unknown, value: string, done: (error?: Error) => void) => {
-        const valid = state.dataForm.role === "admin"
-          ? /^[a-zA-Z0-9!@#$%^&*()_+-=]{6,32}$/.test(value)
-          : /^[a-zA-Z0-9!@#$%^&*()_+-=]{2,32}$/.test(value);
+        const valid = /^[a-zA-Z0-9!@#$%^&*()_+-=]{2,32}$/.test(value);
         done(valid ? undefined : new Error("Username format is incorrect"));
       },
-      trigger: ["change", "blur"],
-    },
-  ],
-  pass: [
-    {
-      pattern: /^[a-zA-Z0-9!@#$%^&*()_+-=]{6,32}$/,
-      message: "Pass format is incorrect",
       trigger: ["change", "blur"],
     },
   ],
@@ -708,7 +650,6 @@ const state = reactive({
   } as AccountPageDto,
   quotaTmp: 0 as number | undefined,
   unlimitedQuota: false,
-  fileList: [] as UploadFile[],
   qrCodeDialog: {
     title: "QR Code",
     visible: false,
@@ -738,7 +679,6 @@ const {
   queryParams,
   quotaTmp,
   unlimitedQuota,
-  fileList,
   qrCodeDialog,
   qrCodeSrc,
   outboundOptions,
@@ -1067,52 +1007,6 @@ const closeDialogKick = () => {
   kickFormRef.value.clearValidate();
 };
 
-/**
- * 导入
- */
-const handleImport = (params: UploadRequestOptions) => {
-  if (state.fileList.length > 0) {
-    let formData = new FormData();
-    formData.append("file", params.file);
-    importAccountApi(formData).then(() => {
-      ElMessage.success(t("common.success"));
-    });
-    state.fileList = [];
-  }
-};
-
-const beforeImport = (file: UploadRawFile) => {
-  if (!file.name.endsWith(".json")) {
-    ElMessage.error("file format not supported");
-    return false;
-  }
-  if (file.size / 1024 / 1024 > 2) {
-    ElMessage.error("the file is too big, less than 2 MB");
-    return false;
-  }
-};
-
-/**
- * 导出
- */
-const handleExport = () => {
-  exportAccountApi().then((res) => {
-    const blob = new Blob([res.data], {
-      type: "application/octet-stream",
-    });
-    let url = window.URL.createObjectURL(blob);
-    let a = document.createElement("a");
-    document.body.appendChild(a);
-    a.href = url;
-    let dis = res.headers["content-disposition"];
-    a.download = dis.split("attachment; filename=")[1];
-    // 模拟点击下载
-    a.click();
-    window.URL.revokeObjectURL(url);
-    ElMessage.success(t("common.success"));
-  });
-};
-
 const handleSubscribe = async (row: { [key: string]: any }) => {
   try {
     const dto: Hysteria2SubscribeUrlDto = {
@@ -1171,20 +1065,7 @@ onMounted(() => {
   handleQuery();
   loadOutboundOptions();
   loadRoutingStatus();
-  if (route.query.focus === "change-pass") {
-    nextTick(() => {
-      handleUpdate({ id: 1 }).then(() => {
-        setTimeout(() => {
-          const inputPass = dataFormPassRef.value.$el.querySelector(
-            ".el-input__wrapper input"
-          );
-          if (inputPass) {
-            inputPass.focus();
-          }
-        }, 50);
-      });
-    });
-  }
+
 });
 </script>
 

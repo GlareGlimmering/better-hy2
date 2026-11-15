@@ -42,20 +42,18 @@ func TestResetAdminCredentialsInitializesEmptyDataDirectory(t *testing.T) {
 	}
 
 	db := openResetTestDatabase(t, databasePath)
-	for _, table := range []string{"account", "config"} {
+	for _, table := range []string{"account", "config", "panel_admin"} {
 		var count int
 		if err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?`, table).Scan(&count); err != nil || count != 1 {
 			t.Fatalf("table %s count=%d err=%v", table, count, err)
 		}
 	}
-	var storedUsername, storedPassword, connectionPassword, role string
-	if err := db.QueryRow(`SELECT username, pass, con_pass, role FROM account WHERE id=1`).Scan(
-		&storedUsername, &storedPassword, &connectionPassword, &role,
-	); err != nil {
+	var storedUsername, storedPassword string
+	if err := db.QueryRow("SELECT username, password_hash FROM panel_admin").Scan(&storedUsername, &storedPassword); err != nil {
 		t.Fatal(err)
 	}
-	if storedUsername != username || storedPassword != util.SHA224String(password) || connectionPassword != username+"."+password || role != "admin" {
-		t.Fatalf("administrator was not reset correctly: username=%q connection=%q role=%q", storedUsername, connectionPassword, role)
+	if storedUsername != username || !util.VerifyPanelPassword(storedPassword, password) {
+		t.Fatal("administrator was not reset correctly")
 	}
 
 	keys := []string{
@@ -117,7 +115,7 @@ func TestSqliteSchemaInitializationIsIdempotent(t *testing.T) {
 	}
 	db := openResetTestDatabase(t, databasePath)
 	var admins int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM account WHERE id=1 AND role='admin'`).Scan(&admins); err != nil || admins != 1 {
+	if err := db.QueryRow(`SELECT COUNT(*) FROM panel_admin`).Scan(&admins); err != nil || admins != 0 {
 		t.Fatalf("default administrator count=%d err=%v", admins, err)
 	}
 	var total, distinct int
@@ -149,7 +147,7 @@ func TestResetUsesExecutableDirectoryOutsideCurrentWorkingDirectory(t *testing.T
 	expectedDatabase := filepath.Join(installDir, filepath.FromSlash(constant.SqliteDBPath))
 	db := openResetTestDatabase(t, expectedDatabase)
 	var storedUsername string
-	if err = db.QueryRow(`SELECT username FROM account WHERE id=1`).Scan(&storedUsername); err != nil || storedUsername != username {
+	if err = db.QueryRow(`SELECT username FROM panel_admin`).Scan(&storedUsername); err != nil || storedUsername != username {
 		t.Fatalf("administrator was not updated in standard database: username=%q err=%v", storedUsername, err)
 	}
 	unexpectedDatabase := filepath.Join(otherDir, filepath.FromSlash(constant.SqliteDBPath))

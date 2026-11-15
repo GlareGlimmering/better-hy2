@@ -10,6 +10,7 @@ systemctl show --property=SystemState >/dev/null
 case ${3:-stable} in
   stable) old_version=v1.0.0 ;;
   rc.1) old_version=v1.1.0-rc.1 ;;
+  rc.3) old_version=v1.1.0-rc.3 ;;
   *) echo "Unsupported recovery baseline: $3" >&2; exit 1 ;;
 esac
 artifacts=$(realpath "$1")
@@ -127,6 +128,7 @@ Type=exec
 WorkingDirectory=$live
 Environment=HUI_DATA=$live/
 Environment=GIN_MODE=release
+Environment=HUI_NODE_ADDRESS=93.184.216.34
 Environment=HYSTERIA_DISABLE_UPDATE_CHECK=1
 ExecStart=$live/h-ui -p 8000
 [Install]
@@ -157,17 +159,24 @@ with sqlite3.connect(db) as conn:
     assert conn.execute("UPDATE config SET value=? WHERE key='JWT_SECRET'", ("fixture-stats-secret",)).rowcount == 1
     assert conn.execute("UPDATE config SET value=? WHERE key='HYSTERIA2_CONFIG'", (config,)).rowcount == 1
     assert conn.execute("UPDATE config SET value='1' WHERE key='HYSTERIA2_ENABLE'").rowcount == 1
-    conn.execute("INSERT INTO account(username, con_pass, quota, expire_time) VALUES(?, ?, -1, 253370736000000)",
+    conn.execute("INSERT INTO account(username, con_pass, quota, expire_time, outbound, upload, download) VALUES(?, ?, 1000000000, 253370736000000, 'DIRECT', 12345, 67890)",
                  ("smokeuser", "smokeuser.fixture-credential"))
 PY
 systemctl start "$unit"
 check_panel
 check_proxy "$artifacts/old-kernel"
+if [[ $old_version == v1.1.0-rc.3 ]]; then
+  python3 "$(dirname "$0")/test-panel-admin-migration.py" "$live" "$root" legacy
+fi
 if [[ $2 == active ]]; then systemctl enable "$unit"; else systemctl disable "$unit"; fi
 if [[ $2 == stopped ]]; then systemctl stop "$unit"; fi
 [[ $(systemctl show -p ActiveState --value "$unit") == "$(if [[ $2 == active ]]; then echo active; else echo inactive; fi)" ]]
 systemctl stop "$unit"
 [[ $(systemctl show -p ActiveState --value "$unit") == inactive ]]
+
+if [[ $old_version == v1.1.0-rc.3 ]]; then
+  python3 "$(dirname "$0")/test-panel-admin-migration.py" "$live" "$root" snapshot
+fi
 
 # Model a stopped database with committed, uncheckpointed WAL data. The
 # standalone writer exits without a SQLite close, leaving real sidecars.
@@ -190,9 +199,20 @@ cp -a "$live" "$root/snapshot/live"
 cp -a "$unitfile" "$root/snapshot/unit"
 (cd "$root/snapshot" && find live unit -type f -print0 | sort -z | xargs -0 sha256sum) >"$root/snapshot.sha256"
 (cd "$root/snapshot" && sha256sum --check "$root/snapshot.sha256")
-install_pair "$artifacts/h-ui-linux-amd64" "$artifacts/hysteria-linux-amd64"
+if [[ $old_version == v1.1.0-rc.3 ]]; then
+  cmp "$live/bin/hysteria-linux-amd64" "$artifacts/hysteria-linux-amd64"
+  [[ $(systemctl show -p ActiveState --value "$unit") == inactive ]]
+  install -m 0755 "$artifacts/h-ui-linux-amd64" "$live/h-ui"
+else
+  install_pair "$artifacts/h-ui-linux-amd64" "$artifacts/hysteria-linux-amd64"
+fi
 systemctl start "$unit"
 check_panel
+if [[ $old_version == v1.1.0-rc.3 ]]; then
+  python3 "$(dirname "$0")/test-panel-admin-migration.py" "$live" "$root" migrated
+  (cd "$live" && HUI_DATA="$live/" ./h-ui reset >"$root/new-reset.log")
+  python3 "$(dirname "$0")/test-panel-admin-migration.py" "$live" "$root" reset
+fi
 check_proxy "$artifacts/hysteria-linux-amd64"
 python3 - "$live/data/h_ui.db" <<'PY'
 import json
@@ -235,6 +255,9 @@ else
 fi
 check_panel
 check_proxy "$artifacts/old-kernel"
+if [[ $old_version == v1.1.0-rc.3 ]]; then
+  python3 "$(dirname "$0")/test-panel-admin-migration.py" "$live" "$root" restored
+fi
 python3 - "$live/data/h_ui.db" <<'PY'
 import sqlite3
 import sys
