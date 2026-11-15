@@ -51,7 +51,7 @@ DIRECT 内置；原生 SOCKS5 无需 Xray。VLESS/HTTP 节点在「出站节点�
 
 ## 升级与恢复
 
-从 RC.7 升级请使用 README 中固定到 v2.0.0 的安装命令。安装器调用新版更新器，在停止服务前验证配套内核，内核哈希不匹配时拒绝升级。已运行 v2 时，`sudo hui update` 选择最新的 v2 正式版，也保留旧 `upgrade` 命令。使用原配套内核的 v1.0.0 可继续运行 v1，或在另一台主机全新安装 v2。
+从 RC.7 升级请使用 README 中固定到 v2.0.1 的安装命令。安装器调用新版更新器，在停止服务前验证配套内核，内核哈希不匹配时拒绝升级。已运行 v2 时，`sudo hui update` 选择最新的 v2 正式版，也保留旧 `upgrade` 命令。使用原配套内核的 v1.0.0 可继续运行 v1，或在另一台主机全新安装 v2。
 
 升级快照位于 `/var/lib/h-ui/backups/upgrade-*`，包含 SQLite 一致性备份、旧程序、systemd unit、HY2 YAML、相关 Xray 配置/CA 及文件所有权信息，保留最新五份。启动或 HTTP/入口资源检查失败会自动恢复快照与原运行状态；回滚失败会明确报错。配套内核匹配时更新器只替换面板。
 
@@ -63,8 +63,8 @@ DIRECT 内置；原生 SOCKS5 无需 Xray。VLESS/HTTP 节点在「出站节点�
 
 ```bash
 installer=$(mktemp) &&
-curl -fsSL https://github.com/GlareGlimmering/better-hy2/releases/download/v2.0.1-rc.1/install.sh -o "$installer" &&
-sudo bash "$installer" --version v2.0.1-rc.1 --migrate-v1
+curl -fsSL https://github.com/GlareGlimmering/better-hy2/releases/download/v2.0.1/install.sh -o "$installer" &&
+sudo bash "$installer" --version v2.0.1 --migrate-v1
 ```
 
 旧服务运行时下载并校验配套制品，准备恢复快照。停机从停止 h-ui.service 及 HY2 子进程开始，随后刷新 SQLite 备份、成对替换程序、迁移数据库和受管配置，并检查面板与 HY2。启动或健康检查失败时恢复旧组合、SQLite 和配置，重新启动原 unit。已落库计数会保留，停止时仍留在旧内核内存中的未结算流量可能丢失。若遇断电或强制终止，先按输出的快照路径进行手工恢复，再重试。

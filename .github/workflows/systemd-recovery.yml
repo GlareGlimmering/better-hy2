@@ -35,6 +35,7 @@ jobs:
           - { state: active, baseline: rc.3 }
           - { state: active, baseline: rc.4 }
           - { state: active, baseline: rc.7 }
+          - { state: active, baseline: v2-rc.1 }
     env:
       KERNEL_SHA: 54a51aaac00fa53a1378e20f207d54f7ac8d2b7e
       KERNEL_VERSION: v2.13.0-hui.5-dev
@@ -110,7 +111,13 @@ jobs:
         working-directory: ${{ runner.temp }}/hui-recovery-artifacts
         run: |
           version="${{ matrix.baseline }}"
-          if [[ "$version" == rc.1 || "$version" == rc.3 || "$version" == rc.4 || "$version" == rc.7 ]]; then
+          if [[ "$version" == v2-rc.1 ]]; then
+            base=https://github.com/GlareGlimmering/better-hy2/releases/download/v2.0.1-rc.1
+            curl -fsSL --retry 3 -o old-panel "$base/h-ui-linux-amd64"
+            curl -fsSL --retry 3 -o old-kernel "$base/hysteria-linux-amd64"
+            panel_hash=4b5ff083caae2516b0f84641e79cde8b5a78c99033d98aa1865c6569609938a7
+            kernel_hash=f8cf6f7f5691e7eec1ef3f7392939e24788c3088378008ad1e17ca7e53bc42af
+          elif [[ "$version" == rc.1 || "$version" == rc.3 || "$version" == rc.4 || "$version" == rc.7 ]]; then
             base="https://github.com/GlareGlimmering/better-hy2/releases/download/v1.1.0-$version"
             curl -fsSL --retry 3 -o old-panel "$base/h-ui-linux-amd64"
             curl -fsSL --retry 3 -o old-kernel "$base/hysteria-linux-amd64"

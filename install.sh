@@ -154,7 +154,13 @@ select_latest_prerelease() {
 }
 
 ensure_no_automatic_downgrade() {
-  local target="$1" current="$2"
+  local target="$1" current="$2" target_major current_major
+  allowed_version "$current" || fail "cannot determine the installed release version; upgrade refused"
+  target_major="${target#v}"
+  current_major="${current#v}"
+  if ((10#${target_major%%.*} < 10#${current_major%%.*})); then
+    fail "refusing major-version downgrade from ${current} to ${target}; restore the matching pre-upgrade snapshot"
+  fi
   if [[ "$current" == *-rc.* && "$target" != *-rc.* ]] && allowed_version "$current" && version_is_older "$target" "$current"; then
     fail "refusing prerelease-to-stable downgrade; restore the matching pre-upgrade snapshot"
   fi
@@ -311,10 +317,7 @@ migrate_existing_v1() {
 }
 
 valid_existing_installation() {
-  local reported
   [[ -x "${HUI_INSTALL_DIR}/h-ui" ]] || return 1
-  reported="$("${HUI_INSTALL_DIR}/h-ui" version 2>/dev/null)" || return 1
-  [[ "$reported" == "h-ui version "* || "$reported" == "Better HY2 version "* ]] || return 1
   systemctl cat --no-pager "$HUI_SERVICE" >/dev/null 2>&1
 }
 
@@ -337,8 +340,20 @@ main() {
   fi
   preflight_environment
   validate_cli_link
-  local target work_dir candidate sums existing=0
+  local target work_dir candidate sums current_version="" existing=0
+  # Detect the installed version even when its unit is missing. A partial
+  # installation must not fall through to an older release's fresh installer.
+  if [[ -e "${HUI_INSTALL_DIR}/h-ui" || -L "${HUI_INSTALL_DIR}/h-ui" ]]; then
+    current_version="$("${HUI_INSTALL_DIR}/h-ui" version 2>/dev/null)" ||
+      fail "cannot determine the installed release version; upgrade refused"
+    current_version="${current_version#h-ui version }"
+    current_version="${current_version#Better HY2 version }"
+    allowed_version "$current_version" || fail "cannot determine the installed release version; upgrade refused"
+  fi
   target="$(resolve_version)"
+  if [[ -n "$current_version" ]]; then
+    ensure_no_automatic_downgrade "$target" "$current_version"
+  fi
   if valid_existing_installation; then
     existing=1
   elif [[ -e "${HUI_INSTALL_DIR}/h-ui" || -d "${HUI_INSTALL_DIR}/bin" || -f "/etc/systemd/system/${HUI_SERVICE}" ]]; then
@@ -347,14 +362,6 @@ main() {
 
   if ((migrate_v1 && !existing)); then
     fail "--migrate-v1 requires an existing standard Better HY2 installation"
-  fi
-
-  if ((existing)); then
-    local current_version
-    current_version="$("${HUI_INSTALL_DIR}/h-ui" version 2>/dev/null)"
-    current_version="${current_version#h-ui version }"
-    current_version="${current_version#Better HY2 version }"
-    ensure_no_automatic_downgrade "$target" "$current_version"
   fi
 
   create_installer_work_dir

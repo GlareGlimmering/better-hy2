@@ -129,6 +129,15 @@ func Run(ctx context.Context, opts Options, deps Dependencies) error {
 	if err := normalizeAndValidate(&opts, &deps); err != nil {
 		return err
 	}
+	current, ok := releaseTagParts(opts.CurrentVersion)
+	if !ok {
+		return errors.New("cannot determine the installed release version; upgrade refused")
+	}
+	if opts.Version != "latest" {
+		if err := requireSupportedMajor(current[0], opts.Version); err != nil {
+			return err
+		}
+	}
 	release, err := resolveRelease(ctx, opts, deps)
 	if err != nil {
 		return fmt.Errorf("resolve target release: %w", err)
@@ -153,8 +162,8 @@ func Run(ctx context.Context, opts Options, deps Dependencies) error {
 		!strings.Contains(release.TagName, "-rc.") && compareReleaseTags(release.TagName, opts.CurrentVersion) < 0 {
 		return errors.New("refusing prerelease-to-stable downgrade; restore the matching pre-upgrade snapshot")
 	}
-	if usesPairedStableLine(opts.CurrentVersion) && !usesPairedStableLine(release.TagName) {
-		return errors.New("refusing to install an older major version on the v2 database; restore the matching pre-upgrade snapshot")
+	if err := requireSupportedMajor(current[0], release.TagName); err != nil {
+		return err
 	}
 	if opts.CurrentVersion == release.TagName {
 		fmt.Fprintf(opts.Output, "Better HY2 is already at %s\n", release.TagName)
@@ -245,6 +254,20 @@ func Run(ctx context.Context, opts Options, deps Dependencies) error {
 		fmt.Fprintf(opts.Output, "Upgrade successful. Running version: %s\n", release.TagName)
 	} else {
 		fmt.Fprintf(opts.Output, "Upgrade installed %s; h-ui.service remains stopped because it was stopped before the upgrade.\n", release.TagName)
+	}
+	return nil
+}
+
+func requireSupportedMajor(currentMajor int, target string) error {
+	parts, ok := releaseTagParts(target)
+	if !ok {
+		return fmt.Errorf("invalid target version %q", target)
+	}
+	if parts[0] < currentMajor {
+		return fmt.Errorf("refusing major-version downgrade from v%d to %s; restore the matching pre-upgrade snapshot", currentMajor, target)
+	}
+	if currentMajor == 2 && parts[0] > 2 {
+		return fmt.Errorf("target %s is outside the supported v2 upgrade line", target)
 	}
 	return nil
 }
