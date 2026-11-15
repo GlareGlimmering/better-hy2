@@ -3,11 +3,15 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/spf13/cobra"
+	"h-ui/model/constant"
 	upgradeop "h-ui/upgrade"
 )
 
@@ -69,3 +73,22 @@ func init() {
 	upgradeCmd.Flags().StringVar(&upgradeHealthURL, "health-url", "", "override the loopback panel health URL")
 	rootCmd.AddCommand(upgradeCmd)
 }
+
+// Used by the pinned installer after downloading the candidate and its pair.
+var migrateV1Cmd = &cobra.Command{
+	Use:    "migrate-v1 <v2-version> <asset-directory>",
+	Hidden: true,
+	Args:   cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if args[0] != constant.Version {
+			return fmt.Errorf("migration must run using the verified target version")
+		}
+		opts := upgradeop.DefaultOptions()
+		opts.Version = args[0]
+		ctx, cancel := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+		defer cancel()
+		return upgradeop.MigrateV1(ctx, args[1], opts, upgradeop.DefaultDependencies())
+	},
+}
+
+func init() { rootCmd.AddCommand(migrateV1Cmd) }

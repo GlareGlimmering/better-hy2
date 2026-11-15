@@ -235,28 +235,7 @@ jobs:
             cd kernel-source
             go build -trimpath -ldflags="-X github.com/apernet/hysteria/app/v2/cmd.appVersion=$KERNEL_VERSION -X github.com/apernet/hysteria/app/v2/cmd.appCommit=$kernel_sha" -o ../build/hysteria-linux-amd64 ./app
           )
-          python3 - "$kernel_sha" <<'PYTHON'
-          import hashlib
-          import json
-          import os
-          from pathlib import Path
-          import sys
-
-          def artifact(filename, version, commit):
-              with (Path("build") / filename).open("rb") as binary:
-                  digest = hashlib.file_digest(binary, "sha256").hexdigest()
-              return {"version": version, "commit": commit, "sha256": digest}
-
-          pair = {
-              "panel": artifact("h-ui-linux-amd64", os.environ["PANEL_VERSION"], os.environ["PANEL_SHA"]),
-              "kernel": artifact("hysteria-linux-amd64", os.environ["KERNEL_VERSION"], sys.argv[1]),
-              "os": "linux",
-              "arch": "amd64",
-              "accountConsistency": 2,
-              "accountBandwidth": 1,
-          }
-          Path("build/HY2-PAIR.json").write_text(json.dumps(pair, indent=2) + "\n")
-          PYTHON
+          python3 scripts/write-pair-manifest.py build "$PANEL_VERSION" "$PANEL_SHA" "$KERNEL_VERSION" "$kernel_sha"
           HUI_PAIR_TEST_PANEL="$PWD/build/h-ui-linux-amd64" \
           HUI_PAIR_TEST_KERNEL="$PWD/build/hysteria-linux-amd64" \
           HUI_PAIR_TEST_PANEL_VERSION="$PANEL_VERSION" \
@@ -266,7 +245,7 @@ jobs:
           cd build
           printf '%s  %s\n' f8cf6f7f5691e7eec1ef3f7392939e24788c3088378008ad1e17ca7e53bc42af hysteria-linux-amd64 | sha256sum --check
           files=(h-ui-linux-amd64 hysteria-linux-amd64 HY2-PAIR.json)
-          if [[ "${{ steps.release-tag.outputs.prerelease }}" != "true" ]]; then
+          if [[ "$PANEL_VERSION" == v2.* || "${{ steps.release-tag.outputs.prerelease }}" != "true" ]]; then
             files+=(install.sh)
           fi
           sha256sum "${files[@]}" > SHA256SUMS
@@ -351,7 +330,7 @@ jobs:
           if [[ "${{ needs.build.outputs.is-paired-tag }}" == "true" ]]; then
             release_args+=("release-assets/hysteria-linux-amd64" "release-assets/HY2-PAIR.json")
           fi
-          if [[ "${{ needs.build.outputs.is-paired-tag }}" != "true" || "${{ needs.build.outputs.is-prerelease-tag }}" != "true" ]]; then
+          if [[ "$RELEASE_TAG" == v2.* || "${{ needs.build.outputs.is-paired-tag }}" != "true" || "${{ needs.build.outputs.is-prerelease-tag }}" != "true" ]]; then
             release_args+=("release-assets/install.sh")
           fi
           if [[ "${{ needs.build.outputs.is-prerelease-tag }}" == "true" ]]; then

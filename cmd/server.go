@@ -148,6 +148,13 @@ func newHysteria2AuthRouter() http.Handler {
 	r.Use(gin.CustomRecoveryWithWriter(nil, func(c *gin.Context, _ interface{}) {
 		c.AbortWithStatus(http.StatusInternalServerError)
 	}))
+	r.GET("/ready", func(c *gin.Context) {
+		if !service.Hysteria2IsRunning() {
+			c.Status(http.StatusServiceUnavailable)
+			return
+		}
+		c.Status(http.StatusNoContent)
+	})
 	r.POST(service.Hysteria2AuthPath, func(c *gin.Context) {
 		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 16<<10)
 		controller.Hysteria2Auth(c)

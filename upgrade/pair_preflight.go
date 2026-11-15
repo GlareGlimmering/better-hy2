@@ -75,6 +75,14 @@ func preflightReleasePair(ctx context.Context, release releaseInfo, panel, sums,
 	if err := downloadFile(ctx, assets[pairManifestAsset], manifest, deps); err != nil {
 		return "", fmt.Errorf("download paired release manifest: %w", err)
 	}
+	kernel := filepath.Join(dir, pairKernelAsset)
+	if err := downloadFile(ctx, assets[pairKernelAsset], kernel, deps); err != nil {
+		return "", fmt.Errorf("download paired kernel: %w", err)
+	}
+	return verifyReleasePairFiles(release.TagName, panel, sums, manifest, kernel, deps)
+}
+
+func verifyReleasePairFiles(tag, panel, sums, manifest, kernel string, deps Dependencies) (string, error) {
 	if err := verifyPairChecksum(manifest, sums); err != nil {
 		return "", err
 	}
@@ -95,7 +103,7 @@ func preflightReleasePair(ctx context.Context, release releaseInfo, panel, sums,
 	if err := decoder.Decode(new(any)); err != io.EOF {
 		return "", errors.New("invalid trailing content in paired release manifest")
 	}
-	if err := pair.validate(release.TagName); err != nil {
+	if err := pair.validate(tag); err != nil {
 		return "", err
 	}
 	for name, digest := range map[string]string{BinaryAsset: pair.Panel.SHA256, pairKernelAsset: pair.Kernel.SHA256} {
@@ -109,10 +117,6 @@ func preflightReleasePair(ctx context.Context, release releaseInfo, panel, sums,
 	}
 	if err := verifyPanelBuildCommit(panel, pair.Panel.Commit); err != nil {
 		return "", err
-	}
-	kernel := filepath.Join(dir, pairKernelAsset)
-	if err := downloadFile(ctx, assets[pairKernelAsset], kernel, deps); err != nil {
-		return "", fmt.Errorf("download paired kernel: %w", err)
 	}
 	if err := verifyPairChecksum(kernel, sums); err != nil {
 		return "", err
