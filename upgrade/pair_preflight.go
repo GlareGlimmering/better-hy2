@@ -20,6 +20,11 @@ const (
 	pairKernelAsset   = "hysteria-linux-amd64"
 )
 
+// Major version 2 uses the account consistency and bandwidth kernel pair.
+func usesPairedStableLine(tag string) bool {
+	return strings.HasPrefix(tag, "v2.")
+}
+
 var (
 	standardRCTag     = regexp.MustCompile(`^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$`)
 	pairCommit        = regexp.MustCompile(`^[0-9a-f]{40}$`)

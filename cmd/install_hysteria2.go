@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"h-ui/model/constant"
 	"h-ui/util"
 )
 
@@ -19,7 +18,7 @@ var installHysteria2Cmd = &cobra.Command{
 				return err
 			}
 		}
-		if err := util.DownloadHysteria2(constant.Hysteria2CustomVersion); err != nil {
+		if err := util.DownloadHysteria2(util.ManagedHysteria2Version()); err != nil {
 			return err
 		}
 		version, err := util.InstalledHysteria2Version()

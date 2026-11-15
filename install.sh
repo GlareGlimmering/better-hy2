@@ -349,7 +349,7 @@ main() {
 
   local hui_version hy2_version service_state panel_summary
   hui_version="$("${HUI_INSTALL_DIR}/h-ui" version 2>/dev/null || true)"
-  hy2_version="$("${HUI_INSTALL_DIR}/bin/hysteria2" version 2>/dev/null | head -n 1 || true)"
+  hy2_version="$("${HUI_INSTALL_DIR}/bin/hysteria-linux-amd64" version 2>/dev/null | head -n 1 || true)"
   service_state="$(systemctl is-active "$HUI_SERVICE" 2>/dev/null || true)"
   panel_summary="http://127.0.0.1:${panel_port}"
   cat <<EOF

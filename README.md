@@ -1,71 +1,81 @@
 # Better HY2
 
-A lightweight, modern management panel for Hysteria2.
+Better HY2 manages a Hysteria2 server, proxy accounts, and outbound nodes from a web panel. A single VPS can serve the panel and subscriptions through a Cloudflare Tunnel while HY2 clients connect directly over UDP.
 
-[中文](README_ZH.md) · [Releases](https://github.com/GlareGlimmering/better-hy2/releases) · [Installation and operations](docs/OPERATIONS.md)
+[中文](README_ZH.md) · [Download v2.0.0](https://github.com/GlareGlimmering/better-hy2/releases/tag/v2.0.0) · [Operations guide](docs/OPERATIONS.md)
 
-## Features
+## What we added
 
-- Hysteria2 server lifecycle and configuration management.
-- DIRECT, native SOCKS5 and Xray-adapted VLESS/HTTP outbound nodes.
-- Per-account outbound routing with explicit bindings and fail-closed validation.
-- Traffic monitoring, quotas, expiry and device limits.
-- Subscription templates and automatic public IPv4 node addresses.
-- Responsive dashboard, account drawer and English/Chinese/Russian UI.
-- System, HY2 kernel and request access logs with rotation and management.
-- SHA256/version-verified updates, database backups and automatic rollback on startup/health-check failure.
+- **Proxy accounts and subscriptions.** Set expiry, concurrent connection limits, GB quotas and shared per-account upload/download limits in Mbps. View traffic in the dashboard and customize subscription node names and addresses. The default node address uses the server's public IPv4.
+- **Outbound nodes.** Assign each account to DIRECT, native SOCKS5, or VLESS and HTTP nodes backed by Xray. Strict routing rejects missing or failed routes. Test TCP and UDP separately.
+- **Panel security.** Administrator credentials are separate from HY2 accounts. The panel uses salted Argon2id, login rate limits, trusted-proxy configuration and session revocation on password change. HY2 authentication uses a private loopback listener. Subscription links remain usable and their responses request no caching.
+- **Operations.** Manage HY2, configure TLS, inspect system and access logs, and use CLI installation, checked updates, backups and uninstall. The panel ships with its tested kernel and a compatibility manifest.
 
-## Requirements
+## Install v2.0.0
 
-Linux AMD64, systemd and root installation privileges. Ubuntu/Debian-style systemd installations are the supported deployment target. Other distributions and container installations are not certified by this release. The installer needs Bash, curl, coreutils and network access to GitHub and the pinned kernel release.
-
-## Quick install
+Use a **Linux AMD64** host with **systemd**, Bash, curl, coreutils and root privileges. The installer checks the panel version and checksums and installs the paired kernel. On a fresh installation it prints a random panel login once. Xray is optional.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/GlareGlimmering/better-hy2/main/install.sh | sudo bash
+installer=$(mktemp) &&
+curl -fsSL https://github.com/GlareGlimmering/better-hy2/releases/download/v2.0.0/install.sh -o "$installer" &&
+sudo bash "$installer" --version v2.0.0
 ```
 
-The script resolves the latest stable release, downloads its exact assets and verifies the binary SHA256 and version. It installs the pinned custom HY2 kernel and initializes a random administrator. Credentials are printed once: record them securely. Xray is optional and is not downloaded on a fresh/DIRECT-only installation.
+The standard panel listens on `http://127.0.0.1:8000`. The installer leaves the firewall and proxy configuration to you.
 
-The panel listens on **http://127.0.0.1:8000**. Expose it through an HTTPS reverse proxy or Cloudflare Tunnel targeting that loopback endpoint; the installer does not open firewall ports or configure a reverse proxy. HY2 UDP listening is configured separately in the panel.
+## Recommended setup: Cloudflare Tunnel + your own HY2 certificate
 
-## Update
+| Connection | Public endpoint | Origin |
+| --- | --- | --- |
+| Panel and subscriptions | `https://panel.example.com` | Cloudflare Tunnel → `http://127.0.0.1:8000` |
+| HY2 client traffic | VPS public IP or a DNS-only hostname, UDP `443` | Hysteria2 listener |
+| HY2 authentication callback | Local only | Dedicated loopback listener managed by Better HY2 |
 
-```bash
-sudo hui update
+1. Run `cloudflared` on the same VPS and publish an HTTP application for `panel.example.com` targeting `http://127.0.0.1:8000`. Cloudflare supplies the public HTTPS certificate. Configure the panel hostname to bypass cache if a rule would otherwise cache subscriptions. Omit full subscription URLs from proxy logs. [Cloudflare published applications](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/routing-to-tunnel/) · [Proxy settings](docs/OPERATIONS.md#reverse-proxy-subscriptions-and-login-limits)
+2. In **HY2 Management**, set the listen address to `:443` and enable **TLS**. Provide the HY2 certificate and key using the form. A self-signed private CA can issue the certificate. Its SAN should match the HY2 SNI, for example `hy2.example.com`. Open **UDP 443** on the VPS and its provider firewall. The public HTTP tunnel handles panel and subscription traffic, while HY2 clients use the independent UDP listener. [Certificate generation](docs/OPERATIONS.md#generate-a-private-hy2-certificate)
+3. Create an ordinary proxy account, choose **DIRECT** for the first test, and start HY2. In strict routing mode every effective account needs an explicit binding. Copy the subscription URL or use the native HY2 client example below. A client using a private CA needs that CA and the matching SNI configured locally. Use a publicly trusted HY2 certificate if your client cannot import a private CA or verify a certificate pin. [Hysteria client TLS options](https://v2.hysteria.network/docs/advanced/Full-Client-Config/#tls)
+
+```yaml
+server: 198.51.100.10:443
+auth: "paste-the-full-proxy-connection-credential"
+tls:
+  sni: hy2.example.com
+  ca: ./hy2-ca.crt
+  insecure: false
+socks5:
+  listen: 127.0.0.1:1080
 ```
 
-The default channel installs stable releases only and refuses automatic downgrades. The legacy entry remains supported:
+Use your own public IP and install only the public CA certificate on clients. The panel administrator signs in to the web interface. Proxy users use the separate connection credential.
 
-```bash
-sudo /usr/local/h-ui/h-ui upgrade
-```
+## Common commands
 
-## Migrate RC.23
+| Task | Command |
+| --- | --- |
+| Show the panel version | `hui version` |
+| Show the installed kernel and capabilities | `/usr/local/h-ui/bin/hysteria-linux-amd64 version --json` |
+| Recover administrator access | `sudo hui reset` |
+| Update an installed v2 release within the stable v2 series | `sudo hui update` |
+| Choose an exact v2 version | `sudo hui update v2.0.0` |
+| Check the panel service | `systemctl status h-ui.service --no-pager` |
+| Follow service logs | `sudo journalctl -u h-ui.service -f` |
+| Follow HY2 request logs | `sudo tail -F /var/lib/hui/hy2_access.log` |
+| Restart the panel and its managed child process | `sudo systemctl restart h-ui.service` |
+| Uninstall, keeping existing data | `sudo hui uninstall` |
+| Inspect the complete-removal plan | `sudo hui uninstall --purge` |
 
-RC.23 cannot parse the new stable tag. **Use the new installer, not the old binary's `upgrade v1.0.0`:**
+Use **HY2 Management** to start, stop or restart the HY2 child only. The uninstall command lists the paths and asks for confirmation before making changes.
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/GlareGlimmering/better-hy2/main/install.sh | sudo bash -s -- --version v1.0.0
-```
+## Upgrade from RC.7 or v1.0.0
 
-It verifies the new candidate and delegates to that candidate's compatible upgrader. Existing accounts, bindings, certificates and configuration paths remain unchanged. Back up first; service restart briefly interrupts panel and HY2 connections. Xray is not restarted by the panel upgrader. See [operations and recovery](docs/OPERATIONS.md).
+- **RC.7:** Run the pinned `v2.0.0` installer shown above. It uses the v2 updater and verifies the installed kernel matches `HY2-PAIR.json` before replacing the panel. Keep a private backup and allow for a brief service interruption. Rollback restores the prior binary and matching database snapshot.
+- **v1.0.0:** Its original kernel lacks the required account protocol. The v2 installer refuses to update on a kernel mismatch. Keep this server on v1 or start v2 on a separate host. Automatic coordinated kernel and panel replacement remains unavailable. The repository's legacy **Latest** pointer stays on v1 so older updaters keep seeing a compatible release.
 
-## Documentation
+v2.0.0 pairs with the exact `v2.13.0-hui.5-dev` build in the Release (Traffic Stats protocol 2 and bandwidth capability 1). The kernel version retains the suffix used by the tested RCs. Keep older panel binaries paired with their pre-upgrade databases when rolling back. [Backup and recovery](docs/OPERATIONS.md#update-backup-and-recovery)
 
-[Installation, first-time setup, HY2 configuration, Xray outbounds, account routing, backup/recovery and troubleshooting](docs/OPERATIONS.md).
+## Build and credits
 
-[Prerelease acceptance record and test status (Chinese)](docs/ACCEPTANCE_ZH.md).
-
-The internal Go module, binary filename, database and service names retain `h-ui` for compatibility. This project does not change the Hysteria2/Xray proxy protocols. The managed HY2 kernel is **v2.13.0-hui.4**; it is independently released at [GlareGlimmering/hysteria](https://github.com/GlareGlimmering/hysteria). Do not replace it with an incompatible upstream binary when managed user routing is enabled.
-
-## Validation and limitations
-
-The RC.23 baseline and existing proxy chains passed operator VPS acceptance before this release. Automated tests exercise configuration, account routing constraints, installer/upgrader, rollback, frontend and embedded assets. These checks do not constitute a production security audit or prove zero network leakage under all failures. UDP end-to-end support depends on the selected outbound and upstream; a TCP result does not validate UDP. The renamed stable installer and upgrade should still receive operator acceptance before broad rollout. No automated VPS deployment is performed.
-
-## Build
-
-Use the Go version from `go.mod`, Node 22 and pnpm from `frontend/package.json`:
+Use the Go version in `go.mod`, Node 22 and the pnpm version in `frontend/package.json`. Build the frontend first so the Go executable embeds it.
 
 ```bash
 cd frontend
@@ -74,13 +84,7 @@ pnpm run test:unit
 pnpm run build:prod
 cd ..
 go test ./...
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w -X h-ui/model/constant.Version=v1.0.0" -o h-ui-linux-amd64 .
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-X h-ui/model/constant.Version=v2.0.0" -o h-ui-linux-amd64 .
 ```
 
-Build the frontend first: Go embeds `frontend/dist`, including underscore-prefixed chunks. The release workflow verifies all embedded asset references.
-
-## Credits and license
-
-Derived from [H UI by jonssonyan](https://github.com/jonssonyan/h-ui). Thanks to [Hysteria](https://github.com/apernet/hysteria), [Xray-core](https://github.com/XTLS/Xray-core) and all upstream contributors. Original copyright and license notices remain applicable; see [third-party notices](THIRD_PARTY_NOTICES.md).
-
-Better HY2 is distributed under [GPL-3.0](LICENSE). Source is supplied for the exact release tag. Independently downloaded proxy kernels retain their own licenses.
+Based on [H UI](https://github.com/jonssonyan/h-ui), with [Hysteria](https://github.com/apernet/hysteria) and [Xray-core](https://github.com/XTLS/Xray-core). [GPL-3.0](LICENSE) · [Third-party notices](THIRD_PARTY_NOTICES.md) · [Acceptance records](docs/ACCEPTANCE_ZH.md)

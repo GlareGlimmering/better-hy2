@@ -64,6 +64,9 @@ jobs:
             elif [[ "$release_tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
               echo "match=true" >> "${GITHUB_OUTPUT}"
               echo "prerelease=false" >> "${GITHUB_OUTPUT}"
+              if [[ "$release_tag" == v2.* ]]; then
+                echo "paired=true" >> "${GITHUB_OUTPUT}"
+              fi
             else
               echo "Invalid release tag: $release_tag" >&2
               exit 1
@@ -216,7 +219,7 @@ jobs:
           go-version-file: kernel-source/app/go.mod
           cache: false
 
-      - name: Build and verify the paired RC assets
+      - name: Build and verify the paired release assets
         if: steps.release-tag.outputs.paired == 'true'
         env:
           CGO_ENABLED: '0'
@@ -261,7 +264,12 @@ jobs:
           HUI_PAIR_TEST_KERNEL_COMMIT="$kernel_sha" \
           go test ./upgrade -run '^TestPairPreflightCompiledArtifacts(UpgradesWithMatchingInstalledKernel)?$' -count=1 -v
           cd build
-          sha256sum h-ui-linux-amd64 hysteria-linux-amd64 HY2-PAIR.json > SHA256SUMS
+          printf '%s  %s\n' f8cf6f7f5691e7eec1ef3f7392939e24788c3088378008ad1e17ca7e53bc42af hysteria-linux-amd64 | sha256sum --check
+          files=(h-ui-linux-amd64 hysteria-linux-amd64 HY2-PAIR.json)
+          if [[ "${{ steps.release-tag.outputs.prerelease }}" != "true" ]]; then
+            files+=(install.sh)
+          fi
+          sha256sum "${files[@]}" > SHA256SUMS
           sha256sum --check SHA256SUMS
 
       - name: Upload build artifact
@@ -342,11 +350,15 @@ jobs:
           )
           if [[ "${{ needs.build.outputs.is-paired-tag }}" == "true" ]]; then
             release_args+=("release-assets/hysteria-linux-amd64" "release-assets/HY2-PAIR.json")
-          else
+          fi
+          if [[ "${{ needs.build.outputs.is-paired-tag }}" != "true" || "${{ needs.build.outputs.is-prerelease-tag }}" != "true" ]]; then
             release_args+=("release-assets/install.sh")
           fi
           if [[ "${{ needs.build.outputs.is-prerelease-tag }}" == "true" ]]; then
             release_args+=(--prerelease --latest=false --notes-from-tag)
+          elif [[ "${{ needs.build.outputs.is-paired-tag }}" == "true" ]]; then
+            # Older v1 updaters follow GitHub Latest without a paired-kernel check.
+            release_args+=(--latest=false --notes-from-tag)
           else
             release_args+=(--latest --notes-from-tag)
           fi

@@ -1,73 +1,81 @@
 # Better HY2
 
-A lightweight, modern management panel for Hysteria2.
+Better HY2 是用于管理 Hysteria2 服务、代理账户和出站节点的面板。面板和订阅可以经 Cloudflare Tunnel 提供 HTTPS，HY2 客户端直接通过 UDP 连接 VPS。
 
-轻量、现代的 Hysteria2 管理面板。
+[English](README.md) · [下载 v2.0.0](https://github.com/GlareGlimmering/better-hy2/releases/tag/v2.0.0) · [运维文档](docs/OPERATIONS_ZH.md)
 
-[English](README.md) · [下载](https://github.com/GlareGlimmering/better-hy2/releases) · [安装与运维](docs/OPERATIONS_ZH.md)
+## 做了什么
 
-## 功能
+- **代理账户与订阅**。支持到期时间、同时在线连接数、GB 流量配额和每账户共享的上下行限速（Mbps）。仪表盘显示流量，订阅支持自定义节点名称和连接地址，默认读取服务器公网 IPv4。
+- **统一出站节点**。账户可绑定 DIRECT、原生 SOCKS5 或由 Xray 转发的 VLESS、HTTP 节点。严格路由下，缺少绑定或指定节点故障时拒绝转发。节点支持分开测试 TCP 和 UDP。
+- **面板安全**。管理员与代理账户独立，使用带盐 Argon2id、登录限流、可信反代和改密后会话撤销。HY2 认证回调使用独立的本机入口，原有订阅地址可继续使用，订阅响应要求禁用缓存。
+- **部署与排查**。从面板管理 HY2 与 TLS，查阅内核日志、访问日志和流量数据。CLI 支持安装、校验升级、快照回退和卸载。Release 提供经过配套验证的内核及兼容清单。
 
-- Hysteria2 服务、配置及证书管理。
-- DIRECT、原生 SOCKS5 和通过 Xray 适配的 VLESS / HTTP 出站节点。
-- 按账户绑定出站，保留严格 Fail-Closed 校验。
-- 流量统计、配额、到期和设备限制。
-- 订阅模板及服务器公网 IPv4 自动检测。
-- 响应式仪表盘、账户抽屉及中英俄三语界面。
-- 系统日志、HY2 内核及访问日志，支持轮转与管理。
-- SHA256 / 版本校验、数据库备份、启动或健康检查失败自动回滚。
+## 安装 v2.0.0
 
-## 环境要求
-
-Linux AMD64、systemd、root 安装权限。支持目标为 Ubuntu / Debian 风格的 systemd 环境；本版本不认证其他发行版或容器安装。需要 Bash、curl、coreutils，以及访问 GitHub 和固定内核 Release 的网络能力。
-
-## 一行安装
+需要 **Linux AMD64**、**systemd**、Bash、curl、coreutils 和 root 权限。安装器校验面板版本与制品哈希，并安装配套内核。全新安装会输出一次随机管理员凭据。使用 DIRECT 无需安装 Xray。
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/GlareGlimmering/better-hy2/main/install.sh | sudo bash
+installer=$(mktemp) &&
+curl -fsSL https://github.com/GlareGlimmering/better-hy2/releases/download/v2.0.0/install.sh -o "$installer" &&
+sudo bash "$installer" --version v2.0.0
 ```
 
-默认只解析最新正式版，下载精确版本附件，检查 SHA256 与二进制版本，安装固定定制 HY2 并初始化随机管理员。凭据仅输出一次，请妥善保存。全新或仅 DIRECT 的安装不会自动下载 Xray，Xray 仍为可选功能。
+标准安装的面板监听 `http://127.0.0.1:8000`。反代和防火墙由操作者设置。
 
-面板仅监听 **http://127.0.0.1:8000**。通过 HTTPS 反向代理或 Cloudflare Tunnel 转发到此地址；安装器不会开放防火墙或配置反向代理。HY2 UDP 监听在面板内单独配置。
+## 推荐部署：Cloudflare Tunnel + 自建证书
 
-## 一行升级
+| 用途 | 公网入口 | VPS 上的服务 |
+| --- | --- | --- |
+| 面板和订阅 | `https://panel.example.com` | Cloudflare Tunnel → `http://127.0.0.1:8000` |
+| HY2 代理流量 | VPS 公网 IP 或仅 DNS 解析的域名，UDP `443` | Hysteria2 监听端口 |
+| HY2 认证回调 | 本机使用 | Better HY2 管理的独立回环入口 |
 
-```bash
-sudo hui update
+1. 在同一台 VPS 运行 `cloudflared`，将 `panel.example.com` 发布为 HTTP 应用，上游填 `http://127.0.0.1:8000`。公网 HTTPS 由 Cloudflare 提供。若缓存规则会匹配订阅，设置绕过缓存，并避免在代理日志中记录完整订阅 URL。[Cloudflare 应用发布文档](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/routing-to-tunnel/) · [反代配置](docs/OPERATIONS_ZH.md#反代订阅和登录限流)
+2. 在 **HY 管理 → TLS 与证书** 填入 HY2 服务证书和私钥，监听地址可用 `:443`。自建证书可由自签 CA 签发，证书 SAN 与 HY2 的 SNI 一致，例如 `hy2.example.com`。在 VPS 和云防火墙放行 **UDP 443**。Tunnel 承载面板与订阅，客户端的 HY2 流量走独立的 UDP 入口。[证书生成命令](docs/OPERATIONS.md#generate-a-private-hy2-certificate)
+3. 创建一个普通代理账户，先绑定 **DIRECT**，再启动 HY2。开启严格路由前，为所有有效代理账号设置明确的出站绑定。可复制订阅 URL，或使用下面的原生 HY2 客户端配置。使用私有 CA 的客户端需要配置 CA 和 SNI。客户端无法导入私有 CA 或校验指纹时，可以使用公开受信的 HY2 证书。[Hysteria 客户端 TLS 参数](https://v2.hysteria.network/docs/advanced/Full-Client-Config/#tls)
+
+```yaml
+server: 198.51.100.10:443
+auth: "在此填写完整代理连接凭据"
+tls:
+  sni: hy2.example.com
+  ca: ./hy2-ca.crt
+  insecure: false
+socks5:
+  listen: 127.0.0.1:1080
 ```
 
-默认仅升级稳定版并禁止自动降级。保留旧入口：
+把示例 IP 换成 VPS 公网 IP。客户端只需要 CA 公共证书。管理员账号用于登录面板，代理账号使用独立的连接凭据。
 
-```bash
-sudo /usr/local/h-ui/h-ui upgrade
-```
+## 常用指令
 
-## 从 RC.23 迁移
+| 操作 | 指令 |
+| --- | --- |
+| 查看面板版本 | `hui version` |
+| 查看内核版本和能力 | `/usr/local/h-ui/bin/hysteria-linux-amd64 version --json` |
+| 本机恢复管理员访问 | `sudo hui reset` |
+| 更新现有 v2 到同系列正式版 | `sudo hui update` |
+| 指定 v2 版本 | `sudo hui update v2.0.0` |
+| 查看面板服务状态 | `systemctl status h-ui.service --no-pager` |
+| 跟踪服务日志 | `sudo journalctl -u h-ui.service -f` |
+| 跟踪 HY2 请求日志 | `sudo tail -F /var/lib/hui/hy2_access.log` |
+| 重启面板及其受管子进程 | `sudo systemctl restart h-ui.service` |
+| 卸载面板并保留数据 | `sudo hui uninstall` |
+| 查看完整清除计划 | `sudo hui uninstall --purge` |
 
-旧 RC.23 无法解析新的稳定版本号，**不要直接执行旧程序的 `upgrade v1.0.0`**。使用新安装器：
+单独启停或重启 HY2，请在 **HY 管理** 操作。CLI 卸载会先列出路径并要求确认。
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/GlareGlimmering/better-hy2/main/install.sh | sudo bash -s -- --version v1.0.0
-```
+## 从 RC.7 或 v1.0.0 升级
 
-安装器校验新版候选程序后，调用新版升级器迁移。原有账户、绑定、证书、配置和目录保持兼容。升级前备份；面板与 HY2 重启会短暂中断连接。面板升级器不重启独立 Xray。详见[运维与恢复](docs/OPERATIONS_ZH.md)。
+- **RC.7** 使用上面的 `v2.0.0` 固定版本安装命令。安装器调用新版更新器，确认已安装内核与 `HY2-PAIR.json` 匹配后替换面板。请先保留私有备份，升级会短暂中断服务。回退需要旧二进制及对应数据库快照。
+- **v1.0.0** 的配套旧内核缺少 v2 所需的账号协议。内核不匹配时安装器会拒绝更新。可以继续使用 v1，或在另一台主机全新安装 v2。目前没有全自动的面板与内核联合升级。旧更新器依赖的 GitHub **Latest** 指针仍指向 v1。
 
-## 文档
+v2.0.0 配套的是 Release 中精确构建的 `v2.13.0-hui.5-dev`，支持 Traffic Stats 协议 2 和账号限速能力 1。内核版本沿用已测试 RC 的标识。[备份和恢复](docs/OPERATIONS_ZH.md)
 
-[安装、首次设置、HY2 配置、Xray 出站、账户绑定、备份恢复及故障排查](docs/OPERATIONS_ZH.md)。
+## 构建与致谢
 
-[预发布验收记录与测试进度](docs/ACCEPTANCE_ZH.md)。
-
-为保持兼容，内部 Go module、二进制、数据库和服务继续使用 `h-ui` 名称。本项目不修改 HY2 / Xray 代理协议。匹配内核固定为 **v2.13.0-hui.4**，独立发布于 [GlareGlimmering/hysteria](https://github.com/GlareGlimmering/hysteria)。启用用户路由时不得换成不兼容官方内核。
-
-## 验证与限制
-
-发布前，运营者已确认 RC.23 基线及既有代理链路通过 VPS 人工验收。自动化测试覆盖配置、账户路由约束、安装、升级回滚、前端及嵌入资源；不代表完整安全审计或任何异常下绝对零泄漏证明。UDP 端到端能力取决于节点和上游，TCP 成功不能等同 UDP 成功。新版品牌安装器及升级仍建议先灰度验收。本项目不会自动部署 VPS。
-
-## 构建
-
-使用 `go.mod` 指定的 Go、Node 22 及 `frontend/package.json` 指定的 pnpm：
+使用 `go.mod` 所需的 Go、Node 22 和 `frontend/package.json` 固定的 pnpm。先构建前端，再编译 Go 程序，前端资源会嵌入二进制。
 
 ```bash
 cd frontend
@@ -76,13 +84,7 @@ pnpm run test:unit
 pnpm run build:prod
 cd ..
 go test ./...
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w -X h-ui/model/constant.Version=v1.0.0" -o h-ui-linux-amd64 .
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-X h-ui/model/constant.Version=v2.0.0" -o h-ui-linux-amd64 .
 ```
 
-必须先构建前端：Go 通过 `all:dist` 嵌入全部资源，包括下划线开头的 Chunk，发布流水线检查资源引用完整性。
-
-## 致谢与许可证
-
-基于 [jonssonyan/H UI](https://github.com/jonssonyan/h-ui)。感谢 [Hysteria](https://github.com/apernet/hysteria)、[Xray-core](https://github.com/XTLS/Xray-core) 及上游贡献者。保留原版权和许可要求，参见[第三方声明](THIRD_PARTY_NOTICES.md)。
-
-本项目遵循 [GPL-3.0](LICENSE)，对应版本源码随 Tag 提供；单独下载的代理内核遵循各自许可证。
+基于 [H UI](https://github.com/jonssonyan/h-ui)，感谢 [Hysteria](https://github.com/apernet/hysteria) 和 [Xray-core](https://github.com/XTLS/Xray-core) 贡献者。[GPL-3.0](LICENSE) · [第三方许可说明](THIRD_PARTY_NOTICES.md) · [验收记录](docs/ACCEPTANCE_ZH.md)

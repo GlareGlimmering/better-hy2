@@ -153,6 +153,9 @@ func Run(ctx context.Context, opts Options, deps Dependencies) error {
 		!strings.Contains(release.TagName, "-rc.") && compareReleaseTags(release.TagName, opts.CurrentVersion) < 0 {
 		return errors.New("refusing prerelease-to-stable downgrade; restore the matching pre-upgrade snapshot")
 	}
+	if usesPairedStableLine(opts.CurrentVersion) && !usesPairedStableLine(release.TagName) {
+		return errors.New("refusing to install an older major version on the v2 database; restore the matching pre-upgrade snapshot")
+	}
 	if opts.CurrentVersion == release.TagName {
 		fmt.Fprintf(opts.Output, "Better HY2 is already at %s\n", release.TagName)
 		return nil
@@ -168,9 +171,10 @@ func Run(ctx context.Context, opts Options, deps Dependencies) error {
 	if err := downloadReleaseAssets(ctx, release, candidate, checksumPath, deps); err != nil {
 		return err
 	}
-	if standardRCTag.MatchString(release.TagName) {
-		if !release.Prerelease || release.Draft {
-			return errors.New("standard RC must be published as a prerelease")
+	paired := standardRCTag.MatchString(release.TagName) || usesPairedStableLine(release.TagName)
+	if paired {
+		if release.Draft || release.Prerelease != strings.Contains(release.TagName, "-rc.") {
+			return errors.New("paired release tag and published channel do not match")
 		}
 		if err := verifyPairExecutable(candidate); err != nil {
 			return fmt.Errorf("panel candidate: %w", err)
@@ -181,7 +185,7 @@ func Run(ctx context.Context, opts Options, deps Dependencies) error {
 	}
 
 	verifyInstalledKernel := func() error { return nil }
-	if standardRCTag.MatchString(release.TagName) {
+	if paired {
 		kernelDigest, err := preflightReleasePair(ctx, release, candidate, checksumPath, workDir, deps)
 		if err != nil {
 			return fmt.Errorf("paired upgrade preflight: %w", err)
@@ -189,7 +193,7 @@ func Run(ctx context.Context, opts Options, deps Dependencies) error {
 		kernelPath := filepath.Join(opts.DataDir, util.GetHysteria2BinPath())
 		verifyInstalledKernel = func() error {
 			if err := verifyFileDigest(kernelPath, kernelDigest); err != nil {
-				return fmt.Errorf("installed HY2 kernel does not match the target RC pair: %w; automatic joint activation is unavailable; use a verified maintenance-mode installation", err)
+				return fmt.Errorf("installed HY2 kernel does not match the target release pair: %w; automatic joint activation is unavailable; use a verified maintenance-mode installation", err)
 			}
 			return nil
 		}
@@ -330,10 +334,16 @@ func resolveRelease(ctx context.Context, opts Options, deps Dependencies) (relea
 	if opts.Version != "latest" {
 		return fetchRelease(ctx, base+"/tags/"+url.PathEscape(opts.Version), deps)
 	}
-	if !opts.Prerelease {
+	// Keep the GitHub Latest pointer on v1 for older unpaired updaters.
+	v2Stable := !opts.Prerelease && usesPairedStableLine(opts.CurrentVersion)
+	if !opts.Prerelease && !v2Stable {
 		return fetchRelease(ctx, base+"/latest", deps)
 	}
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, base+"?per_page=30", nil)
+	query := "?per_page=30"
+	if v2Stable {
+		query = "?per_page=100"
+	}
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, base+query, nil)
 	req.Header.Set("User-Agent", "h-ui-upgrader")
 	resp, err := deps.HTTPClient.Do(req)
 	if err != nil {
@@ -350,7 +360,14 @@ func resolveRelease(ctx context.Context, opts Options, deps Dependencies) (relea
 	var selected *releaseInfo
 	for index := range releases {
 		release := &releases[index]
-		if release.Draft || !release.Prerelease || !strings.Contains(release.TagName, "-rc.") || !releaseTagPattern.MatchString(release.TagName) {
+		if release.Draft || !releaseTagPattern.MatchString(release.TagName) {
+			continue
+		}
+		if v2Stable {
+			if release.Prerelease || !usesPairedStableLine(release.TagName) || strings.Contains(release.TagName, "-") {
+				continue
+			}
+		} else if !release.Prerelease || !strings.Contains(release.TagName, "-rc.") {
 			continue
 		}
 		if selected == nil || compareReleaseTags(release.TagName, selected.TagName) > 0 {
@@ -359,6 +376,9 @@ func resolveRelease(ctx context.Context, opts Options, deps Dependencies) (relea
 	}
 	if selected != nil {
 		return *selected, nil
+	}
+	if v2Stable {
+		return releaseInfo{}, errors.New("no published v2 stable release found")
 	}
 	return releaseInfo{}, errors.New("no allowed prerelease found")
 }

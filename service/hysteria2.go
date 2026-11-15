@@ -47,7 +47,7 @@ func InitHysteria2() error {
 		if proxy.NewHysteria2Instance().IsRunning() {
 			return errors.New("stop hysteria2 before updating the managed kernel")
 		}
-		return util.DownloadHysteria2(constant.Hysteria2CustomVersion)
+		return util.DownloadHysteria2(util.ManagedHysteria2Version())
 	}); err != nil {
 		return fmt.Errorf("initialize managed hysteria2 kernel: %w", err)
 	}

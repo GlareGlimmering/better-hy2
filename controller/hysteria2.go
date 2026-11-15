@@ -105,7 +105,7 @@ func Hysteria2ChangeVersion(c *gin.Context) {
 }
 
 func ListRelease(c *gin.Context) {
-	vo.Success([]string{constant.Hysteria2CustomVersion}, c)
+	vo.Success([]string{util.ManagedHysteria2Version()}, c)
 }
 
 func Hysteria2RoutingStatus(c *gin.Context) {

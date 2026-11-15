@@ -126,13 +126,13 @@ func EnsureHysteria2UserRoutingCompatible(config bo.Hysteria2ServerConfig) error
 		return fmt.Errorf("verify Hysteria2 user-routing kernel: %w", err)
 	}
 	if !supportsUserOutboundRouting(version) {
-		return fmt.Errorf("Hysteria2 %s does not support managed userOutbounds; required %s", version, constant.Hysteria2CustomVersion)
+		return fmt.Errorf("Hysteria2 %s does not support managed userOutbounds; required %s", version, util.ManagedHysteria2Version())
 	}
 	return nil
 }
 
 func supportsUserOutboundRouting(version string) bool {
-	return version == constant.Hysteria2CustomVersion || version == constant.Hysteria2AccountConsistencyVersion
+	return version == util.ManagedHysteria2Version() || version == constant.Hysteria2AccountConsistencyVersion
 }
 
 func Hysteria2RoutingStatus() (vo.Hysteria2RoutingStatusVo, error) {
@@ -185,7 +185,7 @@ func Hysteria2RoutingStatus() (vo.Hysteria2RoutingStatusVo, error) {
 		status.KernelVersion = version
 		status.KernelCompatible = supportsUserOutboundRouting(version)
 		if !status.KernelCompatible {
-			status.Errors = append(status.Errors, fmt.Sprintf("kernel %s is incompatible; required %s", version, constant.Hysteria2CustomVersion))
+			status.Errors = append(status.Errors, fmt.Sprintf("kernel %s is incompatible; required %s", version, util.ManagedHysteria2Version()))
 		}
 	}
 	if status.ActiveUsers == 0 {
