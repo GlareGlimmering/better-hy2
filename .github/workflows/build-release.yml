@@ -209,7 +209,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: GlareGlimmering/hysteria
-          ref: 54a51aaac00fa53a1378e20f207d54f7ac8d2b7e
+          ref: dc6b01106be3ca86c21cf7a9695e858b8145671e
           path: kernel-source
           persist-credentials: false
 
@@ -226,7 +226,7 @@ jobs:
           CGO_ENABLED: '0'
           GOOS: linux
           GOARCH: amd64
-          KERNEL_VERSION: v2.13.0-hui.5-dev
+          KERNEL_VERSION: v2.13.0-hui.6-dev
           PANEL_VERSION: ${{ steps.release-tag.outputs.tag }}
         shell: bash
         run: |
@@ -234,8 +234,9 @@ jobs:
           export PANEL_SHA=$(git rev-parse HEAD)
           (
             cd kernel-source
-            go build -trimpath -ldflags="-X github.com/apernet/hysteria/app/v2/cmd.appVersion=$KERNEL_VERSION -X github.com/apernet/hysteria/app/v2/cmd.appCommit=$kernel_sha" -o ../build/hysteria-linux-amd64 ./app
+            go build -buildvcs=false -trimpath -ldflags="-X github.com/apernet/hysteria/app/v2/cmd.appVersion=$KERNEL_VERSION -X github.com/apernet/hysteria/app/v2/cmd.appCommit=$kernel_sha" -o ../build/hysteria-linux-amd64 ./app
           )
+          build/hysteria-linux-amd64 version --json | python3 -c 'import json, sys; assert json.load(sys.stdin)["acmeDNSWorker"] == 1'
           python3 scripts/write-pair-manifest.py build "$PANEL_VERSION" "$PANEL_SHA" "$KERNEL_VERSION" "$kernel_sha"
           HUI_PAIR_TEST_PANEL="$PWD/build/h-ui-linux-amd64" \
           HUI_PAIR_TEST_KERNEL="$PWD/build/hysteria-linux-amd64" \
@@ -244,7 +245,7 @@ jobs:
           HUI_PAIR_TEST_KERNEL_COMMIT="$kernel_sha" \
           go test ./upgrade -run '^TestPairPreflightCompiledArtifacts(UpgradesWithMatchingInstalledKernel)?$' -count=1 -v
           cd build
-          printf '%s  %s\n' f8cf6f7f5691e7eec1ef3f7392939e24788c3088378008ad1e17ca7e53bc42af hysteria-linux-amd64 | sha256sum --check
+          printf '%s  %s\n' cece1fcd469368887d5eed488407c0720e30950bd3ccd12e70e86ff27e5ae7be hysteria-linux-amd64 | sha256sum --check
           files=(h-ui-linux-amd64 hysteria-linux-amd64 HY2-PAIR.json)
           if [[ "$PANEL_VERSION" == v2.* || "${{ steps.release-tag.outputs.prerelease }}" != "true" ]]; then
             files+=(install.sh)

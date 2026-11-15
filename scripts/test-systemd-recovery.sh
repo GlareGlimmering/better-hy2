@@ -13,7 +13,7 @@ case ${3:-stable} in
   rc.3) old_version=v1.1.0-rc.3 ;;
   rc.4) old_version=v1.1.0-rc.4 ;;
   rc.7) old_version=v1.1.0-rc.7 ;;
-  v2-rc.1) old_version=v2.0.1-rc.1 ;;
+  v2-stable) old_version=v2.0.1 ;;
   *) echo "Unsupported recovery baseline: $3" >&2; exit 1 ;;
 esac
 artifacts=$(realpath "$1")
@@ -227,8 +227,7 @@ cp -a "$live" "$root/snapshot/live"
 cp -a "$unitfile" "$root/snapshot/unit"
 (cd "$root/snapshot" && find live unit -type f -print0 | sort -z | xargs -0 sha256sum) >"$root/snapshot.sha256"
 (cd "$root/snapshot" && sha256sum --check "$root/snapshot.sha256")
-if [[ $old_version == v1.1.0-rc.3 || $old_version == v1.1.0-rc.4 || $old_version == v1.1.0-rc.7 || $old_version == v2.0.1-rc.1 ]]; then
-  cmp "$live/bin/hysteria-linux-amd64" "$artifacts/hysteria-linux-amd64"
+if cmp -s "$live/bin/hysteria-linux-amd64" "$artifacts/hysteria-linux-amd64"; then
   [[ $(systemctl show -p ActiveState --value "$unit") == inactive ]]
   install -m 0755 "$artifacts/h-ui-linux-amd64" "$live/h-ui"
 else

@@ -33,6 +33,12 @@ sudo /usr/local/h-ui/h-ui reset
 
 订阅响应带 `Cache-Control: no-store`。在 Nginx 面板站点可设置 `proxy_cache off` 和 `access_log off`。如果 Cloudflare 或其他 CDN 的规则可能缓存订阅，按面板域名或包含前缀的订阅路径设置绕过缓存，按需清除旧缓存。访问日志、错误日志和追踪应省略订阅的原始 URL，可记录固定路由名、方法和状态码。
 
+## ACME Worker 联调版
+
+`v2.0.2-rc.1` 配套 `v2.13.0-hui.6-dev`。在全新隔离 Linux AMD64 systemd 环境中运行该 RC 自带的 `install.sh --version v2.0.2-rc.1`，安装器会校验并装入配套内核。已安装旧内核的环境会被 `hui update` 拦截，需在维护模式成对替换和恢复。
+
+在 HY 管理选择 ACME 的 DNS 模式和 `worker`，填入 `worker_url`（HTTPS 根地址）和 `worker_token`（节点凭据）。用独立测试域名、独立 `acme.dir` 和 `letsencrypt-staging` 验证首次签发与实际重新验证 DNS-01 的续期。测试域名对应的 TXT 必须在节点白名单内。生产切换沿用原证书域名与 ACME 目录，保留原 CA。旧直连 Token 可在联调和灰度通过后撤销。
+
 ## HY2 配置
 
 在 HY2 管理设置监听、TLS/ACME 和网络选项。使用固定定制内核 `v2.13.0-hui.5-dev`，SHA256：`f8cf6f7f5691e7eec1ef3f7392939e24788c3088378008ad1e17ca7e53bc42af`。HTTP Auth 与 `userOutbounds` 由面板维护，不要手改覆盖。保留定制内核的 ACME IPv4 DNS 传播逻辑，不全局禁用 IPv6，不关闭证书验证。
