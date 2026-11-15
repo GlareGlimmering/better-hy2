@@ -25,20 +25,6 @@ var accountApplyHysteria2Config = func(config bo.Hysteria2ServerConfig) error {
 	return applyHysteria2Config(config, defaultHysteria2ConfigApplyOps())
 }
 
-func Login(username string, pass string) (string, error) {
-	account, err := dao.GetAccount("username = ? and pass = ? and role = 'admin' and deleted = 0", username, pass)
-	if err != nil {
-		return "", err
-	}
-	accountBo := bo.AccountBo{
-		Id:       *account.Id,
-		Username: *account.Username,
-		Roles:    []string{*account.Role},
-		Deleted:  *account.Deleted,
-	}
-	return genToken(accountBo, *account.Pass, account.AuthGeneration)
-}
-
 func PageAccount(accountPageDto dto.AccountPageDto) ([]entity.Account, int64, error) {
 	return dao.PageAccount(accountPageDto)
 }
@@ -138,9 +124,6 @@ func UpdateAccountWithResult(account entity.Account) (AccountUpdateResult, error
 	updates := map[string]interface{}{}
 	if account.Username != nil && *account.Username != "" {
 		updates["username"] = *account.Username
-	}
-	if account.Pass != nil && *account.Pass != "" {
-		updates["pass"] = *account.Pass
 	}
 	if account.ConPass != nil && *account.ConPass != "" {
 		username := ""
@@ -289,8 +272,6 @@ func accountUpdateSnapshot(account entity.Account, updates map[string]interface{
 		switch key {
 		case "username":
 			values[key] = *account.Username
-		case "pass":
-			values[key] = *account.Pass
 		case "con_pass":
 			values[key] = *account.ConPass
 		case "upload_mbps":
@@ -345,38 +326,6 @@ func GetAccount(id int64) (entity.Account, error) {
 	return dao.GetAccount("id = ?", id)
 }
 
-func ListExportAccount() ([]bo.AccountExport, error) {
-	accounts, err := dao.ListAccount(nil, nil)
-	if err != nil {
-		return nil, errors.New(constant.SysError)
-	}
-	var accountExports []bo.AccountExport
-	for _, item := range accounts {
-		accountExport := bo.AccountExport{
-			Id:           *item.Id,
-			Username:     *item.Username,
-			Pass:         *item.Pass,
-			ConPass:      *item.ConPass,
-			Quota:        *item.Quota,
-			Download:     *item.Download,
-			Upload:       *item.Upload,
-			ExpireTime:   *item.ExpireTime,
-			DeviceNo:     *item.DeviceNo,
-			KickUtilTime: *item.KickUtilTime,
-			Role:         *item.Role,
-			Deleted:      *item.Deleted,
-			CreateTime:   *item.CreateTime,
-			UpdateTime:   *item.UpdateTime,
-			LoginAt:      *item.LoginAt,
-			ConAt:        *item.ConAt,
-			Remark:       *item.Remark,
-			Outbound:     AccountOutbound(item),
-		}
-		accountExports = append(accountExports, accountExport)
-	}
-	return accountExports, nil
-}
-
 func AccountOutbound(account entity.Account) string {
 	if account.Outbound == nil {
 		return ""
@@ -386,66 +335,6 @@ func AccountOutbound(account entity.Account) string {
 
 func ReleaseKickAccount(id int64) error {
 	return dao.UpdateAccount([]int64{id}, map[string]interface{}{"kick_util_time": 0})
-}
-
-func UpsertAccount(accounts []entity.Account) error {
-	hysteria2ConfigApplyMutex.Lock()
-	defer hysteria2ConfigApplyMutex.Unlock()
-	before, err := dao.ListAccount("role = ? and deleted = 0", "user")
-	if err != nil {
-		return err
-	}
-	previous := make(map[string]entity.Account, len(accounts))
-	for _, account := range accounts {
-		if account.Username == nil {
-			continue
-		}
-		if existing, getErr := dao.GetAccount("username = ?", *account.Username); getErr == nil {
-			previous[*account.Username] = existing
-		}
-	}
-	for i := range accounts {
-		if accounts[i].Outbound != nil || accounts[i].Username == nil {
-			continue
-		}
-		existing, err := dao.GetAccount("username = ?", *accounts[i].Username)
-		if err == nil {
-			outbound := AccountOutbound(existing)
-			accounts[i].Outbound = &outbound
-		}
-	}
-	for i := range accounts {
-		outbound, err := CanonicalAccountOutbound(AccountOutbound(accounts[i]))
-		if err != nil {
-			return err
-		}
-		accounts[i].Outbound = &outbound
-	}
-	if err := dao.UpsertAccount(accounts); err != nil {
-		return err
-	}
-	_, err = applyAccountRoutingMutation(before)
-	if err == nil {
-		return nil
-	}
-	for _, account := range accounts {
-		if account.Username == nil {
-			continue
-		}
-		if old, exists := previous[*account.Username]; exists {
-			if _, restoreErr := dao.SaveAccount(old); restoreErr != nil {
-				return fmt.Errorf("%v; restore imported account %q failed: %w", err, *account.Username, restoreErr)
-			}
-			continue
-		}
-		created, getErr := dao.GetAccount("username = ?", *account.Username)
-		if getErr == nil {
-			if restoreErr := dao.DeleteAccount([]int64{*created.Id}); restoreErr != nil {
-				return fmt.Errorf("%v; remove imported account %q failed: %w", err, *account.Username, restoreErr)
-			}
-		}
-	}
-	return fmt.Errorf("%w; imported accounts restored", err)
 }
 
 func GetAccountInfo(c *gin.Context) (vo.AccountInfoVo, error) {

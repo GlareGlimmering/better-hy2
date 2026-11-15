@@ -174,7 +174,6 @@ import {
   SystemMonitorVo,
   TrafficMonitorVo,
 } from "@/api/monitor/types";
-import { verifyDefaultPassApi } from "@/api/account";
 import { useAccountStore } from "@/store/modules/account";
 import { formatTrafficG } from "@/utils/account-quota";
 import { timestampToCompactDateTime } from "@/utils/time";
@@ -299,16 +298,6 @@ const viewAllUsers = () => router.push({ name: "AccountList" });
 
 const showSecurityWarnings = () => {
   if (!accountStore.roles.includes("admin")) return;
-  verifyDefaultPassApi().then((response) => {
-    if (response.data) {
-      ElNotification({
-        title: t("common.securityRisk"),
-        dangerouslyUseHTMLString: true,
-        message: t("common.defaultPassTip"),
-        type: "warning",
-      });
-    }
-  });
   if (window.location.protocol !== "https:") {
     ElNotification({
       title: t("common.securityRisk"),

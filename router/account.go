@@ -17,9 +17,6 @@ func initAccountAdminRouter(accountApi *gin.RouterGroup) {
 		account.POST("/resetTraffic", controller.ResetTraffic)
 		account.GET("/getAccountInfo", controller.GetAccountInfo)
 		account.GET("/getAccount", controller.GetAccount)
-		account.POST("/importAccount", controller.ImportAccount)
-		account.POST("/exportAccount", controller.ExportAccount)
 		account.POST("/releaseKickAccount", controller.ReleaseKickAccount)
-		account.GET("/verifyDefaultPass", controller.VerifyDefaultPass)
 	}
 }

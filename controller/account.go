@@ -2,7 +2,7 @@ package controller
 
 import (
 	"crypto/rand"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"h-ui/model/constant"
@@ -10,9 +10,6 @@ import (
 	"h-ui/model/entity"
 	"h-ui/model/vo"
 	"h-ui/service"
-	"h-ui/util"
-	"io"
-	"strings"
 	"time"
 )
 
@@ -27,17 +24,17 @@ func AccountOutboundOptions(c *gin.Context) {
 }
 
 func Login(c *gin.Context) {
-	loginDto, err := validateField(c, dto.LoginDto{})
-	if err != nil {
+	c.Header("Cache-Control", "no-store")
+	var credentials dto.LoginDto
+	if c.ShouldBindJSON(&credentials) != nil || validate.Struct(credentials) != nil {
+		vo.Fail(constant.InvalidError, c)
 		return
 	}
-
-	if !service.ExistAccountUsername(*loginDto.Username, 0) {
-		vo.Fail("account not exist", c)
+	token, err := service.Login(*credentials.Username, *credentials.Pass)
+	if errors.Is(err, service.ErrPanelPasswordChangeRequired) {
+		vo.Success(vo.JwtVo{PasswordChangeRequired: true}, c)
 		return
 	}
-
-	token, err := service.Login(*loginDto.Username, util.SHA224String(*loginDto.Pass))
 	if err != nil {
 		vo.Fail(err.Error(), c)
 		return
@@ -47,6 +44,21 @@ func Login(c *gin.Context) {
 		AccessToken: token,
 	}
 	vo.Success(jwtVo, c)
+}
+
+func ChangePanelPassword(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	var credentials dto.PanelPasswordChangeDto
+	if c.ShouldBindJSON(&credentials) != nil || validate.Struct(credentials) != nil {
+		vo.Fail(constant.InvalidError, c)
+		return
+	}
+	token, err := service.ChangePanelPassword(*credentials.Username, *credentials.Pass, *credentials.NewPassword)
+	if err != nil {
+		vo.Fail(err.Error(), c)
+		return
+	}
+	vo.Success(vo.JwtVo{TokenType: constant.TokenType, AccessToken: token}, c)
 }
 
 func PageAccount(c *gin.Context) {
@@ -180,17 +192,6 @@ func UpdateAccount(c *gin.Context) {
 	}
 
 	if accountUpdateDto.Username != nil && *accountUpdateDto.Username != "" {
-		if len(*accountUpdateDto.Username) < 6 {
-			target, err := service.GetAccount(*accountUpdateDto.Id)
-			if err != nil {
-				vo.Fail(err.Error(), c)
-				return
-			}
-			if target.Role != nil && *target.Role == "admin" {
-				vo.Fail(constant.InvalidError, c)
-				return
-			}
-		}
 		if service.ExistAccountUsername(*accountUpdateDto.Username, *accountUpdateDto.Id) {
 			vo.Fail(fmt.Sprintf("username %s already exists", *accountUpdateDto.Username), c)
 			return
@@ -209,24 +210,8 @@ func UpdateAccount(c *gin.Context) {
 		}
 	}
 
-	var passEncrypt *string
-	if accountUpdateDto.Pass != nil && *accountUpdateDto.Pass != "" {
-		target, err := service.GetAccount(*accountUpdateDto.Id)
-		if err != nil {
-			vo.Fail(err.Error(), c)
-			return
-		}
-		if target.Role == nil || *target.Role != "admin" {
-			vo.Fail("regular users do not have a login password", c)
-			return
-		}
-		hashed := util.SHA224String(*accountUpdateDto.Pass)
-		passEncrypt = &hashed
-	}
-
 	account := entity.Account{
 		Username:     accountUpdateDto.Username,
-		Pass:         passEncrypt,
 		ConPass:      accountUpdateDto.ConPass,
 		Quota:        accountUpdateDto.Quota,
 		UploadMbps:   accountUpdateDto.UploadMbps,
@@ -310,66 +295,6 @@ func GetAccount(c *gin.Context) {
 	vo.Success(accountVo, c)
 }
 
-func ImportAccount(c *gin.Context) {
-	file, header, err := c.Request.FormFile("file")
-	if err != nil {
-		vo.Fail(constant.SysError, c)
-		return
-	}
-	// 文件大小 2MB
-	if header.Size > 1024*1024*2 {
-		vo.Fail("the file is too big", c)
-		return
-	}
-	// 文件后缀.json
-	if !strings.HasSuffix(header.Filename, ".json") {
-		vo.Fail("file format not supported", c)
-		return
-	}
-	content, err := io.ReadAll(file)
-	if err != nil {
-		vo.Fail("json file read err", c)
-		return
-	}
-	var accounts []entity.Account
-	if err = json.Unmarshal(content, &accounts); err != nil {
-		vo.Fail("content Unmarshal err", c)
-		return
-	}
-	if err = service.UpsertAccount(accounts); err != nil {
-		vo.Fail(err.Error(), c)
-		return
-	}
-	service.ReconcileAccountConnections()
-	vo.Success(nil, c)
-}
-
-func ExportAccount(c *gin.Context) {
-	accountExports, err := service.ListExportAccount()
-	if err != nil {
-		vo.Fail(err.Error(), c)
-		return
-	}
-
-	fileName := fmt.Sprintf("AccountExport-%s.json", time.Now().Format("20060102150405"))
-	filePath := constant.ExportPathDir + fileName
-
-	if err = util.ExportFile(filePath, accountExports, 0); err != nil {
-		vo.Fail(err.Error(), c)
-		return
-	}
-
-	// 下载
-	if !util.Exists(filePath) {
-		vo.Fail("file not exist", c)
-		return
-	}
-	c.Header("Content-Type", "application/octet-stream")
-	c.Header("Content-Transfer-Encoding", "binary")
-	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", fileName))
-	c.File(filePath)
-}
-
 func ReleaseKickAccount(c *gin.Context) {
 	idDto, err := validateField(c, dto.IdDto{})
 	if err != nil {
@@ -380,18 +305,4 @@ func ReleaseKickAccount(c *gin.Context) {
 		return
 	}
 	vo.Success(nil, c)
-}
-
-func VerifyDefaultPass(c *gin.Context) {
-	info, err := service.GetAccountInfo(c)
-	if err != nil {
-		vo.Fail(err.Error(), c)
-		return
-	}
-	account, err := service.GetAccount(info.Id)
-	if err != nil {
-		vo.Fail(err.Error(), c)
-		return
-	}
-	vo.Success(account.Pass != nil && *account.Pass == "02f382b76ca1ab7aa06ab03345c7712fd5b971fb0c0f2aef98bac9cd", c)
 }

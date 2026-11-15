@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 	"h-ui/model/constant"
 	"h-ui/model/dto"
 	"h-ui/model/entity"
@@ -75,17 +74,6 @@ func UpdateAccount(ids []int64, updates map[string]interface{}) error {
 	return nil
 }
 
-func UpsertAccount(accounts []entity.Account) error {
-	if tx := sqliteDB.Model(&entity.Account{}).Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "username"}},
-		DoUpdates: clause.AssignmentColumns([]string{"pass", "con_pass", "quota", "download", "upload", "expire_time", "kick_util_time", "device_no", "role", "deleted", "create_time", "update_time", "login_at", "con_at", "remark", "outbound"}),
-	}).Create(accounts); tx.Error != nil {
-		logrus.Errorf("%v", tx.Error)
-		return errors.New(constant.SysError)
-	}
-	return nil
-}
-
 func UpdateAccountTraffic(username string, download int64, upload int64) error {
 	if upload != 0 || download != 0 {
 		updates := map[string]interface{}{}
@@ -123,7 +111,7 @@ func GetAccount(query interface{}, args ...interface{}) (entity.Account, error) 
 // failure without logging the credential or combining account policy predicates.
 func FindHysteria2AuthAccount(password string) (entity.Account, bool, error) {
 	var account entity.Account
-	err := sqliteDB.Where("con_pass = ?", password).First(&account).Error
+	err := sqliteDB.Where("con_pass = ? and role = 'user'", password).First(&account).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return account, false, nil
 	}

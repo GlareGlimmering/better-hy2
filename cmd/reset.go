@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"github.com/spf13/cobra"
 	"h-ui/dao"
@@ -27,7 +28,6 @@ func runReset(cmd *cobra.Command, args []string) {
 	}
 	fmt.Printf("Better HY2 Login Username: %s\n", username)
 	fmt.Printf("Better HY2 Login Password: %s\n", password)
-	fmt.Printf("Better HY2 Connection Password: %s.%s\n", username, password)
 }
 
 func resetAdminCredentials() (string, string, error) {
@@ -38,22 +38,19 @@ func resetAdminCredentials() (string, string, error) {
 	if err != nil {
 		return "", "", err
 	}
-	password, err := util.RandomString(6)
+	password, err := util.RandomString(24)
+	if err != nil {
+		return "", "", err
+	}
+	hash, err := util.HashPanelPassword(password)
 	if err != nil {
 		return "", "", err
 	}
 	if err = dao.InitSqliteSchema(); err != nil {
 		return "", "", err
 	}
-	if err = dao.UpdateAccount([]int64{1}, map[string]interface{}{
-		"username": username,
-		"pass":     util.SHA224String(password),
-		"con_pass": fmt.Sprintf("%s.%s", username, password),
-	}); err != nil {
-		_ = dao.CloseSqliteDB()
-		return "", "", err
-	}
-	if err = dao.CloseSqliteDB(); err != nil {
+	username, err = dao.ResetPanelAdmin(username, hash)
+	if err = errors.Join(err, dao.CloseSqliteDB()); err != nil {
 		return "", "", err
 	}
 	return username, password, nil

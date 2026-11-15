@@ -13,7 +13,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"h-ui/dao"
 	"h-ui/model/constant"
-	"h-ui/model/entity"
 	"h-ui/service"
 	"h-ui/util"
 )
@@ -27,7 +26,7 @@ func TestPasswordResetRevokesPreviousAdministratorJWT(t *testing.T) {
 	if err = dao.InitSqliteSchema(); err != nil {
 		t.Fatal(err)
 	}
-	old, err := service.Login(username, util.SHA224String(password))
+	old, err := service.Login(username, password)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,9 +37,13 @@ func TestPasswordResetRevokesPreviousAdministratorJWT(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondName, secondPass, role := "second-admin-fixture", util.SHA224String("second-password-fixture"), "admin"
-	secondID, err := dao.SaveAccount(entity.Account{Username: &secondName, Pass: &secondPass, Role: &role})
+	secondName, secondPass := "second-admin-fixture", "second-password-fixture"
+	secondHash, err := util.HashPanelPassword(secondPass)
 	if err != nil {
+		t.Fatal(err)
+	}
+	db := openResetTestDatabase(t, filepath.Join(os.Getenv("HUI_DATA"), constant.SqliteDBPath))
+	if _, err := db.Exec("INSERT INTO panel_admin(username,password_hash) VALUES (?,?)", secondName, secondHash); err != nil {
 		t.Fatal(err)
 	}
 	second, err := service.Login(secondName, secondPass)
@@ -65,7 +68,7 @@ func TestPasswordResetRevokesPreviousAdministratorJWT(t *testing.T) {
 	if _, err = service.ParseToken(old); err == nil {
 		t.Error("previous JWT survived reset and database reopen")
 	}
-	current, err := service.Login(username, util.SHA224String(password))
+	current, err := service.Login(username, password)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,37 +78,11 @@ func TestPasswordResetRevokesPreviousAdministratorJWT(t *testing.T) {
 	if _, err = service.ParseToken(second); err != nil {
 		t.Fatal("reset revoked another administrator's session")
 	}
-	for _, state := range []map[string]interface{}{{"deleted": 1}, {"deleted": 0, "role": "user"}} {
-		if err := dao.UpdateAccount([]int64{secondID}, state); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := service.ParseToken(second); err == nil {
-			t.Error("inactive administrator token accepted")
-		}
-	}
-	if err := dao.UpdateAccount([]int64{secondID}, map[string]interface{}{"role": "admin", "deleted": 0}); err != nil {
-		t.Fatal(err)
-	}
-	if err := dao.CloseSqliteDB(); err != nil {
-		t.Fatal(err)
-	}
-	if err := dao.InitSqliteSchema(); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := service.ParseToken(second); err == nil {
-		t.Error("restoring administrator privileges revived a revoked token")
-	}
-	if err := dao.DeleteAccount([]int64{secondID}); err != nil {
+	if _, err := db.Exec("DELETE FROM panel_admin WHERE username = ?", secondName); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := service.ParseToken(second); err == nil {
 		t.Error("deleted administrator token accepted")
-	}
-	if _, err := dao.SaveAccount(entity.Account{BaseEntity: entity.BaseEntity{Id: &secondID}, Username: &secondName, Pass: &secondPass, Role: &role}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := service.ParseToken(second); err == nil {
-		t.Error("recreating an administrator with the same ID revived the token")
 	}
 }
 
@@ -146,7 +123,8 @@ func TestPanelRequestLogsNeverContainSubscriptionCredentials(t *testing.T) {
 		t.Fatal(err)
 	}
 	secret := "audit-fixture.subscription"
-	if err := dao.UpdateAccount([]int64{1}, map[string]interface{}{"con_pass": secret}); err != nil {
+	db := openResetTestDatabase(t, filepath.Join(os.Getenv("HUI_DATA"), constant.SqliteDBPath))
+	if _, err := db.Exec("INSERT INTO account(username, con_pass, quota, expire_time) VALUES ('audit-fixture', ?, -1, 253370736000000)", secret); err != nil {
 		t.Fatal(err)
 	}
 	oldWriter, oldErrorWriter, oldMode := gin.DefaultWriter, gin.DefaultErrorWriter, gin.Mode()

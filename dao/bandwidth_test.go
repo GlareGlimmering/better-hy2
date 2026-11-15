@@ -15,7 +15,7 @@ func TestBandwidthSchemaPreservesLegacyQuotaAndVersionsUpdates(t *testing.T) {
 	if err := sqliteInit(sqlInitStr); err != nil {
 		t.Fatal(err)
 	}
-	if err := sqliteDB.Exec("UPDATE account SET quota=-1,upload=123,download=456 WHERE id=1").Error; err != nil {
+	if err := sqliteDB.Exec("INSERT INTO account(id,username,quota,upload,download) VALUES (1,'legacy-proxy',-1,123,456)").Error; err != nil {
 		t.Fatal(err)
 	}
 	for i := 0; i < 2; i++ {

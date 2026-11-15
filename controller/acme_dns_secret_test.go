@@ -1,7 +1,9 @@
 package controller
 
 import (
+	"database/sql"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -9,10 +11,12 @@ import (
 	"h-ui/dao"
 	"h-ui/model/constant"
 	"h-ui/service"
+	"h-ui/util"
 )
 
 func TestACMEDNSValueRequiresCurrentAdminAndOrdinaryConfigIsMasked(t *testing.T) {
-	t.Setenv("HUI_DATA", t.TempDir())
+	root := t.TempDir()
+	t.Setenv("HUI_DATA", root)
 	if err := dao.InitSqliteSchema(); err != nil {
 		t.Fatal(err)
 	}
@@ -22,11 +26,20 @@ func TestACMEDNSValueRequiresCurrentAdminAndOrdinaryConfigIsMasked(t *testing.T)
 	if err := dao.UpdateConfig([]string{constant.Hysteria2Config}, map[string]interface{}{"value": yaml}); err != nil {
 		t.Fatal(err)
 	}
-	admin, err := dao.GetAccount("id = ?", 1)
+	const username, password = "fixture-admin", "fixture-admin-password"
+	hash, err := util.HashPanelPassword(password)
 	if err != nil {
 		t.Fatal(err)
 	}
-	token, err := service.Login(*admin.Username, *admin.Pass)
+	db, err := sql.Open("sqlite", filepath.Join(root, constant.SqliteDBPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err = dao.ResetPanelAdmin(username, hash); err != nil {
+		t.Fatal(err)
+	}
+	token, err := service.Login(username, password)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,10 +69,10 @@ func TestACMEDNSValueRequiresCurrentAdminAndOrdinaryConfigIsMasked(t *testing.T)
 	if !strings.Contains(w.Body.String(), fixture) || w.Header().Get("Cache-Control") != "no-store" {
 		t.Fatal("admin response missing value or cache restriction")
 	}
-	if err := dao.UpdateAccount([]int64{1}, map[string]interface{}{"role": "user"}); err != nil {
+	if _, err := db.Exec("DELETE FROM panel_admin WHERE username = ?", username); err != nil {
 		t.Fatal(err)
 	}
 	if w := call(ReadACMEDNSValue, token, request); strings.Contains(w.Body.String(), fixture) {
-		t.Fatal("previous administrator session still had access after demotion")
+		t.Fatal("previous administrator session still had access after deletion")
 	}
 }

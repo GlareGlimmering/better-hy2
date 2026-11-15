@@ -42,7 +42,7 @@
             size="large"
             name="pass"
             @keyup="checkCapslock"
-            @keyup.enter="handleLogin"
+            @keyup.enter="changingPassword || handleLogin()"
           />
           <span class="mr-2" @click="passVisible = !passVisible">
             <svg-icon
@@ -53,13 +53,33 @@
         </el-form-item>
       </el-tooltip>
 
+      <template v-if="changingPassword">
+        <el-alert
+          v-if="passwordChangeRequired"
+          :title="$t('login.passwordChangeRequired')"
+          type="warning"
+          :closable="false"
+        />
+        <el-form-item prop="newPassword" class="my-4">
+          <el-input v-model="newPassword" :placeholder="$t('login.newPassword')" type="password"
+            autocomplete="new-password" show-password maxlength="128" @keyup.enter="handleLogin" />
+        </el-form-item>
+        <el-form-item class="my-4">
+          <el-input v-model="confirmPassword" :placeholder="$t('login.confirmPassword')" type="password"
+            autocomplete="new-password" show-password maxlength="128" @keyup.enter="handleLogin" />
+        </el-form-item>
+      </template>
       <el-button
         size="default"
         :loading="loading"
         type="primary"
         class="w-full"
         @click.prevent="handleLogin"
-        >{{ $t("login.login") }}
+        >{{ $t(changingPassword ? "login.changePassword" : "login.login") }}
+      </el-button>
+      <el-button v-if="!passwordChangeRequired" text class="mt-2 text-white"
+        @click="changingPassword = !changingPassword">
+        {{ $t(changingPassword ? "login.login" : "login.changePassword") }}
       </el-button>
     </el-form>
   </div>
@@ -82,9 +102,15 @@ import { useAccountStore } from "@/store/modules/account";
 // API依赖
 import { LocationQuery, LocationQueryValue, useRoute } from "vue-router";
 import { AccountLoginDto } from "@/api/account/types";
+import { useI18n } from "vue-i18n";
 
 const accountStore = useAccountStore();
 const route = useRoute();
+const { t } = useI18n();
+const changingPassword = ref(false);
+const passwordChangeRequired = ref(false);
+const newPassword = ref("");
+const confirmPassword = ref("");
 
 /**
  * 按钮loading
@@ -120,7 +146,7 @@ const loginRules = {
       trigger: ["change", "blur"],
     },
     {
-      pattern: /^[a-zA-Z0-9!@#$%^&*()_+-=]{6,32}$/,
+      max: 128,
       message: "Username format is incorrect",
       trigger: ["change", "blur"],
     },
@@ -132,7 +158,7 @@ const loginRules = {
       trigger: ["change", "blur"],
     },
     {
-      pattern: /^[a-zA-Z0-9!@#$%^&*()_+-=]{6,32}$/,
+      max: 128,
       message: "Password format is incorrect",
       trigger: ["change", "blur"],
     },
@@ -152,12 +178,29 @@ const checkCapslock = (e: any) => {
  */
 const handleLogin = () => {
   loginFormRef.value.validate((valid: boolean) => {
-    if (valid) {
+    if (valid && !loading.value) {
+      if (changingPassword.value && (
+        new TextEncoder().encode(newPassword.value).length < 12 ||
+        new TextEncoder().encode(newPassword.value).length > 128 ||
+        newPassword.value !== confirmPassword.value ||
+        newPassword.value === loginForm.value.pass
+      )) {
+        ElMessage.error(t("login.invalidNewPassword"));
+        return;
+      }
       loading.value = true;
       const params = { ...loginForm.value };
       accountStore
-        .login(params)
-        .then(() => {
+        .login(params, changingPassword.value ? newPassword.value : undefined)
+        .then((signedIn) => {
+          if (!signedIn) {
+            passwordChangeRequired.value = true;
+            changingPassword.value = true;
+            return;
+          }
+          loginForm.value.pass = "";
+          newPassword.value = "";
+          confirmPassword.value = "";
           const query: LocationQuery = route.query;
 
           const redirect = (query.redirect as LocationQueryValue) ?? "/";

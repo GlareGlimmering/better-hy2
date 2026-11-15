@@ -70,5 +70,4 @@ func TestShortProxyUsernameCreateAndEdit(t *testing.T) {
 	if err != nil || *account.Remark != "edited" || *account.Quota != 1073741824 {
 		t.Fatalf("remark update must preserve legacy quota: %v", err)
 	}
-	request(UpdateAccount, `{"id":1,"username":"xy"}`, false)
 }

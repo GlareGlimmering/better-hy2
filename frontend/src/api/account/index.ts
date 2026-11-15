@@ -122,31 +122,6 @@ export function loginApi(data: AccountLoginDto): AxiosPromise<AccountLoginVo> {
 }
 
 /**
- * 导入
- */
-export function importAccountApi(data: FormData): AxiosPromise {
-  return request({
-    url: "/account/importAccount",
-    method: "post",
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
-    data: data,
-  });
-}
-
-/**
- * 导出
- */
-export function exportAccountApi(): AxiosPromise {
-  return request({
-    url: "/account/exportAccount",
-    method: "post",
-    responseType: "blob",
-  });
-}
-
-/**
  * 解除下线状态
  */
 export function releaseKickAccountApi(data: IdDto): AxiosPromise {
@@ -157,17 +132,10 @@ export function releaseKickAccountApi(data: IdDto): AxiosPromise {
   });
 }
 
-/**
- * 是否默认密码
- * @param data
- */
-export function verifyDefaultPassApi(): AxiosPromise {
-  return request({
-    url: "/account/verifyDefaultPass",
-    method: "get",
-  });
-}
-
 export function generateConnectionPasswordApi(): AxiosPromise<string> {
   return request({ url: "/account/generateConnectionPassword", method: "post" });
+}
+
+export function changePanelPasswordApi(data: AccountLoginDto & { newPassword: string }): AxiosPromise<AccountLoginVo> {
+  return request({ url: "/auth/changePassword", method: "post", data });
 }

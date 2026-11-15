@@ -6,7 +6,6 @@ export interface AccountPageDto extends BaseDto {
 
 export interface AccountUpdateDto extends IdDto {
   username: string;
-  pass?: string;
   conPass: string;
   quota?: number;
   expireTime: number;
@@ -67,8 +66,9 @@ export interface AccountVo extends IdDto {
 }
 
 export interface AccountLoginVo {
-  accessToken: string;
-  tokenType: string;
+  passwordChangeRequired?: boolean;
+  accessToken?: string;
+  tokenType?: string;
 }
 
 export interface AccountInfo {
@@ -79,7 +79,6 @@ export interface AccountInfo {
 
 export interface AccountForm extends IdDto {
   username: string;
-  pass?: string;
   conPass: string;
   quota: number;
   expireTime: number;

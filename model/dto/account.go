@@ -8,8 +8,8 @@ type AccountPageDto struct {
 }
 
 type LoginDto struct {
-	Username *string `json:"username" form:"username" validate:"required,min=6,max=32,validateStr"`
-	Pass     *string `json:"pass" form:"pass" validate:"required,min=6,max=32,validateStr"`
+	Username *string `json:"username" form:"username" validate:"required,max=128"`
+	Pass     *string `json:"pass" form:"pass" validate:"required,max=128"`
 }
 
 type AccountSaveDto struct {
@@ -27,8 +27,8 @@ type AccountSaveDto struct {
 
 type AccountUpdateDto struct {
 	IdDto
-	Username     *string `json:"username" form:"username" validate:"omitempty,min=2,max=32,validateUsername"`
-	Pass         *string `json:"pass" form:"pass" validate:"omitempty,min=6,max=32,validateStr"`
+	Username *string `json:"username" form:"username" validate:"omitempty,min=2,max=32,validateUsername"`
+
 	ConPass      *string `json:"conPass" form:"conPass" validate:"omitempty,min=6,max=32,validateStr"`
 	Quota        *int64  `json:"quota" form:"quota" validate:"omitempty,min=-1"`
 	ExpireTime   *int64  `json:"expireTime" form:"expireTime" validate:"omitempty,min=0"`
@@ -38,4 +38,9 @@ type AccountUpdateDto struct {
 	UploadMbps   *int64  `json:"uploadMbps" form:"uploadMbps" validate:"omitempty,min=0,max=100000"`
 	DownloadMbps *int64  `json:"downloadMbps" form:"downloadMbps" validate:"omitempty,min=0,max=100000"`
 	Outbound     *string `json:"outbound" form:"outbound" validate:"omitempty,max=64"`
+}
+
+type PanelPasswordChangeDto struct {
+	LoginDto
+	NewPassword *string `json:"newPassword" validate:"required,max=128"`
 }

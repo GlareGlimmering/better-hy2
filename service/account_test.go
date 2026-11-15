@@ -1,10 +1,12 @@
 package service
 
 import (
+	"database/sql"
 	"errors"
+	"h-ui/util"
+	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"h-ui/dao"
 	"h-ui/model/bo"
@@ -36,45 +38,6 @@ outbounds:
 trafficStats:
   listen: 127.0.0.1:9999
 `
-
-func TestLoginAllowsAdministratorsOnly(t *testing.T) {
-	_, _ = setupSubscriptionTestDatabase(t)
-
-	if _, err := Login("subscription-test", "unused"); err == nil {
-		t.Fatal("regular user unexpectedly logged in")
-	}
-	if _, err := Login("sysadmin", "02f382b76ca1ab7aa06ab03345c7712fd5b971fb0c0f2aef98bac9cd"); err != nil {
-		t.Fatalf("administrator login failed: %v", err)
-	}
-}
-
-func TestLegacyAccountImportExportCompatibility(t *testing.T) {
-	_, _ = setupSubscriptionTestDatabase(t)
-	username, loginPassword, connectionPassword := "legacy-user", "legacy-password-hash", "legacy-user.connection-secret"
-	quota, download, upload := int64(4096), int64(100), int64(200)
-	expire, kick, devices, deleted := time.Now().Add(24*time.Hour).UnixMilli(), int64(0), int64(2), int64(0)
-	role, remark := "user", "legacy import"
-	if err := UpsertAccount([]entity.Account{{
-		Username: &username, Pass: &loginPassword, ConPass: &connectionPassword,
-		Quota: &quota, Download: &download, Upload: &upload, ExpireTime: &expire,
-		KickUtilTime: &kick, DeviceNo: &devices, Role: &role, Deleted: &deleted, Remark: &remark,
-	}}); err != nil {
-		t.Fatalf("UpsertAccount() error = %v", err)
-	}
-	exported, err := ListExportAccount()
-	if err != nil {
-		t.Fatalf("ListExportAccount() error = %v", err)
-	}
-	for _, account := range exported {
-		if account.Username == username {
-			if account.Pass != loginPassword || account.ConPass != connectionPassword {
-				t.Fatalf("legacy credentials changed during import/export: %#v", account)
-			}
-			return
-		}
-	}
-	t.Fatal("legacy account missing from export")
-}
 
 func TestConnectionPasswordUpdateDoesNotNeedLoginPassword(t *testing.T) {
 	accountID, _ := setupSubscriptionTestDatabase(t)
@@ -114,39 +77,9 @@ func TestAccountOutboundMigrationUpdateAndExport(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("UpdateAccount() error = %v", err)
 	}
-	exported, err := ListExportAccount()
-	if err != nil {
-		t.Fatalf("ListExportAccount() error = %v", err)
-	}
-	for _, item := range exported {
-		if item.Id == accountID {
-			if item.Outbound != outbound {
-				t.Fatalf("exported outbound = %q", item.Outbound)
-			}
-			return
-		}
-	}
-	t.Fatal("updated account missing from export")
-}
-
-func TestLegacyImportPreservesExistingOutboundBinding(t *testing.T) {
-	accountID, _ := setupSubscriptionTestDatabase(t)
-	outbound := "DIRECT"
-	if err := UpdateAccount(entity.Account{BaseEntity: entity.BaseEntity{Id: &accountID}, Outbound: &outbound}); err != nil {
-		t.Fatal(err)
-	}
-
-	username := "subscription-test"
-	legacyPassword := "legacy"
-	if err := UpsertAccount([]entity.Account{{Username: &username, Pass: &legacyPassword}}); err != nil {
-		t.Fatalf("UpsertAccount() error = %v", err)
-	}
-	account, err := dao.GetAccount("id = ?", accountID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := AccountOutbound(account); got != outbound {
-		t.Fatalf("outbound after legacy import = %q, want %q", got, outbound)
+	account, err = dao.GetAccount("id = ?", accountID)
+	if err != nil || AccountOutbound(account) != outbound {
+		t.Fatalf("outbound not persisted: %v", err)
 	}
 }
 
@@ -387,5 +320,70 @@ func setAccountRoutingTestConfig(t *testing.T) {
 	t.Helper()
 	if err := dao.UpdateConfig([]string{constant.Hysteria2Config}, map[string]interface{}{"value": accountRoutingTestConfig}); err != nil {
 		t.Fatalf("store account routing test config: %v", err)
+	}
+}
+
+func TestPanelAdminMigrationAndPasswordGate(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("HUI_DATA", root)
+	if err := dao.InitSqliteSchema(); err != nil {
+		t.Fatal(err)
+	}
+	if err := dao.CloseSqliteDB(); err != nil {
+		t.Fatal(err)
+	}
+	db, err := sql.Open("sqlite", filepath.Join(root, constant.SqliteDBPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range []struct{ username, password, connection, role string }{
+		{"former-admin", "shared-password", "old-prefix.shared-password", "admin"},
+		{"other-admin", "private-password", "different.connection", "admin"},
+		{"sysadmin", "sysadmin", "sysadmin.sysadmin", "admin"},
+		{"proxy-admin", "private-password", "proxy-admin.connection", "user"},
+	} {
+		if _, err := db.Exec("INSERT INTO account(username,pass,con_pass,role) VALUES(?,?,?,?)", row.username, util.SHA224String(row.password), row.connection, row.role); err != nil {
+			_ = db.Close()
+			t.Fatal(err)
+		}
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	for attempt := 0; attempt < 2; attempt++ {
+		if err := dao.InitSqliteSchema(); err != nil {
+			t.Fatal(err)
+		}
+		if err := dao.CloseSqliteDB(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := dao.InitSqliteSchema(); err != nil {
+		t.Fatal(err)
+	}
+	defer dao.CloseSqliteDB()
+	for _, attempt := range [][2]string{{"sysadmin", "sysadmin"}, {"proxy-admin", "private-password"}} {
+		if token, err := Login(attempt[0], attempt[1]); err == nil || token != "" {
+			t.Fatal("unexpected panel access")
+		}
+	}
+	if token, err := Login("former-admin", "shared-password"); !errors.Is(err, ErrPanelPasswordChangeRequired) || token != "" {
+		t.Fatal("coupled password obtained a session")
+	}
+	if token, err := ChangePanelPassword("former-admin", "shared-password", "replacement-panel-password"); err != nil || token == "" {
+		t.Fatal("coupled password could not be replaced", err)
+	}
+	if _, found, err := dao.FindHysteria2AuthAccount("old-prefix.shared-password"); err != nil || found {
+		t.Fatal("old administrator can authenticate as a proxy user", err)
+	}
+	if _, found, err := dao.FindHysteria2AuthAccount("proxy-admin.connection"); err != nil || !found {
+		t.Fatal("proxy user credential did not survive migration", err)
+	}
+	if token, err := Login("other-admin", "private-password"); err != nil || token == "" {
+		t.Fatal("uncoupled legacy administrator cannot sign in", err)
+	}
+	admin, err := dao.PanelAdminByUsername("other-admin")
+	if err != nil || admin.Legacy || !util.VerifyPanelPassword(admin.PasswordHash, "private-password") {
+		t.Fatal("legacy hash was not upgraded to native Argon2id", err)
 	}
 }

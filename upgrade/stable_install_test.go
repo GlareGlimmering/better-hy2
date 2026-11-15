@@ -1,9 +1,7 @@
 package upgrade
 
 import (
-	"crypto/sha256"
 	"database/sql"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,6 +9,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"h-ui/util"
 )
 
 // Run the real installer fresh path and real CLI schema/reset against an empty
@@ -65,10 +65,10 @@ func TestFreshStableInstallerWithRealAdministratorInitialization(t *testing.T) {
 	}
 	defer database.Close()
 	var name, pass string
-	if err := database.QueryRow("SELECT username, pass FROM account WHERE id=1").Scan(&name, &pass); err != nil {
+	if err := database.QueryRow("SELECT username, password_hash FROM panel_admin").Scan(&name, &pass); err != nil {
 		t.Fatal(err)
 	}
-	if name != username[1] || pass != fmt.Sprintf("%x", sha256.Sum224([]byte(password[1]))) {
+	if name != username[1] || !util.VerifyPanelPassword(pass, password[1]) {
 		t.Fatal("administrator reset did not update actual fresh database")
 	}
 	var count int

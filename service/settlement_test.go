@@ -109,7 +109,7 @@ func TestConnectionsToKickIncludesZeroQuotaAndDeletedAccounts(t *testing.T) {
 		t.Fatal(err)
 	}
 	result := connectionsToKick([]string{"sysadmin", *user.Username, "removed-user"}, accounts, 1000)
-	if len(result) != 2 || result[0] != *user.Username || result[1] != "removed-user" {
+	if len(result) != 3 || result[0] != "sysadmin" || result[1] != *user.Username || result[2] != "removed-user" {
 		t.Fatalf("unexpected reconciliation result: %v", result)
 	}
 }

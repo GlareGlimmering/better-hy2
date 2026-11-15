@@ -21,12 +21,12 @@ type MyClaims struct {
 	jwt.StandardClaims
 }
 
-func genToken(accountBo bo.AccountBo, passwordHash, generation string) (string, error) {
+func genToken(accountBo bo.AccountBo, passwordHash string) (string, error) {
 	c := MyClaims{
 		AccountBo: accountBo,
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: time.Now().Add(TokenExpireDuration).Unix(),
-			Issuer:    "h-ui",
+			Issuer:    "better-hy2/panel-admin",
 		},
 	}
 	config, err := dao.GetConfig("key = ?", constant.JwtSecret)
@@ -37,16 +37,13 @@ func genToken(accountBo bo.AccountBo, passwordHash, generation string) (string, 
 	if config.Value == nil || *config.Value == "" {
 		return "", errors.New(constant.SysError)
 	}
-	return token.SignedString(adminSigningKey(*config.Value, accountBo.Id, accountBo.Username, passwordHash, generation))
+	return token.SignedString(adminSigningKey(*config.Value, accountBo.Id, accountBo.Username, passwordHash))
 }
 
-func adminSigningKey(secret string, id int64, username, passwordHash, generation string) []byte {
+func adminSigningKey(secret string, id int64, username, passwordHash string) []byte {
 	mac := hmac.New(sha256.New, []byte(secret))
 	// Bind the session to the exact credential snapshot verified at login.
-	fmt.Fprintf(mac, "better-hy2/admin-session/v1\x00%d\x00%s\x00%s", id, username, passwordHash)
-	if generation != "" {
-		fmt.Fprintf(mac, "\x00%s", generation)
-	}
+	fmt.Fprintf(mac, "better-hy2/admin-session/v2\x00%d\x00%s\x00%s", id, username, passwordHash)
 	return mac.Sum(nil)
 }
 
@@ -57,14 +54,14 @@ func ParseToken(tokenString string) (*MyClaims, error) {
 	}
 	token, err := jwt.ParseWithClaims(tokenString, &MyClaims{}, func(token *jwt.Token) (i interface{}, err error) {
 		claims, ok := token.Claims.(*MyClaims)
-		if !ok || token.Method != jwt.SigningMethodHS256 || claims.ExpiresAt == 0 || claims.Issuer != "h-ui" {
+		if !ok || token.Method != jwt.SigningMethodHS256 || claims.ExpiresAt == 0 || claims.Issuer != "better-hy2/panel-admin" {
 			return nil, errors.New(constant.IllegalTokenError)
 		}
-		account, err := dao.GetAccount("id = ? and role = 'admin' and deleted = 0", claims.AccountBo.Id)
-		if err != nil || account.Username == nil || account.Pass == nil {
+		account, err := dao.PanelAdminByID(claims.AccountBo.Id)
+		if err != nil || account.Legacy || account.MustChange || account.PasswordHash == "" || account.Username != claims.AccountBo.Username {
 			return nil, errors.New(constant.IllegalTokenError)
 		}
-		return adminSigningKey(*config.Value, claims.AccountBo.Id, *account.Username, *account.Pass, account.AuthGeneration), nil
+		return adminSigningKey(*config.Value, claims.AccountBo.Id, account.Username, account.PasswordHash), nil
 	})
 	if err != nil {
 		return nil, errors.New(constant.IllegalTokenError)

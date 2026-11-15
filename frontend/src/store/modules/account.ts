@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 
-import { getAccountInfoApi, loginApi } from "@/api/account";
+import { changePanelPasswordApi, getAccountInfoApi, loginApi } from "@/api/account";
 import { resetRouter } from "@/router";
 import { store } from "@/store";
 
@@ -20,18 +20,17 @@ export const useAccountStore = defineStore("account", () => {
    *
    * @returns
    */
-  function login(accountLoginDto: AccountLoginDto) {
-    return new Promise<void>((resolve, reject) => {
-      loginApi(accountLoginDto)
-        .then((response) => {
-          const { tokenType, accessToken } = response.data;
-          token.value = tokenType + " " + accessToken; // Bearer eyJhbGciOiJIUzI1NiJ9.xxx.xxx
-          resolve();
-        })
-        .catch((error) => {
-          reject(error);
-        });
-    });
+  async function login(credentials: AccountLoginDto, newPassword?: string) {
+    const { data } = newPassword === undefined
+      ? await loginApi(credentials)
+      : await changePanelPasswordApi({ ...credentials, newPassword });
+    if (data.passwordChangeRequired) {
+      resetToken();
+      return false;
+    }
+    if (!data.tokenType || !data.accessToken) throw new Error("Missing administrator session");
+    token.value = data.tokenType + " " + data.accessToken;
+    return true;
   }
 
   // 查询当前
