@@ -35,9 +35,13 @@ sudo /usr/local/h-ui/h-ui reset
 
 ## HY2 配置
 
-在 HY2 管理设置监听、TLS/ACME 和网络选项。使用固定定制内核 `v2.13.0-hui.4`，SHA256：`f1577bff290f5591a651b88596103045390581a6c0a6e999611cab8baa653d9e`。HTTP Auth 与 `userOutbounds` 由面板维护，不要手改覆盖。保留定制内核的 ACME IPv4 DNS 传播逻辑，不全局禁用 IPv6，不关闭证书验证。
+在 HY2 管理设置监听、TLS/ACME 和网络选项。使用固定定制内核 `v2.13.0-hui.5-dev`，SHA256：`f8cf6f7f5691e7eec1ef3f7392939e24788c3088378008ad1e17ca7e53bc42af`。HTTP Auth 与 `userOutbounds` 由面板维护，不要手改覆盖。保留定制内核的 ACME IPv4 DNS 传播逻辑，不全局禁用 IPv6，不关闭证书验证。
 
 订阅节点默认使用检测到的公网 IPv4；只有 NAT、接口无公网地址时需显式配置 `HUI_NODE_ADDRESS`。HTTP 订阅 URL、节点地址与 TLS SNI 是独立概念。
+
+## 生成 HY2 自建证书
+
+使用自签 CA 签发 HY2 服务证书。命令见[自建证书示例](OPERATIONS.md#generate-a-private-hy2-certificate)。把 `hy2-server.crt` 和 `hy2-server.key` 用于 HY 管理的 TLS 表单，只向客户端分发 `hy2-ca.crt`。客户端 SNI 使用证书 SAN 中的名称，连接地址可以使用 VPS 公网 IP。服务证书应在到期前续签，CA 私钥离线保存。
 
 ## 出站和账户绑定
 
@@ -47,9 +51,9 @@ DIRECT 内置；原生 SOCKS5 无需 Xray。VLESS/HTTP 节点在「出站节点�
 
 ## 升级与恢复
 
-使用 `sudo hui update`，默认只选稳定版，也保留旧 `upgrade` 命令。RC.23 不接受新版本号，必须通过新安装器 `--version v1.0.0` 迁移。候选下载、校验和版本验证完成后才停止服务。标准安装保持 loopback 8000，不修改防火墙。
+从 RC.7 升级请使用 README 中固定到 v2.0.0 的安装命令。安装器调用新版更新器，在停止服务前验证配套内核，内核哈希不匹配时拒绝升级。已运行 v2 时，`sudo hui update` 选择最新的 v2 正式版，也保留旧 `upgrade` 命令。使用原配套内核的 v1.0.0 可继续运行 v1，或在另一台主机全新安装 v2。
 
-升级快照位于 `/var/lib/h-ui/backups/upgrade-*`，包含 SQLite 一致性备份、旧程序、systemd unit、HY2 YAML、相关 Xray 配置/CA 及文件所有权信息，保留最新五份。启动或 HTTP/入口资源检查失败会自动恢复快照与原运行状态；回滚失败会明确报错。v1.0.0 不改变匹配的 HY2/Xray 内核版本，保留配置、账户绑定和证书路径。
+升级快照位于 `/var/lib/h-ui/backups/upgrade-*`，包含 SQLite 一致性备份、旧程序、systemd unit、HY2 YAML、相关 Xray 配置/CA 及文件所有权信息，保留最新五份。启动或 HTTP/入口资源检查失败会自动恢复快照与原运行状态；回滚失败会明确报错。配套内核匹配时更新器只替换面板。
 
 升级前仍建议额外私密备份 `/usr/local/h-ui`、`/var/lib/h-ui` 和 unit，保留权限；原始文件拷贝应停服务以确保一致性，或使用 SQLite 专用备份。备份含敏感数据，不要公开上传。手工恢复时停止 `h-ui.service`，另存失败状态，依照 `manifest.json` 恢复每个文件到原路径并恢复权限、所有权，daemon-reload 后恢复原服务状态。数据库恢复会丢弃快照之后的修改。链接仍指向恢复后的程序，旧版本无 `update` 时使用 `hui upgrade`。
 

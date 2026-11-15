@@ -39,14 +39,45 @@ func GetCustomHysteria2AssetName() (string, error) {
 // binaries remain usable for legacy mode, but automatic downloads can never
 // silently replace the custom kernel with an upstream latest release.
 func DownloadHysteria2(version string) error {
-	return downloadHysteria2WithDependencies(version, hysteria2DownloadDependencies{
+	deps := hysteria2DownloadDependencies{
 		assetName:       GetCustomHysteria2AssetName,
 		releaseAssetURL: GetReleaseAssetURL,
 		targetPath:      GetHysteria2BinPath,
 		expectedSHA256:  constant.Hysteria2CustomSHA256,
 		downloadAsset:   downloadHysteria2Asset,
 		versionAt:       Hysteria2VersionAt,
-	})
+	}
+	deps = managedHysteria2DownloadPolicy(constant.Version, deps)
+	return downloadHysteria2WithDependencies(version, deps)
+}
+
+const pairedHysteria2SHA256 = "f8cf6f7f5691e7eec1ef3f7392939e24788c3088378008ad1e17ca7e53bc42af"
+
+func ManagedHysteria2Version() string {
+	if strings.HasPrefix(constant.Version, "v2.") {
+		return constant.Hysteria2AccountConsistencyVersion
+	}
+	return constant.Hysteria2CustomVersion
+}
+
+func managedHysteria2DownloadPolicy(panelVersion string, deps hysteria2DownloadDependencies) hysteria2DownloadDependencies {
+	if !strings.HasPrefix(panelVersion, "v2.") {
+		return deps
+	}
+	deps.expectedVersion = constant.Hysteria2AccountConsistencyVersion
+	deps.expectedSHA256 = pairedHysteria2SHA256
+	platformAsset := deps.assetName
+	deps.assetName = func() (string, error) {
+		if _, err := platformAsset(); err != nil {
+			return "", err
+		}
+		return "hysteria-linux-amd64", nil
+	}
+	resolve := deps.releaseAssetURL
+	deps.releaseAssetURL = func(owner, _, _, asset string) (string, error) {
+		return resolve(owner, "better-hy2", panelVersion, asset)
+	}
+	return deps
 }
 
 type hysteria2DownloadDependencies struct {
@@ -54,15 +85,20 @@ type hysteria2DownloadDependencies struct {
 	releaseAssetURL func(owner, repo, version, fileName string) (string, error)
 	targetPath      func() string
 	expectedSHA256  string
+	expectedVersion string
 	downloadAsset   func(url, destination string) error
 	versionAt       func(path string) (string, error)
 }
 
 func downloadHysteria2WithDependencies(version string, deps hysteria2DownloadDependencies) error {
-	if version == "" {
-		version = constant.Hysteria2CustomVersion
+	expectedVersion := deps.expectedVersion
+	if expectedVersion == "" {
+		expectedVersion = constant.Hysteria2CustomVersion
 	}
-	if version != constant.Hysteria2CustomVersion {
+	if version == "" {
+		version = expectedVersion
+	}
+	if version != expectedVersion {
 		return fmt.Errorf("unsupported managed Hysteria2 version %q", version)
 	}
 	assetName, err := deps.assetName()
@@ -81,8 +117,8 @@ func downloadHysteria2WithDependencies(version string, deps hysteria2DownloadDep
 		if err != nil {
 			return err
 		}
-		if installed != constant.Hysteria2CustomVersion {
-			return fmt.Errorf("downloaded Hysteria2 reports %q, expected %q", installed, constant.Hysteria2CustomVersion)
+		if installed != expectedVersion {
+			return fmt.Errorf("downloaded Hysteria2 reports %q, expected %q", installed, expectedVersion)
 		}
 		return nil
 	}); err != nil {

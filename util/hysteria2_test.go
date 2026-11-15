@@ -244,3 +244,24 @@ func TestDownloadHysteria2RejectsUnpinnedVersion(t *testing.T) {
 		t.Fatalf("official version error = %v", err)
 	}
 }
+
+func TestV2ManagedKernelPolicyPinsPairedAsset(t *testing.T) {
+	deps := managedHysteria2DownloadPolicy("v2.0.0", hysteria2DownloadDependencies{
+		assetName: func() (string, error) { return "legacy-asset", nil },
+		releaseAssetURL: func(owner, repo, tag, name string) (string, error) {
+			if owner != constant.Hysteria2CustomOwner || repo != "better-hy2" || tag != "v2.0.0" || name != "hysteria-linux-amd64" {
+				t.Fatalf("wrong paired kernel source: %s/%s %s %s", owner, repo, tag, name)
+			}
+			return "", errors.New("fixture stops before download")
+		},
+	})
+	if deps.expectedVersion != constant.Hysteria2AccountConsistencyVersion || deps.expectedSHA256 != pairedHysteria2SHA256 {
+		t.Fatal("v2 did not pin the paired kernel")
+	}
+	if err := downloadHysteria2WithDependencies(constant.Hysteria2CustomVersion, deps); err == nil || !strings.Contains(err.Error(), "unsupported managed") {
+		t.Fatalf("v2 accepted the older kernel: %v", err)
+	}
+	if err := downloadHysteria2WithDependencies(constant.Hysteria2AccountConsistencyVersion, deps); err == nil || !strings.Contains(err.Error(), "fixture stops") {
+		t.Fatalf("v2 did not resolve the release's kernel asset: %v", err)
+	}
+}

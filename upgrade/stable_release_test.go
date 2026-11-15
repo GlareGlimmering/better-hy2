@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -130,5 +131,30 @@ func TestInstallerStableMigrationAndChannelGuard(t *testing.T) {
 	script = prefix + `curl(){ printf '%s' '{"tag_name":"v1.0.0","prerelease":true}'; }; resolve_version`
 	if output, err := runBash(t, script); err == nil || !strings.Contains(output, "stable channel returned") {
 		t.Fatalf("prerelease accepted: %v %s", err, output)
+	}
+}
+
+func TestV2StableChannelSelectsItsOwnStableLine(t *testing.T) {
+	const releases = `[{"tag_name":"v1.0.0"},{"tag_name":"v2.0.1"},{"tag_name":"v2.0.10"},
+  {"tag_name":"v2.8.0-rc.1","prerelease":true},{"tag_name":"v2.9.0","draft":true}]`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/repos/" + DefaultRepository + "/releases/latest":
+			_, _ = w.Write([]byte(`{"tag_name":"v1.0.0"}`))
+		case "/repos/" + DefaultRepository + "/releases":
+			_, _ = w.Write([]byte(releases))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	opts := DefaultOptions()
+	opts.APIBase = server.URL
+	for current, want := range map[string]string{"v1.0.0": "v1.0.0", "v2.0.0": "v2.0.10"} {
+		opts.CurrentVersion = current
+		release, err := resolveRelease(context.Background(), opts, DefaultDependencies())
+		if err != nil || release.TagName != want {
+			t.Fatalf("current %s: got %s, want %s (%v)", current, release.TagName, want, err)
+		}
 	}
 }
