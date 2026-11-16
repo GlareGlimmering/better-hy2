@@ -48,11 +48,11 @@
       </template>
       <el-table v-loading="loading" :data="settings.outbounds" class="outbound-table hui-table">
         <el-table-column :label="$t('xray.name')" min-width="150"><template #default="scope"><el-tooltip :content="scope.row.name" placement="top"><span class="truncate-cell">{{ scope.row.name }}</span></el-tooltip></template></el-table-column>
-        <el-table-column :label="$t('xray.protocol')" width="130"><template #default="scope">{{ protocolLabel(scope.row.protocol) }}</template></el-table-column>
-        <el-table-column :label="$t('xray.remoteAddress')" min-width="220"><template #default="scope"><el-tooltip :content="`${scope.row.address}:${scope.row.port}`" placement="top"><span class="truncate-cell">{{ scope.row.address }}:{{ scope.row.port }}</span></el-tooltip></template></el-table-column>
-        <el-table-column :label="$t('xray.localSocks')" min-width="170"><template #default="scope">{{ scope.row.protocol === 'socks5' ? $t('xray.nativeHy2') : `${scope.row.socksListen}:${scope.row.socksPort}` }}</template></el-table-column>
-        <el-table-column :label="$t('xray.enabled')" width="100"><template #default="scope"><el-tag :type="scope.row.enabled ? 'success' : 'info'">{{ yesNo(scope.row.enabled) }}</el-tag></template></el-table-column>
-        <el-table-column :label="$t('xray.lastTest')" min-width="270">
+        <el-table-column :label="$t('xray.protocol')" width="109"><template #default="scope">{{ protocolLabel(scope.row.protocol) }}</template></el-table-column>
+        <el-table-column :label="$t('xray.remoteAddress')" min-width="175"><template #default="scope"><el-tooltip :content="`${scope.row.address}:${scope.row.port}`" placement="top"><span class="truncate-cell">{{ scope.row.address }}:{{ scope.row.port }}</span></el-tooltip></template></el-table-column>
+        <el-table-column :label="$t('xray.localSocks')" min-width="129"><template #default="scope">{{ scope.row.protocol === 'socks5' ? $t('xray.nativeHy2') : `${scope.row.socksListen}:${scope.row.socksPort}` }}</template></el-table-column>
+        <el-table-column :label="$t('xray.enabled')" width="85"><template #default="scope"><el-tag :type="scope.row.enabled ? 'success' : 'info'">{{ yesNo(scope.row.enabled) }}</el-tag></template></el-table-column>
+        <el-table-column :label="$t('xray.lastTest')" min-width="187">
           <template #default="scope">
             <div class="test-results" :aria-label="$t('xray.lastTestOnly')">
               <div :class="testClass(scope.row.id, 'tcp')">
@@ -66,7 +66,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column :label="$t('common.operate')" :width="compactTable ? 106 : 210" fixed="right" class-name="node-actions-cell">
+        <el-table-column :label="$t('common.operate')" :width="compactTable ? 106 : 180" fixed="right" class-name="node-actions-cell">
           <template #default="scope">
             <el-tooltip :content="$t('xray.tipTest')"><el-button link type="primary" :loading="testing[scope.row.id]" :disabled="!scope.row.enabled || !status.running || testing[scope.row.id]" @click="testOutbound(scope.row)">{{ $t("xray.test") }}</el-button></el-tooltip>
             <el-button link type="primary" @click="openEdit(scope.row)">{{ $t("common.update") }}</el-button>

@@ -39,6 +39,7 @@ export default {
   },
   // 登录页面国际化
   login: {
+    capsLock: "Включён Caps Lock",
     changePassword: "Сменить пароль",
     passwordChangeRequired: "Старый пароль использовался для прокси. Установите новый пароль панели.",
     newPassword: "Новый пароль панели",
@@ -50,6 +51,11 @@ export default {
     login: "Войти",
   },
   // 导航栏国际化
+  panelErrors: {
+    forbidden: "У вас нет доступа к этой странице",
+    missing: "Страница не найдена",
+    home: "На панель управления",
+  },
   navbar: {
     navigation: "Переключить навигацию",
     language: "Язык",
@@ -160,6 +166,7 @@ export default {
     releaseKickTip: "Убрать статус офлайн",
   },
   config: {
+    serviceSettings: "Настройки службы",
     appearance: "Внешний вид",
     appearanceTip: "Настройки внешнего вида сохраняются в этом браузере",
     darkMode: "Тёмная тема",

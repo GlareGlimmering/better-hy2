@@ -39,6 +39,7 @@ export default {
   },
   // 登录页面国际化
   login: {
+    capsLock: "大写锁定已开启",
     changePassword: "修改密码",
     passwordChangeRequired: "旧密码与代理凭据共用。请先设置新的面板密码。",
     newPassword: "新面板密码",
@@ -50,6 +51,11 @@ export default {
     login: "登 录",
   },
   // 导航栏国际化
+  panelErrors: {
+    forbidden: "你没有权限访问此页面",
+    missing: "找不到页面",
+    home: "返回仪表盘",
+  },
   navbar: {
     navigation: "切换导航",
     language: "语言",
@@ -158,6 +164,7 @@ export default {
     releaseKickTip: "解除下线状态",
   },
   config: {
+    serviceSettings: "服务设置",
     appearance: "外观设置",
     appearanceTip: "外观偏好保存在当前浏览器中",
     darkMode: "深色模式",

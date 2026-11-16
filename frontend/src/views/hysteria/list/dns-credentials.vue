@@ -98,7 +98,17 @@ const copyValue = async (key: string) => {
 </script>
 
 <style scoped>
-.credentials { width: 100%; }
-.credential { display: flex; flex-wrap: wrap; gap: 0 12px; align-items: center; }
+.credentials { display: grid; width: 100%; gap: 7px; }
+.credential {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 10px;
+  align-items: center;
+  padding: 5px 9px;
+  border: 1px solid var(--hui-border);
+  border-radius: var(--hui-radius-sm);
+  background: var(--hui-canvas);
+}
+.credential > div { display: flex; flex-wrap: wrap; align-items: center; }
 .credential code { overflow-wrap: anywhere; }
 </style>

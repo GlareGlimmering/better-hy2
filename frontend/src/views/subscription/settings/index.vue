@@ -1,130 +1,132 @@
 <template>
-  <div class="app-container">
-    <el-card>
-      <template #header>
-        <span>{{ $t("route.subscriptionSettings") }}</span>
-      </template>
+  <div class="hui-page hui-workspace subscription-page">
+    <header class="hui-page-heading">
+      <h1>{{ $t("route.subscriptionSettings") }}</h1>
+    </header>
+    <el-form ref="formRef" :model="form" :rules="rules" label-position="top" class="subscription-layout">
+      <el-card shadow="never" class="hui-panel template-editor">
+          <el-form-item
+            :label="$t('subscriptionTemplate.nodeName')"
+            prop="nodeNameTemplate"
+          >
+            <el-input
+              v-model="form.nodeNameTemplate"
+              maxlength="256"
+            />
+          </el-form-item>
+          <el-form-item
+            :label="$t('subscriptionTemplate.serverAddress')"
+            prop="serverAddressTemplate"
+          >
+            <el-radio-group v-model="addressMode" @change="onAddressModeChange">
+              <el-radio label="auto">{{ $t("subscriptionTemplate.addressModeAuto") }}</el-radio>
+              <el-radio label="custom">{{ $t("subscriptionTemplate.addressModeCustom") }}</el-radio>
+            </el-radio-group>
+            <el-input
+              v-if="addressMode === 'custom'"
+              v-model="customAddress"
+              class="address-input"
+              :placeholder="$t('subscriptionTemplate.ipPlaceholder')"
+              maxlength="45"
+            />
+            <el-alert
+              v-if="addressMode === 'legacy'"
+              class="legacy-warning"
+              type="warning"
+              :closable="false"
+              show-icon
+              :title="$t('subscriptionTemplate.legacyAddressWarning', { value: legacyAddress })"
+            />
+            <div class="hint">{{ $t("subscriptionTemplate.addressHint") }}</div>
+          </el-form-item>
 
-      <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
-        <el-form-item
-          :label="$t('subscriptionTemplate.nodeName')"
-          prop="nodeNameTemplate"
-        >
-          <el-input
-            v-model="form.nodeNameTemplate"
-            maxlength="256"
-          />
-        </el-form-item>
-        <el-form-item
-          :label="$t('subscriptionTemplate.serverAddress')"
-          prop="serverAddressTemplate"
-        >
-          <el-radio-group v-model="addressMode" @change="onAddressModeChange">
-            <el-radio label="auto">{{ $t("subscriptionTemplate.addressModeAuto") }}</el-radio>
-            <el-radio label="custom">{{ $t("subscriptionTemplate.addressModeCustom") }}</el-radio>
-          </el-radio-group>
-          <el-input
-            v-if="addressMode === 'custom'"
-            v-model="customAddress"
-            class="address-input"
-            :placeholder="$t('subscriptionTemplate.ipPlaceholder')"
-            maxlength="45"
-          />
+          <el-form-item :label="$t('subscriptionTemplate.variablesTitle')">
+            <el-space wrap>
+              <el-button
+                v-for="variable in form.variables"
+                :key="variable"
+                size="small"
+                @click="insertVariable(variable)"
+                >{{ variable }}</el-button
+              >
+            </el-space>
+          </el-form-item>
+          <el-form-item class="actions">
+            <el-button type="primary" @click="save">{{
+              $t("common.save")
+            }}</el-button>
+            <el-button @click="reset">{{
+              $t("subscriptionTemplate.restore")
+            }}</el-button>
+          </el-form-item>
+      </el-card>
+      <aside class="subscription-details">
+        <el-card shadow="never" class="hui-panel">
+          <el-descriptions
+            :title="$t('subscriptionTemplate.detected')"
+            :column="1"
+            border
+          >
+            <el-descriptions-item label="IPv4">
+              <el-text v-if="form.serverIPv4" type="success">{{
+                form.serverIPv4
+              }}</el-text>
+              <el-text v-else type="danger">{{ form.serverIPv4Error }}</el-text>
+            </el-descriptions-item>
+            <el-descriptions-item label="IPv6">
+              <el-text v-if="form.serverIPv6" type="success">{{
+                form.serverIPv6
+              }}</el-text>
+              <el-text v-else type="warning">{{ form.serverIPv6Error }}</el-text>
+            </el-descriptions-item>
+          </el-descriptions>
+
           <el-alert
-            v-if="addressMode === 'legacy'"
-            class="legacy-warning"
-            type="warning"
+            v-if="form.previewError"
+            :title="form.previewError"
+            type="error"
             :closable="false"
-            show-icon
-            :title="$t('subscriptionTemplate.legacyAddressWarning', { value: legacyAddress })"
           />
-          <div class="hint">{{ $t("subscriptionTemplate.addressHint") }}</div>
-        </el-form-item>
-
-        <el-form-item :label="$t('subscriptionTemplate.variablesTitle')">
-          <el-space wrap>
-            <el-button
-              v-for="variable in form.variables"
-              :key="variable"
-              size="small"
-              @click="insertVariable(variable)"
-              >{{ variable }}</el-button
-            >
-          </el-space>
-        </el-form-item>
-
-        <el-table
-          :data="form.variables.map((variable) => ({ variable }))"
-          size="small"
-          border
-        >
-          <el-table-column
-            prop="variable"
-            :label="$t('subscriptionTemplate.variable')"
-            width="210"
-          />
-          <el-table-column :label="$t('subscriptionTemplate.description')">
-            <template #default="scope">
-              {{
-                $t(
-                  `subscriptionTemplate.variables.${variableKey(
-                    scope.row.variable
-                  )}`
-                )
-              }}
-            </template>
-          </el-table-column>
-        </el-table>
-
-        <el-descriptions
-          :title="$t('subscriptionTemplate.detected')"
-          :column="1"
-          border
-        >
-          <el-descriptions-item label="IPv4">
-            <el-text v-if="form.serverIPv4" type="success">{{
-              form.serverIPv4
-            }}</el-text>
-            <el-text v-else type="danger">{{ form.serverIPv4Error }}</el-text>
-          </el-descriptions-item>
-          <el-descriptions-item label="IPv6">
-            <el-text v-if="form.serverIPv6" type="success">{{
-              form.serverIPv6
-            }}</el-text>
-            <el-text v-else type="warning">{{ form.serverIPv6Error }}</el-text>
-          </el-descriptions-item>
-        </el-descriptions>
-
-        <el-alert
-          v-if="form.previewError"
-          :title="form.previewError"
-          type="error"
-          :closable="false"
-        />
-        <el-descriptions
-          v-else
-          :title="$t('subscriptionTemplate.preview')"
-          :column="1"
-          border
-        >
-          <el-descriptions-item :label="$t('subscriptionTemplate.name')">{{
-            form.previewName
-          }}</el-descriptions-item>
-          <el-descriptions-item :label="$t('subscriptionTemplate.server')">{{
-            form.previewAddress
-          }}</el-descriptions-item>
-        </el-descriptions>
-
-        <el-form-item class="actions">
-          <el-button type="primary" @click="save">{{
-            $t("common.save")
-          }}</el-button>
-          <el-button @click="reset">{{
-            $t("subscriptionTemplate.restore")
-          }}</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
+          <el-descriptions
+            v-else
+            :title="$t('subscriptionTemplate.preview')"
+            :column="1"
+            border
+          >
+            <el-descriptions-item :label="$t('subscriptionTemplate.name')">{{
+              form.previewName
+            }}</el-descriptions-item>
+            <el-descriptions-item :label="$t('subscriptionTemplate.server')">{{
+              form.previewAddress
+            }}</el-descriptions-item>
+          </el-descriptions>
+        </el-card>
+        <el-card shadow="never" class="hui-panel variables-panel">
+          <el-table
+            :data="form.variables.map((variable) => ({ variable }))"
+            size="small"
+            class="hui-table"
+          >
+            <el-table-column
+              prop="variable"
+              :label="$t('subscriptionTemplate.variable')"
+              min-width="135"
+            />
+            <el-table-column :label="$t('subscriptionTemplate.description')">
+              <template #default="scope">
+                {{
+                  $t(
+                    `subscriptionTemplate.variables.${variableKey(
+                      scope.row.variable
+                    )}`
+                  )
+                }}
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+      </aside>
+    </el-form>
   </div>
 </template>
 
@@ -206,21 +208,27 @@ onMounted(load);
 </script>
 
 <style scoped>
-.hint {
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
-  margin-top: 4px;
+.subscription-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
 }
-.address-input,
-.legacy-warning {
-  margin-top: 12px;
+
+.subscription-details {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
 }
-.el-table,
-.el-descriptions,
-.el-alert {
-  margin-bottom: 20px;
-}
-.actions {
-  margin-top: 20px;
+
+.subscription-details :deep(.el-descriptions__content) { overflow-wrap: anywhere; }
+.subscription-details :deep(.el-descriptions + .el-descriptions),
+.subscription-details :deep(.el-descriptions + .el-alert) { margin-top: 16px; }
+.hint { color: var(--hui-muted); font-size: 12px; margin-top: 4px; }
+.address-input, .legacy-warning { margin-top: 12px; }
+.actions { margin: 20px 0 0; }
+
+@media (width <= 850px) {
+  .subscription-layout { grid-template-columns: minmax(0, 1fr); }
 }
 </style>

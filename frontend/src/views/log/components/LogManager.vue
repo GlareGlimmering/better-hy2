@@ -1,23 +1,24 @@
 <template>
-  <div class="app-container">
-    <el-card shadow="never" class="usage-card">
-      <div class="usage-grid" v-loading="usageLoading">
-        <div v-for="item in usageItems" :key="item.type" class="usage-item">
+  <div class="hui-page hui-workspace log-page">
+    <header class="hui-page-heading">
+      <h1>{{ $t("route.log") }}</h1>
+    </header>
+    <div class="usage-grid" v-loading="usageLoading">
+        <div v-for="item in usageItems" :key="item.type" class="hui-surface usage-item">
           <span>{{ typeLabel(item.type) }}</span>
           <strong v-if="!item.error">{{ item.human }}</strong>
           <el-text v-else type="danger">{{ item.error }}</el-text>
         </div>
-        <div class="usage-item total">
+        <div class="hui-surface usage-item total">
           <span>{{ $t("log.totalUsage") }}</span>
           <strong>{{ usage.human }}</strong>
           <el-text v-if="!usage.complete" type="warning">
             {{ $t("log.partialUsage") }}
           </el-text>
         </div>
-      </div>
-    </el-card>
+    </div>
 
-    <el-card shadow="never">
+    <el-card shadow="never" class="hui-panel log-panel">
       <div class="toolbar">
         <el-radio-group v-model="logType" @change="handleTypeChange">
           <el-radio-button label="system">{{ $t("log.system") }}</el-radio-button>
@@ -26,19 +27,23 @@
         </el-radio-group>
 
         <div class="toolbar-actions">
-          <span>{{ $t("log.autoRefresh") }}</span>
-          <el-switch v-model="autoRefresh" @change="syncTimer" />
+          <label class="toolbar-toggle">
+            {{ $t("log.autoRefresh") }}
+            <el-switch v-model="autoRefresh" :aria-label="$t('log.autoRefresh')" @change="syncTimer" />
+          </label>
           <el-button @click="togglePaused">
             {{ paused ? $t("log.resume") : $t("log.pause") }}
           </el-button>
           <el-button :loading="loading" @click="refreshNow">{{ $t("common.refresh") }}</el-button>
-          <span>{{ $t("log.autoScroll") }}</span>
-          <el-switch v-model="autoScroll" />
+          <label class="toolbar-toggle">
+            {{ $t("log.autoScroll") }}
+            <el-switch v-model="autoScroll" :aria-label="$t('log.autoScroll')" />
+          </label>
           <el-button @click="handleExport">{{ $t("common.export") }}</el-button>
           <el-button type="danger" plain @click="confirmClear(logType)">
             {{ $t("log.clearCurrent") }}
           </el-button>
-          <el-button type="danger" @click="confirmClear('all')">
+          <el-button type="danger" plain @click="confirmClear('all')">
             {{ $t("log.clearAll") }}
           </el-button>
         </div>
@@ -202,13 +207,70 @@ onBeforeUnmount(stopTimer);
 </script>
 
 <style lang="scss" scoped>
-.usage-card { margin-bottom: 16px; }
-.usage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
-.usage-item { display: flex; flex-direction: column; gap: 6px; padding: 12px; border: 1px solid var(--el-border-color-lighter); border-radius: 4px; }
-.usage-item.total { background: var(--el-fill-color-light); }
-.toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
-.toolbar-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.usage-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.usage-item {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  padding: 14px 16px;
+  color: var(--hui-muted);
+  overflow-wrap: anywhere;
+
+  strong { color: var(--hui-ink); font-size: 24px; font-weight: 740; }
+  &.total { background: var(--hui-accent-soft); }
+}
+
+.toolbar,
+.toolbar-actions,
+.toolbar-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar { margin-bottom: 14px; gap: 10px 16px; }
+.toolbar-actions .el-button { margin-left: 0; }
+.toolbar-toggle { color: var(--hui-muted); font-size: 13px; }
 .log-alert { margin-bottom: 12px; }
-.log-viewport { height: 560px; overflow: auto; padding: 12px; color: var(--el-text-color-primary); background: var(--el-fill-color-darker); border-radius: 4px; }
-pre { min-height: 100%; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-family: Consolas, "Liberation Mono", Menlo, monospace; font-size: 13px; line-height: 1.55; }
+.log-viewport {
+  height: clamp(280px, 60vh, 620px);
+  overflow: auto;
+  padding: 14px;
+  color: var(--hui-ink);
+  background: var(--hui-canvas);
+  border: 1px solid var(--hui-border);
+  border-radius: var(--hui-radius-sm);
+}
+pre {
+  min-height: 100%;
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: "IBM Plex Mono", Consolas, Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+@media (width <= 720px) {
+  .toolbar :deep(.el-radio-group) {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .toolbar :deep(.el-radio-button__inner) {
+    width: 100%;
+    padding-inline: 5px;
+    white-space: normal;
+    line-height: 1.2;
+  }
+  .usage-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .usage-item { padding: 11px 12px; }
+  .usage-item strong { font-size: 20px; }
+}
 </style>
