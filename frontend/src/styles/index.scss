@@ -166,3 +166,52 @@
   .hui-page-heading, .hui-surface-heading { flex-wrap: wrap; }
   .hui-surface-heading { padding: 13px 12px; }
 }
+
+.hui-workspace {
+  display: grid;
+  gap: 18px;
+}
+
+.hui-panel.el-card {
+  --el-card-bg-color: var(--hui-surface);
+  --el-card-border-color: var(--hui-border);
+  --el-card-border-radius: var(--hui-radius-lg);
+  min-width: 0;
+  border-color: var(--hui-border);
+  background: var(--hui-surface);
+  color: var(--hui-ink);
+}
+
+.hui-panel.el-card .el-card__header {
+  min-height: 0;
+  border-bottom-color: var(--hui-border);
+}
+
+.hui-section-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 690;
+}
+.hui-section-description {
+  margin: 4px 0 0;
+  color: var(--hui-muted);
+  font-size: 13px;
+}
+.hui-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.hui-actions > .el-button { margin: 0; }
+
+.hui-editor-drawer .el-drawer__header {
+  margin: 0;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--hui-border);
+}
+.hui-editor-drawer .el-drawer__title { font-weight: 700; color: var(--hui-ink); }
+.hui-editor-drawer .el-drawer__footer {
+  padding: 13px 22px;
+  border-top: 1px solid var(--hui-border);
+}

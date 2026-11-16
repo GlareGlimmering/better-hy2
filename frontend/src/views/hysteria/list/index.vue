@@ -1,51 +1,29 @@
 <template>
   <div
-    class="app-container"
+    class="hui-page hui-workspace hysteria-page"
     v-loading.fullscreen.lock="savingConfig"
     :element-loading-text="$t('hysteria.applyingConfig')"
   >
-    <div class="search">
-      <el-form :inline="true">
-        <el-form-item>
-          <el-button type="primary" @click="submitForm" :icon="Select" :loading="savingConfig" :disabled="lifecycleLoading">
-            {{ $t("common.save") }}
-          </el-button>
-        </el-form-item>
-        <el-form-item>
-          <el-upload
-            v-model:file-list="fileList"
-            :http-request="handleImport"
-            :show-file-list="false"
-            accept=".yaml"
-            :limit="1"
-            :before-upload="beforeImport"
-          >
-            <el-button>
-              <template #icon>
-                <i-ep-upload />
-              </template>
-              {{ $t("common.import") }}
-            </el-button>
-          </el-upload>
-        </el-form-item>
-        <el-form-item>
-          <el-button @click="handleExport">
-            <template #icon>
-              <i-ep-download />
-            </template>
-            {{ $t("common.export") }}
-          </el-button>
-        </el-form-item>
-        <el-form-item>
-          <el-button @click="handleReset">
-            <template #icon>
-              <i-ep-refresh />
-            </template>
-            {{ $t("common.reset") }}
-          </el-button>
-        </el-form-item>
-      </el-form>
-    </div>
+    <header class="hui-page-heading">
+      <h1>{{ $t("route.hysteriaList") }}</h1>
+      <div class="hui-actions">
+        <el-upload
+          v-model:file-list="fileList"
+          :http-request="handleImport"
+          :show-file-list="false"
+          accept=".yaml"
+          :limit="1"
+          :before-upload="beforeImport"
+        >
+          <el-button><template #icon><i-ep-upload /></template>{{ $t("common.import") }}</el-button>
+        </el-upload>
+        <el-button @click="handleExport"><template #icon><i-ep-download /></template>{{ $t("common.export") }}</el-button>
+        <el-button @click="handleReset"><template #icon><i-ep-refresh /></template>{{ $t("common.reset") }}</el-button>
+        <el-button type="primary" :icon="Select" :loading="savingConfig" :disabled="lifecycleLoading" @click="submitForm">
+          {{ $t("common.save") }}
+        </el-button>
+      </div>
+    </header>
 
     <el-alert
       v-if="configSaveError"
@@ -57,19 +35,18 @@
       @close="configSaveError = ''"
     />
 
-    <el-card shadow="never">
+    <el-card shadow="never" class="hui-panel lifecycle-panel">
+      <template #header>
+        <div class="lifecycle-header">
+          <h2 class="hui-section-title">{{ $t("monitor.hysteria2Running") }}</h2>
+          <small>{{ hysteria2Monitor.version || "—" }}</small>
+        </div>
+      </template>
       <el-form inline class="lifecycle-toolbar">
         <el-form-item>
-          <el-tag
-            :type="hysteria2Monitor.running ? 'success' : 'info'"
-            size="large"
-          >
-            {{
-              hysteria2Monitor.running
-                ? $t("hysteria.runningState")
-                : $t("hysteria.stoppedState")
-            }}
-          </el-tag>
+          <span class="hui-status" :class="hysteria2Monitor.running ? 'is-live' : ''">
+            {{ $t(hysteria2Monitor.running ? "hysteria.runningState" : "hysteria.stoppedState") }}
+          </span>
         </el-form-item>
         <el-form-item v-if="hysteria2Monitor.running">
           <el-button
@@ -99,11 +76,11 @@
           </el-button>
         </el-form-item>
         <el-form-item>
-          <div style="display: flex; align-items: center">
+          <div class="hui-actions kernel-actions">
             <el-select
               v-model="hysteria2Version"
               :placeholder="$t('hysteria.hysteria2Version')"
-              style="height: 32px; width: 160px"
+              class="kernel-select"
             >
               <el-option
                 v-for="item in hysteria2Versions"
@@ -113,18 +90,10 @@
               />
             </el-select>
             <el-button
-              type="primary"
               @click="handleHysteria2ChangeVersion"
-              style="height: 32px"
               >{{ $t("hysteria.hysteria2ChangeVersion") }}
             </el-button>
           </div>
-        </el-form-item>
-        <el-form-item>
-          <el-tag style="height: 32px">
-            {{ $t("hysteria.hysteria2Version") }}:
-            {{ hysteria2Monitor.version ? hysteria2Monitor.version : "-" }}
-          </el-tag>
         </el-form-item>
       </el-form>
 
@@ -133,9 +102,10 @@
         type="info"
         :closable="false"
         show-icon
-        style="margin-bottom: 16px"
       />
+    </el-card>
 
+    <el-card shadow="never" class="hui-panel hy2-configuration">
       <el-alert
         :type="routingStatus.ready ? 'success' : 'warning'"
         :closable="false"
@@ -1768,14 +1738,26 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
-.el-card .el-form {
-  max-width: 1280px;
-  margin: 0 auto;
+.lifecycle-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 16px;
 }
+
+.lifecycle-header small {
+  color: var(--hui-muted);
+  overflow-wrap: anywhere;
+}
+
+.lifecycle-toolbar :deep(.el-form-item) { margin: 0 12px 10px 0; }
+.kernel-select { width: 174px; }
+
 
 .config-workspace {
   display: grid;
-  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  grid-template-columns: minmax(190px, 240px) minmax(0, 1fr);
   gap: 24px;
   align-items: start;
 }
@@ -1792,8 +1774,12 @@ onMounted(() => {
 .config-navigation {
   position: sticky;
   top: 16px;
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
+  border: 1px solid var(--hui-border);
+  border-radius: var(--hui-radius-md);
+  background: var(--hui-canvas);
+  --el-collapse-header-bg-color: transparent;
+  --el-collapse-content-bg-color: transparent;
+  --el-collapse-border-color: var(--hui-border);
   padding: 0 14px 12px;
 }
 
@@ -1816,8 +1802,8 @@ onMounted(() => {
 
 .config-nav-item:hover,
 .config-nav-item.is-active {
-  color: var(--el-color-primary);
-  background: var(--el-color-primary-light-9);
+  color: var(--hui-accent-ink);
+  background: var(--hui-accent-soft);
 }
 
 .managed-config-note {
