@@ -51,6 +51,9 @@ export default {
   },
   // 导航栏国际化
   navbar: {
+    navigation: "Переключить навигацию",
+    language: "Язык",
+    logoutConfirm: "Выйти из Better HY2?",
     logout: "Выйти",
   },
   common: {
@@ -194,6 +197,7 @@ export default {
     hysteria2RunningFalse: "Остановлена",
   },
   dashboard: {
+    resources: "Ресурсы системы",
     title: "Панель мониторинга",
     description: "Состояние системы и накопленный трафик всех прокси-пользователей",
     lastUpdated: "Обновлено",

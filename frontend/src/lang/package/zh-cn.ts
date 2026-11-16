@@ -51,6 +51,9 @@ export default {
   },
   // 导航栏国际化
   navbar: {
+    navigation: "切换导航",
+    language: "语言",
+    logoutConfirm: "确定退出 Better HY2？",
     logout: "注销",
   },
   common: {
@@ -191,6 +194,7 @@ export default {
     hysteria2RunningFalse: "停止",
   },
   dashboard: {
+    resources: "系统资源",
     title: "仪表盘",
     description: "系统状态与全部代理用户累计流量",
     lastUpdated: "更新时间",

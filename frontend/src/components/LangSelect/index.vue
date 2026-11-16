@@ -21,9 +21,9 @@ function handleLanguageChange(lang: string) {
 
 <template>
   <el-dropdown trigger="click" @command="handleLanguageChange">
-    <div>
-      <svg-icon icon-class="language" />
-    </div>
+    <button type="button" class="language-trigger" :aria-label="$t('navbar.language')">
+      <svg-icon icon-class="language" size="18px" />
+    </button>
     <template #dropdown>
       <el-dropdown-menu>
         <el-dropdown-item :disabled="appStore.language === 'en'" command="en">
@@ -42,3 +42,20 @@ function handleLanguageChange(lang: string) {
     </template>
   </el-dropdown>
 </template>
+
+<style scoped>
+.language-trigger {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--hui-radius-sm);
+  background: transparent;
+  color: var(--hui-muted, var(--el-text-color-regular));
+  cursor: pointer;
+}
+
+.language-trigger:hover {
+  background: var(--hui-hover, var(--el-fill-color-light));
+}
+</style>

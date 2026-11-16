@@ -12,15 +12,8 @@
 .app-main {
   position: relative;
   width: 100%;
-
-  /* 50= navbar  50  */
-  min-height: calc(100vh - 50px);
+  min-height: calc(100vh - var(--hui-header-height));
   overflow: hidden;
-  background-color: var(--el-bg-color-page);
+  background: var(--hui-canvas);
 }
-
-.fixed-header + .app-main {
-  padding-top: 50px;
-}
-
 </style>

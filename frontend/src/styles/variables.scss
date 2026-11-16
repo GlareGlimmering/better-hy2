@@ -8,22 +8,17 @@
   --hui-space-md: 16px;
   --hui-space-lg: 20px;
   --hui-control-height: 36px;
-  --menuBg: #304156;
-  --menuText: #bfcbd9;
-  --menuActiveText: #409eff;
-  --menuHover: #263445;
-  --subMenuBg: #1f2d3d;
-  --subMenuActiveText: #f4f4f5;
-  --subMenuHover: #001528;
+  --hui-header-height: 60px;
+  --hui-sidebar-rail: 64px;
+  --hui-page-gutter: clamp(18px, 3vw, 40px);
+  --hui-canvas: #f5f7fb;
+  --hui-surface: #fff;
+  --hui-border: #e2e8f0;
+  --hui-ink: #142136;
+  --hui-muted: #536279;
+  --hui-hover: #eef3fa;
+  --hui-accent-soft: color-mix(in srgb, var(--el-color-primary) 12%, var(--hui-surface));
+  --hui-accent-ink: #214a85;
 }
 
-$menuBg: var(--menuBg);
-$menuText: var(--menuText);
-$menuActiveText: var(--menuActiveText);
-$menuHover: var(--menuHover);
-
-$subMenuBg: var(--subMenuBg);
-$subMenuActiveText: var(--subMenuActiveText);
-$subMenuHover: var(--subMenuHover);
-
-$sideBarWidth: 210px;
+$sideBarWidth: 226px;

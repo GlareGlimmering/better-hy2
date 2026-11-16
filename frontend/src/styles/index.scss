@@ -76,3 +76,93 @@
     padding: 14px;
   }
 }
+
+.hui-page {
+  width: 100%;
+  max-width: 1520px;
+  margin-inline: auto;
+  padding: 28px var(--hui-page-gutter) 36px;
+  min-width: 0;
+  color: var(--hui-ink);
+}
+
+.hui-page-heading,
+.hui-surface-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+
+  h1, h2, p { margin: 0; }
+  h1 {
+    font-size: clamp(25px, 3vw, 32px);
+    line-height: 1.2;
+    font-weight: 740;
+    letter-spacing: -0.035em;
+  }
+  h2 { font-size: 16px; font-weight: 690; }
+  p { margin-top: 4px; color: var(--hui-muted); font-size: 13px; }
+}
+
+.hui-surface {
+  background: var(--hui-surface);
+  border: 1px solid var(--hui-border);
+  border-radius: var(--hui-radius-lg);
+}
+
+.hui-surface-heading { padding: 16px 18px; }
+
+.hui-table.el-table {
+  --el-bg-color: var(--hui-surface);
+  --el-fill-color-blank: var(--hui-surface);
+  --el-table-bg-color: var(--hui-surface);
+  --el-table-tr-bg-color: var(--hui-surface);
+  --el-table-border-color: var(--hui-border);
+  --el-table-row-hover-bg-color: var(--hui-hover);
+  --el-table-fixed-box-shadow: none;
+  --el-table-text-color: var(--hui-ink);
+  border-radius: 0;
+}
+
+.hui-table.el-table th.el-table__cell {
+  padding: 10px 0;
+  background: var(--hui-canvas);
+  color: var(--hui-muted);
+  font-size: 12px;
+}
+
+.hui-table td.el-table__cell { padding: 9px 0; }
+
+.hui-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--hui-muted);
+  font-weight: 620;
+  font-size: 12px;
+
+  &::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    flex: none;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  &.is-live::before { background: #27986a; }
+  &.is-warning::before { background: #d19b32; }
+  &.is-offline::before { background: #d96b6b; }
+}
+
+.app-wrapper button:focus-visible,
+.app-wrapper a:focus-visible {
+  outline: 2px solid var(--el-color-primary);
+  outline-offset: 2px;
+}
+
+@media (width <= 600px) {
+  .hui-page { padding: 18px 12px 28px; }
+  .hui-page-heading, .hui-surface-heading { flex-wrap: wrap; }
+  .hui-surface-heading { padding: 13px 12px; }
+}

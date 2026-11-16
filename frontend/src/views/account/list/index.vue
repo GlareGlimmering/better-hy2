@@ -1,13 +1,18 @@
 <template>
-  <div class="app-container">
-    <div class="search">
+  <div class="hui-page accounts-page">
+    <header class="hui-page-heading">
+      <h1>{{ $t("route.accountList") }}</h1>
+      <el-button type="primary" :icon="Plus" @click="handleAdd">{{ $t("common.add") }}</el-button>
+    </header>
+
+    <section class="hui-surface accounts-panel">
+      <div class="account-filters">
       <el-form ref="queryFormRef" :model="queryParams" :inline="true">
         <el-form-item :label="$t('account.remark')" prop="remark">
           <el-input
             v-model="queryParams.remark"
             :placeholder="$t('account.remark')"
             clearable
-            style="width: 200px"
             @keyup.enter="handleQuery"
           />
         </el-form-item>
@@ -16,7 +21,6 @@
             v-model="queryParams.username"
             :placeholder="$t('account.username')"
             clearable
-            style="width: 200px"
             @keyup.enter="handleQuery"
           />
         </el-form-item>
@@ -25,71 +29,63 @@
             v-model="queryParams.deleted"
             :placeholder="$t('common.all')"
             clearable
-            style="width: 200px"
           >
             <el-option :label="$t('common.enable')" value="0" />
             <el-option :label="$t('common.disable')" value="1" />
           </el-select>
         </el-form-item>
 
-        <el-form-item>
-          <el-button type="primary" :icon="Search" @click="handleQuery"
-            >{{ $t("common.search") }}
-          </el-button>
-        </el-form-item>
-        <el-form-item>
-          <el-button :icon="Refresh" @click="resetQuery"
-            >{{ $t("common.reset") }}
-          </el-button>
-        </el-form-item>
-        <el-form-item>
-          <el-button :icon="Plus" @click="handleAdd"
-            >{{ $t("common.add") }}
-          </el-button>
-        </el-form-item>
+        <div class="filter-actions">
+          <el-button :icon="Search" @click="handleQuery">{{ $t("common.search") }}</el-button>
+          <el-button text :icon="Refresh" @click="resetQuery">{{ $t("common.reset") }}</el-button>
+        </div>
       </el-form>
-    </div>
+      </div>
 
-    <el-alert
-      :type="routingStatus.ready ? 'success' : 'warning'"
-      :closable="false"
-      show-icon
-      :title="
-        routingStatus.ready
-          ? $t('account.routingReady')
-          : $t('account.routingNotReady')
-      "
-      :description="routingStatusDescription"
-      style="margin-bottom: 16px"
-    />
-
-    <el-card shadow="never">
-      <el-table v-loading="loading" :data="records" class="account-table" @row-click="handleUpdate">
+      <div class="routing-strip" role="status">
+        <span class="hui-status" :class="routingStatus.ready ? 'is-live' : 'is-warning'">
+          {{ $t(routingStatus.ready ? 'account.routingReady' : 'account.routingNotReady') }}
+        </span>
+        <span class="routing-detail">{{ routingStatusDescription }}</span>
+      </div>
+      <el-table v-loading="loading" :data="records" class="hui-table account-table" @row-click="handleUpdate">
         <el-table-column
           key="username"
           :label="$t('account.username')"
           align="left"
           prop="username"
-          min-width="130"
+          :min-width="isMobile ? 164 : 160"
           fixed="left"
         >
           <template #default="{ row }">
-            <button type="button" class="account-name" @click.stop="handleUpdate(row)">{{ row.username }}</button>
+            <div class="account-identity">
+              <span class="account-avatar" aria-hidden="true">{{ row.username?.slice(0, 1).toUpperCase() }}</span>
+              <div class="account-identity-details">
+                <button type="button" class="account-name" :title="row.username" @click.stop="handleUpdate(row)">{{ row.username }}</button>
+                <small v-if="isMobile" class="account-summary">
+                  {{ row.deleted !== 0 ? $t("common.disable") : (row.online ? $t("account.online") : $t("account.offline")) }}
+                  · {{ row.outbound || $t("account.unbound") }}
+                  · {{ formatTrafficG(row.upload + row.download) }}
+                </small>
+              </div>
+            </div>
           </template>
         </el-table-column>
         <el-table-column
+          v-if="!isMobile"
           key="status"
           :label="$t('account.onlineStatus')"
           align="center"
           width="100"
         >
           <template #default="scope">
-            <el-tag v-if="scope.row.deleted !== 0" type="info">{{ $t("common.disable") }}</el-tag>
-            <el-tag v-else-if="scope.row.online" type="success">{{ $t("account.online") }}</el-tag>
-            <el-tag v-else type="info">{{ $t("account.offline") }}</el-tag>
+            <span class="hui-status" :class="{ 'is-live': scope.row.deleted === 0 && scope.row.online }">
+              {{ $t(scope.row.deleted !== 0 ? "common.disable" : (scope.row.online ? "account.online" : "account.offline")) }}
+            </span>
           </template>
         </el-table-column>
         <el-table-column
+          v-if="!isMobile"
           key="outbound"
           :label="$t('account.outbound')"
           align="center"
@@ -98,18 +94,17 @@
           show-overflow-tooltip
         >
           <template #default="scope">
-            <el-tag v-if="scope.row.outbound" type="success">
-              {{ scope.row.outbound }}
-            </el-tag>
-            <el-tag v-else type="info">{{ $t("account.unbound") }}</el-tag>
+            <span class="outbound-name" :class="{ unbound: !scope.row.outbound }">
+              {{ scope.row.outbound || $t("account.unbound") }}
+            </span>
           </template>
         </el-table-column>
-        <el-table-column :label="$t('account.bandwidth')" min-width="120">
+        <el-table-column v-if="!isMobile" :label="$t('account.bandwidth')" min-width="120">
           <template #default="{ row }">
             <span v-if="row.role !== 'admin'">↑ {{ row.uploadMbps || "∞" }} · ↓ {{ row.downloadMbps || "∞" }} Mbps</span>
           </template>
         </el-table-column>
-        <el-table-column key="traffic" :label="$t('account.trafficUsed')" align="center" min-width="130">
+        <el-table-column v-if="!isMobile" key="traffic" :label="$t('account.trafficUsed')" align="center" min-width="130">
           <template #default="scope">
             <el-tooltip :content="`${$t('account.upload')}: ${formatTrafficG(scope.row.upload)} · ${$t('account.download')}: ${formatTrafficG(scope.row.download)}`">
               <span>{{ formatTrafficG(scope.row.upload + scope.row.download) }} / {{ scope.row.quota < 0 ? "∞" : formatTrafficG(scope.row.quota) }}</span>
@@ -117,11 +112,12 @@
           </template>
         </el-table-column>
         <el-table-column
+          v-if="!isMobile"
           key="expireTime"
           :label="$t('account.expireTime')"
           align="center"
           prop="expireTime"
-          width="132"
+          width="151"
         >
           <template #default="scope">
             <el-tooltip
@@ -155,14 +151,16 @@
         </el-table-column>
       </el-table>
 
-      <pagination
-        v-if="total > 0"
-        :total="total"
-        v-model:page="queryParams.pageNum"
-        v-model:limit="queryParams.pageSize"
-        @pagination="handleQuery"
-      />
-    </el-card>
+      <div v-if="total > 0" class="accounts-pagination">
+        <pagination
+          :total="total"
+          :layout="isMobile ? 'prev, pager, next' : undefined"
+          v-model:page="queryParams.pageNum"
+          v-model:limit="queryParams.pageSize"
+          @pagination="handleQuery"
+        />
+      </div>
+    </section>
 
     <el-drawer
       :title="dialog.title"
@@ -1003,25 +1001,96 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
-.time-cell {
-  white-space: nowrap;
-  cursor: help;
+.accounts-page {
+  display: grid;
+  gap: 18px;
 }
 
-.qr-code-image {
-  width: min(300px, 100%);
-  height: auto;
-  aspect-ratio: 1;
+.accounts-panel { min-width: 0; overflow: hidden; }
+
+.account-filters {
+  padding: 14px 16px;
+
+  :deep(.el-form) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 11px;
+  }
+
+  :deep(.el-form-item) {
+    display: flex;
+    flex: 1 1 140px;
+    max-width: 210px;
+    flex-direction: column;
+    margin: 0;
+  }
+
+  :deep(.el-form-item__label) {
+    justify-content: flex-start;
+    height: auto;
+    margin: 0 0 3px;
+    color: var(--hui-muted);
+    line-height: 1.4;
+    font-size: 12px;
+  }
+
+  :deep(.el-input),
+  :deep(.el-select) { width: 100%; }
 }
+
+.filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+
+  .el-button { margin: 0; }
+}
+
+.routing-strip {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 5px 14px;
+  padding: 10px 16px;
+  border-block-start: 1px solid var(--hui-border);
+  color: var(--hui-muted);
+  font-size: 12px;
+}
+
+.routing-detail { overflow-wrap: anywhere; min-width: 0; }
+
+.account-identity {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.account-avatar {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 9px;
+  background: var(--hui-accent-soft);
+  color: var(--hui-accent-ink);
+  font-weight: 700;
+}
+
+.account-identity-details { display: grid; gap: 2px; min-width: 0; }
+.account-summary { color: var(--hui-muted); line-height: 1.35; overflow-wrap: anywhere; }
 
 .account-name {
+  justify-self: start;
   max-width: 100%;
   overflow: hidden;
   padding: 0;
-  border: 0;
   background: transparent;
-  color: var(--el-text-color-primary);
+  color: var(--hui-ink);
   font: inherit;
+  font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
@@ -1036,7 +1105,10 @@ onMounted(() => {
     width: 30px;
     padding: 0;
     margin: 0;
+    color: var(--hui-muted);
   }
+
+  .el-button:hover { color: var(--hui-accent-ink); background: var(--hui-accent-soft); }
 }
 
 .account-qr-icon {
@@ -1045,68 +1117,67 @@ onMounted(() => {
   gap: 2px;
 
   i {
-    box-sizing: border-box;
     width: 5px;
     height: 5px;
     border: 1px solid currentColor;
   }
 
-  i:last-child {
-    border-style: dotted;
-  }
+  i:last-child { border-style: dotted; }
 }
 
-:deep(.account-table .el-table__row) {
-  cursor: pointer;
+.outbound-name {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--hui-hover);
+  color: var(--hui-ink);
+  font-size: 12px;
+  line-height: 1.5;
+  vertical-align: middle;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.outbound-name.unbound { color: var(--hui-muted); }
+
+.time-cell { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.qr-code-image { width: min(300px, 100%); height: auto; aspect-ratio: 1; }
+:deep(.account-table .el-table__row) { cursor: pointer; }
+
+.accounts-pagination { padding: 10px 14px; }
+.accounts-pagination :deep(.el-pagination) { flex-wrap: wrap; row-gap: 6px; }
+
+:global(.account-drawer .el-drawer__header) {
+  margin: 0;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--hui-border);
+}
+:global(.account-drawer .el-drawer__title) { font-weight: 700; color: var(--hui-ink); }
+:global(.account-drawer .el-drawer__body) { padding: 18px 22px; }
+:global(.account-drawer .el-drawer__footer) {
+  padding: 13px 22px;
+  border-top: 1px solid var(--hui-border);
 }
 
-.account-usage {
-  margin-bottom: 20px;
-}
+.account-usage { margin-bottom: 18px; }
 
 .drawer-danger-zone {
-  padding-top: 18px;
+  padding: 14px;
   margin-top: 18px;
-  border-top: 1px solid var(--el-border-color-lighter);
-}
-
-.drawer-danger-zone {
-  padding: 16px;
   background: var(--el-color-danger-light-9);
   border: 1px solid var(--el-color-danger-light-7);
   border-radius: var(--hui-radius-md);
 }
 
-.drawer-section-title {
-  margin-bottom: 12px;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.drawer-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
+.drawer-section-title { margin-bottom: 10px; font-size: 13px; font-weight: 650; }
+.drawer-footer { display: flex; justify-content: flex-end; gap: 8px; }
 
 @media (width <= 767px) {
-  .app-container {
-    padding: 12px;
-  }
-
-  .search :deep(.el-form-item) {
-    width: 100%;
-    margin-right: 0;
-  }
-
-  .search :deep(.el-form-item__content),
-  .search :deep(.el-input),
-  .search :deep(.el-select) {
-    width: 100% !important;
-  }
-
-  :deep(.account-drawer .el-drawer__body) {
-    padding: 14px;
-  }
+  .account-filters { padding: 12px; }
+  .account-filters :deep(.el-form-item) { max-width: none; }
+  .account-avatar { width: 26px; height: 26px; }
+  .routing-strip { padding: 9px 12px; }
+  :global(.account-drawer .el-drawer__body) { padding: 14px; }
 }
 </style>

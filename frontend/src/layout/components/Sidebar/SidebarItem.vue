@@ -99,7 +99,7 @@ function resolvePath(routePath: string) {
     </template>
 
     <!-- 包含多个子路由  -->
-    <el-sub-menu v-else :index="resolvePath(item.path)" teleported>
+    <el-sub-menu v-else :index="resolvePath(item.path)" popper-class="hui-nav-popup" teleported>
       <template #title>
         <svg-icon
           v-if="item.meta && item.meta.icon"
