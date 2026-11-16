@@ -2,14 +2,14 @@ export default {
   // 路由国际化
   route: {
     account: "Account",
-    accountList: "Account Manage",
+    accountList: "Accounts",
     hysteria: "Hysteria",
-    hysteriaList: "Hysteria Manage",
+    hysteriaList: "HY2 Management",
     config: "Panel",
     configList: "Panel Settings",
     monitor: "Monitor",
     monitorSystem: "System Monitor",
-    log: "Log",
+    log: "Logs",
     logSystem: "System Log",
     logHysteria: "Hysteria Log",
     logAccess: "HY2 Access Log",
@@ -51,6 +51,9 @@ export default {
   },
   // 导航栏国际化
   navbar: {
+    navigation: "Toggle navigation",
+    language: "Language",
+    logoutConfirm: "Sign out of Better HY2?",
     logout: "Logout",
   },
   common: {
@@ -192,6 +195,7 @@ export default {
     hysteria2RunningFalse: "Stop",
   },
   dashboard: {
+    resources: "System resources",
     title: "Dashboard",
     description: "System status and cumulative traffic for all proxy users",
     lastUpdated: "Updated",

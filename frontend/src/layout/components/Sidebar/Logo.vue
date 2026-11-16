@@ -1,53 +1,42 @@
-<script lang="ts" setup>
-import { useSettingsStore } from "@/store/modules/settings";
+<script setup lang="ts">
+import logo from "@/assets/logo.svg";
 
-const settingsStore = useSettingsStore();
-
-defineProps({
-  collapse: {
-    type: Boolean,
-    required: true,
-  },
-});
-
-const logo = ref(new URL(`../../../assets/logo.svg`, import.meta.url).href);
+defineProps<{ collapse: boolean }>();
 </script>
 
 <template>
-  <div class="w-full h-[50px] bg-gray-800 dark:bg-[var(--el-bg-color-overlay)]">
-    <transition name="sidebarLogoFade">
-      <router-link
-        v-if="collapse"
-        key="collapse"
-        class="h-full w-full flex items-center justify-center"
-        to="/"
-      >
-        <img v-if="settingsStore.sidebarLogo" :src="logo" class="w-5 h-5" />
-        <span v-else class="ml-3 text-white text-sm font-bold">Better HY2</span>
-      </router-link>
-
-      <router-link
-        v-else
-        key="expand"
-        class="h-full w-full flex items-center justify-center"
-        to="/"
-      >
-        <img v-if="settingsStore.sidebarLogo" :src="logo" class="w-5 h-5" />
-        <span class="ml-3 text-white text-sm font-bold">Better HY2</span>
-      </router-link>
-    </transition>
-  </div>
+  <router-link class="sidebar-brand" :class="{ collapsed: collapse }" aria-label="Better HY2" to="/">
+    <img :src="logo" alt="" width="32" height="32" />
+    <strong v-if="!collapse">Better HY2</strong>
+  </router-link>
 </template>
 
 <style lang="scss" scoped>
-// https://cn.vuejs.org/guide/built-ins/transition.html#the-transition-component
-.sidebarLogoFade-enter-active {
-  transition: opacity 2s;
+.sidebar-brand {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  height: var(--hui-header-height);
+  padding-inline: 16px;
+  border-bottom: 1px solid var(--hui-border);
+  color: var(--hui-ink);
+  white-space: nowrap;
 }
 
-.sidebarLogoFade-leave-active,
-.sidebarLogoFade-enter-from,
-.sidebarLogoFade-leave-to {
-  opacity: 0;
+.sidebar-brand.collapsed {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.sidebar-brand strong {
+  font-size: 16px;
+  font-weight: 750;
+  letter-spacing: -0.025em;
+}
+
+.sidebar-brand:focus-visible {
+  outline: 2px solid var(--el-color-primary);
+  outline-offset: -3px;
 }
 </style>

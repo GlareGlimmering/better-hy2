@@ -8,7 +8,6 @@ import { useSettingsStore } from "@/store/modules/settings";
 import { usePermissionStore } from "@/store/modules/permission";
 import { useAppStore } from "@/store/modules/app";
 import { storeToRefs } from "pinia";
-import variables from "@/styles/variables.module.scss";
 
 const settingsStore = useSettingsStore();
 const permissionStore = usePermissionStore();
@@ -19,15 +18,13 @@ const route = useRoute();
 </script>
 
 <template>
-  <div :class="{ 'has-logo': sidebarLogo }">
+  <aside id="panel-navigation" :aria-label="$t('navbar.navigation')">
     <logo v-if="sidebarLogo" :collapse="!appStore.sidebar.opened" />
     <el-scrollbar>
       <el-menu
         :default-active="route.path"
         :collapse="!appStore.sidebar.opened"
-        :background-color="variables.menuBg"
-        :text-color="variables.menuText"
-        :active-text-color="variables.menuActiveText"
+        class="hui-nav-menu"
         :unique-opened="false"
         :collapse-transition="false"
         mode="vertical"
@@ -41,5 +38,5 @@ const route = useRoute();
         />
       </el-menu>
     </el-scrollbar>
-  </div>
+  </aside>
 </template>
