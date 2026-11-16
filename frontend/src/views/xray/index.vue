@@ -1,14 +1,21 @@
 <template>
-  <div class="app-container xray-page">
-    <el-card class="section-card">
+  <div class="hui-page hui-workspace xray-page">
+    <header class="hui-page-heading">
+      <h1>{{ $t("route.xrayOutbound") }}</h1>
+      <el-button type="primary" @click="openCreate">+ {{ $t("xray.addOutbound") }}</el-button>
+    </header>
+    <el-card shadow="never" class="hui-panel section-card">
       <template #header>
         <div class="section-header">
-          <div><div class="section-title">{{ $t("xray.serviceTitle") }}</div><div class="section-subtitle">{{ $t("xray.serviceHelp") }}</div></div>
+          <div>
+            <h2 class="hui-section-title">{{ $t("xray.serviceTitle") }}</h2>
+            <p class="hui-section-description">{{ $t("xray.serviceHelp") }}</p>
+          </div>
           <el-button :loading="loading" @click="refreshStatus">{{ $t("common.refresh") }}</el-button>
         </div>
       </template>
       <el-row :gutter="16">
-        <el-col :xs="24" :sm="8"><div class="status-block"><span>{{ $t("xray.running") }}</span><el-tag :type="status.running ? 'success' : status.runtimeReady ? 'info' : 'warning'">{{ runtimeStateLabel }}</el-tag></div></el-col>
+        <el-col :xs="24" :sm="8"><div class="status-block"><span>{{ $t("xray.running") }}</span><span class="hui-status" :class="status.running ? 'is-live' : status.runtimeReady ? '' : 'is-warning'">{{ runtimeStateLabel }}</span></div></el-col>
         <el-col :xs="24" :sm="8"><div class="status-block"><span>{{ $t("xray.activeVersion") }}</span><strong>{{ status.activeVersion || "-" }}</strong></div></el-col>
         <el-col :xs="24" :sm="8"><div class="status-block"><span>{{ $t("xray.configValid") }}</span><el-tag :type="status.configValid ? 'success' : 'warning'">{{ yesNo(status.configValid) }}</el-tag></div></el-col>
       </el-row>
@@ -23,18 +30,23 @@
       </el-space>
     </el-card>
 
-    <el-row :gutter="12" class="node-summary">
-      <el-col v-for="item in nodeSummary" :key="item.label" :xs="12" :sm="6"><el-card shadow="never"><div class="summary-value">{{ item.value }}</div><div class="section-subtitle">{{ item.label }}</div></el-card></el-col>
-    </el-row>
+    <div class="node-summary">
+      <div v-for="item in nodeSummary" :key="item.label" class="hui-surface summary-tile">
+        <span class="section-subtitle">{{ item.label }}</span>
+        <strong class="summary-value">{{ item.value }}</strong>
+      </div>
+    </div>
 
-    <el-card class="section-card">
+    <el-card shadow="never" class="hui-panel section-card">
       <template #header>
         <div class="section-header">
-          <div><div class="section-title">{{ $t("xray.outboundList") }}</div><div class="section-subtitle">{{ $t("xray.outboundListHelp") }}</div></div>
-          <el-button type="primary" @click="openCreate">+ {{ $t("xray.addOutbound") }}</el-button>
+          <div>
+            <h2 class="hui-section-title">{{ $t("xray.outboundList") }}</h2>
+            <p class="hui-section-description">{{ $t("xray.outboundListHelp") }}</p>
+          </div>
         </div>
       </template>
-      <el-table v-loading="loading" :data="settings.outbounds" stripe class="outbound-table">
+      <el-table v-loading="loading" :data="settings.outbounds" class="outbound-table hui-table">
         <el-table-column :label="$t('xray.name')" min-width="150"><template #default="scope"><el-tooltip :content="scope.row.name" placement="top"><span class="truncate-cell">{{ scope.row.name }}</span></el-tooltip></template></el-table-column>
         <el-table-column :label="$t('xray.protocol')" width="130"><template #default="scope">{{ protocolLabel(scope.row.protocol) }}</template></el-table-column>
         <el-table-column :label="$t('xray.remoteAddress')" min-width="220"><template #default="scope"><el-tooltip :content="`${scope.row.address}:${scope.row.port}`" placement="top"><span class="truncate-cell">{{ scope.row.address }}:{{ scope.row.port }}</span></el-tooltip></template></el-table-column>
@@ -54,7 +66,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column :label="$t('common.operate')" width="230" fixed="right">
+        <el-table-column :label="$t('common.operate')" :width="compactTable ? 106 : 210" fixed="right" class-name="node-actions-cell">
           <template #default="scope">
             <el-tooltip :content="$t('xray.tipTest')"><el-button link type="primary" :loading="testing[scope.row.id]" :disabled="!scope.row.enabled || !status.running || testing[scope.row.id]" @click="testOutbound(scope.row)">{{ $t("xray.test") }}</el-button></el-tooltip>
             <el-button link type="primary" @click="openEdit(scope.row)">{{ $t("common.update") }}</el-button>
@@ -65,8 +77,8 @@
       </el-table>
     </el-card>
 
-    <el-card class="section-card">
-      <template #header><div class="section-title">{{ $t("xray.configurationState") }}</div></template>
+    <el-card shadow="never" class="hui-panel section-card">
+      <template #header><h2 class="hui-section-title">{{ $t("xray.configurationState") }}</h2></template>
       <el-alert :title="dirty || status.pendingChanges ? $t('xray.pendingChanges') : $t('xray.noPendingChanges')" :type="dirty || status.pendingChanges ? 'warning' : 'success'" :closable="false" show-icon />
       <div class="apply-time">{{ $t("xray.lastApplied") }}: {{ formatTestTime(status.lastAppliedAt) }}</div>
       <el-form label-position="top" class="advanced-form">
@@ -82,7 +94,7 @@
       </el-space>
     </el-card>
 
-    <el-drawer v-model="editorVisible" :title="editingId ? $t('xray.editOutbound') : $t('xray.addOutbound')" size="min(600px, 94%)" destroy-on-close :close-on-click-modal="false">
+    <el-drawer v-model="editorVisible" :title="editingId ? $t('xray.editOutbound') : $t('xray.addOutbound')" :size="compactTable ? '100%' : '560px'" class="hui-editor-drawer" append-to-body destroy-on-close :close-on-click-modal="false">
       <el-form ref="editorRef" :model="editor" :rules="rules" label-position="top">
         <div class="form-section-title">{{ $t("xray.basicFields") }}</div>
         <el-form-item :label="$t('xray.protocol')" prop="protocol"><el-select v-model="editor.protocol" :disabled="!!editingId" class="full-width"><el-option label="VLESS" value="vless" /><el-option label="HTTP Proxy" value="http" /><el-option label="SOCKS5 Proxy" value="socks5" /></el-select><div class="field-help">{{ $t(`xray.protocolHelp.${editor.protocol}`) }}</div></el-form-item>
@@ -110,6 +122,7 @@
 </template>
 
 <script setup lang="ts">
+import { useWindowSize } from "@vueuse/core";
 import { ElMessage, ElMessageBox, FormInstance, FormRules, UploadFile } from "element-plus";
 import { useI18n } from "vue-i18n";
 import { applyXrayApi, getXraySettingsApi, getXrayStatusApi, installXrayApi, restartXrayApi, saveXrayDraftApi, startXrayApi, stopXrayApi, testXrayOutboundApi, uploadXrayCAApi, validateXrayApi } from "@/api/xray";
@@ -117,6 +130,8 @@ import type { XrayOutbound, XraySettings, XrayStatus, XrayTestResult } from "@/a
 import { validateOutboundEditor } from "./outbound-form";
 import { failedTestResult, relativeTestTime, visibleExitIp } from "./test-result";
 
+const { width } = useWindowSize();
+const compactTable = computed(() => width.value <= 767);
 const { t } = useI18n();
 const loading = ref(false);
 const dirty = ref(false);
@@ -207,14 +222,25 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.xray-page { max-width: 1500px; margin: 0 auto; }
-.section-card { margin-bottom: 18px; }
-.node-summary { margin-bottom: 18px; }
-.summary-value { font-size: 24px; font-weight: 600; }
+.node-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.summary-tile { display: grid; gap: 7px; padding: 14px 16px; }
+.summary-value { font-size: 25px; font-weight: 740; font-variant-numeric: tabular-nums; }
 .section-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.section-title { font-size: 17px; font-weight: 600; }
+
 .section-subtitle, .field-help, .detail, .muted { color: var(--el-text-color-secondary); font-size: 12px; }
-.status-block { display: flex; align-items: center; justify-content: space-between; min-height: 36px; padding: 0 8px; }
+.status-block {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 42px;
+  padding: 8px 11px;
+  background: var(--hui-canvas);
+  border-radius: var(--hui-radius-sm);
+}
+.status-block > span:first-child { color: var(--hui-muted); }
+.status-block strong { overflow-wrap: anywhere; }
 .status-error, .service-actions, .advanced-form, .apply-time { margin-top: 16px; }
 .apply-time { color: var(--el-text-color-secondary); font-size: 13px; }
 .success-text { color: var(--el-color-success); }
@@ -228,5 +254,10 @@ onUnmounted(() => {
 .form-section-title { margin: 18px 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--el-border-color-lighter); color: var(--el-text-color-primary); font-weight: 600; }
 .truncate-cell { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .empty-state { padding: 28px 0; color: var(--el-text-color-secondary); }
-@media (max-width: 768px) { .section-header { align-items: flex-start; flex-direction: column; } .outbound-table { width: 100%; } .service-actions { width: 100%; } }
+@media (max-width: 768px) {
+  .section-header { flex-wrap: wrap; }
+  .node-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .status-block { margin-bottom: 5px; }
+  .outbound-table :deep(.node-actions-cell .el-button) { display: block; margin: 0; min-height: 28px; }
+}
 </style>
