@@ -39,7 +39,7 @@ service.interceptors.response.use(
     return Promise.reject(new Error(message || "Error"));
   },
   (error: any) => {
-    if (error.response.data) {
+    if (error.response?.data) {
       const { code, msg } = error.response.data;
       // token 过期,重新登录
       if (code === "A0230") {

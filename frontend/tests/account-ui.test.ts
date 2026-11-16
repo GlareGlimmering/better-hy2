@@ -29,11 +29,27 @@ test("account dialogs remain precise and adapt to narrow screens", () => {
   assert.match(accountPage, /:label-position="isMobile \? 'top' : 'right'"/);
 });
 
-test("account actions use a compact fixed operation column", () => {
+test("account row opens the editor and three accessible links stop row clicks", () => {
+  assert.match(accountPage, /@row-click="handleUpdate"/);
   assert.match(accountPage, /fixed="right"/);
-  assert.match(accountPage, /handleAccountCommand\(\$event, scope\.row\)/);
-  assert.match(accountPage, /command="reset-traffic"/);
-  assert.match(accountPage, /command="delete"/);
+  for (const action of ["handleSubscribe", "handleNodeUrl", "handleQrCode"]) {
+    assert.match(accountPage, new RegExp('@click\\.stop="'+action+'\\(row\\)"'));
+  }
+  assert.match(accountPage, /:aria-label="\$t\('common.nodeQrCode'\)"/);
+  assert.match(accountPage, /class="account-qr-icon"/);
+  assert.doesNotMatch(accountPage, /drawer-secondary-actions|handleAccountCommand|<el-dropdown/);
+  for (const action of ["confirmResetTraffic", "handleKick", "confirmReleaseKickWithPrompt", "handleDelete"]) {
+    assert.ok(accountPage.includes(action+"(drawerAccount)"));
+  }
+});
+
+test("account password generator works in both modes without overwriting newer input", () => {
+  const start = accountPage.indexOf('prop="conPass"');
+  const password = accountPage.slice(start, accountPage.indexOf('prop="outbound"', start));
+  assert.match(password, /<template #append>/);
+  assert.match(password, /@click="generatePassword"/);
+  assert.match(password, /@input="passwordRequest\+\+"/);
+  assert.match(accountPage, /state\.dataForm\.id === accountID && state\.dataForm\.conPass === before/);
 });
 
 test("account drawer uses tenths of G and omits unchanged legacy quota", () => {

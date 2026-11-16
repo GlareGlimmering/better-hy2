@@ -1,9 +1,13 @@
 <template>
-  <div class="app-container">
+  <div
+    class="app-container"
+    v-loading.fullscreen.lock="savingConfig"
+    :element-loading-text="$t('hysteria.applyingConfig')"
+  >
     <div class="search">
       <el-form :inline="true">
         <el-form-item>
-          <el-button type="primary" @click="submitForm" :icon="Select">
+          <el-button type="primary" @click="submitForm" :icon="Select" :loading="savingConfig" :disabled="lifecycleLoading">
             {{ $t("common.save") }}
           </el-button>
         </el-form-item>
@@ -42,6 +46,16 @@
         </el-form-item>
       </el-form>
     </div>
+
+    <el-alert
+      v-if="configSaveError"
+      class="config-save-error"
+      type="error"
+      show-icon
+      :title="$t('hysteria.configNotConfirmed')"
+      :description="configSaveError"
+      @close="configSaveError = ''"
+    />
 
     <el-card shadow="never">
       <el-form inline class="lifecycle-toolbar">
@@ -1287,7 +1301,8 @@ import {
   importHysteria2ConfigApi,
   listConfigApi,
   updateConfigsApi,
-  updateHysteria2ConfigApi,
+  beginHysteria2ConfigApplyApi,
+  getHysteria2ConfigApplyStatusApi,
   uploadCertFileApi,
 } from "@/api/config";
 import { useI18n } from "vue-i18n";
@@ -1563,45 +1578,65 @@ const handleReset = () => {
   state.fileList = [];
 };
 
-const submitForm = () => {
-  dataFormRef.value.validate(async (valid: any) => {
-    if (valid) {
-      let configs: ConfigsUpdateDto[] = [
-        {
-          key: hysteria2Remark,
-          value: state.configForm.remark,
-        },
-        {
-          key: hysteria2ConfigPortHopping,
-          value: state.configForm.portHopping,
-        },
-        {
-          key: clashExtension,
-          value: state.configForm.clashExtension,
-        },
-      ];
-      const params = buildHysteria2ConfigPayload(
-        state.dataForm,
-        optionalFeatureState(),
-        state.tlsType,
-        state.aclType
-      );
-      try {
-        await updateConfigsApi({ configUpdateDtos: configs });
-        await updateHysteria2ConfigApi(params);
-        ElMessage.success(t("common.success"));
-        setConfig();
-        setRoutingStatus();
-      } catch {
-        setConfig();
-        setRoutingStatus();
-      }
+const savingConfig = ref(false);
+const configSaveError = ref("");
+let pageClosed = false;
+onBeforeUnmount(() => { pageClosed = true; });
+
+const submitForm = async () => {
+  if (savingConfig.value || state.lifecycleLoading) return;
+  if (!await dataFormRef.value.validate().catch(() => false) ||
+      savingConfig.value || state.lifecycleLoading || pageClosed) return;
+
+  const configs: ConfigsUpdateDto[] = [
+    { key: hysteria2Remark, value: state.configForm.remark },
+    { key: hysteria2ConfigPortHopping, value: state.configForm.portHopping },
+    { key: clashExtension, value: state.configForm.clashExtension },
+  ];
+  const params = buildHysteria2ConfigPayload(
+    state.dataForm,
+    optionalFeatureState(),
+    state.tlsType,
+    state.aclType
+  );
+
+  savingConfig.value = true;
+  configSaveError.value = "";
+  let awaitingResult = false;
+  try {
+    await updateConfigsApi({ configUpdateDtos: configs });
+    if (pageClosed) return;
+    awaitingResult = true;
+    let { data: result } = await beginHysteria2ConfigApplyApi(params);
+    const deadline = Date.now() + 12 * 60_000;
+    while (result.state === "pending" && Date.now() < deadline) {
+      await new Promise(resolve => window.setTimeout(resolve, 2_000));
+      if (pageClosed) return;
+      ({ data: result } = await getHysteria2ConfigApplyStatusApi(result.id));
     }
-  });
+    if (pageClosed) return;
+    if (result.state === "pending") {
+      configSaveError.value = t("hysteria.configResultUnknown");
+    } else if (result.state === "failed") {
+      configSaveError.value = result.error || t("hysteria.configNotConfirmed");
+    } else {
+      ElMessage.success(t("hysteria.configApplied"));
+      await setConfig().catch(() => {});
+    }
+  } catch (error) {
+    if (!pageClosed) {
+      configSaveError.value = awaitingResult
+        ? t("hysteria.configResultUnknown")
+        : (error instanceof Error ? error.message : String(error));
+    }
+  } finally {
+    savingConfig.value = false;
+    if (!pageClosed) void Promise.allSettled([setHysteria2Monitor(), setRoutingStatus()]);
+  }
 };
 
 const setConfig = () => {
-  listConfigApi({
+  const otherSettings = listConfigApi({
     keys: [
       hysteria2Remark,
       hysteria2ConfigPortHopping,
@@ -1620,7 +1655,7 @@ const setConfig = () => {
     });
   });
 
-  getHysteria2ConfigApi().then((response) => {
+  const hysteriaSettings = getHysteria2ConfigApi().then((response) => {
     const data = response.data;
     if (data) {
       state.tlsType = data?.tls ? "tls" : "acme";
@@ -1642,6 +1677,7 @@ const setConfig = () => {
       assignWith(state.dataForm, data);
     }
   });
+  return Promise.all([otherSettings, hysteriaSettings]);
 };
 
 const setHysteria2Versions = async () => {
@@ -1724,7 +1760,7 @@ const uploadCertFile = async (params: UploadRequestOptions) => {
 };
 
 onMounted(() => {
-  setConfig();
+  void setConfig().catch(() => {});
   setHysteria2Versions();
   setHysteria2Monitor();
   setRoutingStatus();
@@ -1742,6 +1778,11 @@ onMounted(() => {
   grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
   gap: 24px;
   align-items: start;
+}
+
+.config-save-error {
+  margin-bottom: 16px;
+  overflow-wrap: anywhere;
 }
 
 .lifecycle-toolbar {

@@ -44,10 +44,7 @@ test("account create and edit share a responsive drawer", () => {
   assert.doesNotMatch(accounts, /class="account-dialog"/);
 });
 
-test("account more button cannot open editor and drawer dismisses without saving", () => {
-  assert.doesNotMatch(accounts, /@row-click="handleUpdate"/);
-  assert.match(accounts, /@click\.stop="handleUpdate\(scope\.row\)"/);
-  assert.match(accounts, /<el-button type="primary" link @click\.stop>\s*\{\{ \$t\("common\.more"\)/);
+test("account drawer dismisses without saving", () => {
   assert.match(accounts, /:close-on-click-modal="true"/);
   assert.match(accounts, /@close="closeDialog"/);
   const close = accounts.slice(accounts.indexOf("const closeDialog ="), accounts.indexOf("const closeDialogKick ="));

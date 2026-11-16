@@ -229,10 +229,17 @@ func UpdateHysteria2Config(c *gin.Context) {
 		return
 	}
 
-	hysteria2Config, err := service.GetHysteria2Config()
-	if err != nil {
+	if err := applyHysteria2Config(hysteria2ServerConfig); err != nil {
 		vo.Fail(err.Error(), c)
 		return
+	}
+	vo.Success(nil, c)
+}
+
+func applyHysteria2Config(hysteria2ServerConfig bo.Hysteria2ServerConfig) error {
+	hysteria2Config, err := service.GetHysteria2Config()
+	if err != nil {
+		return err
 	}
 
 	needResetPortHopping := false
@@ -245,18 +252,13 @@ func UpdateHysteria2Config(c *gin.Context) {
 	}
 
 	if err = service.ApplyHysteria2Config(hysteria2ServerConfig); err != nil {
-		vo.Fail(err.Error(), c)
-		return
+		return err
 	}
 
 	if needResetPortHopping {
-		if err := service.InitPortHopping(); err != nil {
-			vo.Fail(err.Error(), c)
-			return
-		}
+		return service.InitPortHopping()
 	}
-
-	vo.Success(nil, c)
+	return nil
 }
 
 func ExportHysteria2Config(c *gin.Context) {
