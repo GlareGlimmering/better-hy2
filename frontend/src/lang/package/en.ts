@@ -39,6 +39,7 @@ export default {
   },
   // 登录页面国际化
   login: {
+    capsLock: "Caps Lock is on",
     changePassword: "Change password",
     passwordChangeRequired: "Set a new panel password to continue. The old password was shared with a proxy credential.",
     newPassword: "New panel password",
@@ -50,6 +51,11 @@ export default {
     login: "Login",
   },
   // 导航栏国际化
+  panelErrors: {
+    forbidden: "You do not have access to this page",
+    missing: "Page not found",
+    home: "Back to dashboard",
+  },
   navbar: {
     navigation: "Toggle navigation",
     language: "Language",
@@ -159,6 +165,7 @@ export default {
     releaseKickTip: "Remove offline status",
   },
   config: {
+    serviceSettings: "Service settings",
     appearance: "Appearance",
     appearanceTip: "Appearance preferences are saved in this browser",
     darkMode: "Dark mode",

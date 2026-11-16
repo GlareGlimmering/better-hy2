@@ -1,55 +1,31 @@
 <template>
-  <div class="app-container">
-    <div class="search">
-      <el-form inline>
-        <el-form-item>
-          <el-button type="primary" @click="submitForm" :icon="Select">
-            {{ $t("common.save") }}
-          </el-button>
-        </el-form-item>
-        <el-form-item>
-          <el-button @click="handleRestartServer">
-            <template #icon>
-              <i-ep-refreshRight />
-            </template>
-            {{ $t("config.restartServer") }}
-          </el-button>
-        </el-form-item>
-        <el-form-item>
-          <el-upload
-            v-model:file-list="fileList"
-            :http-request="handleImport"
-            :show-file-list="false"
-            accept=".json"
-            :limit="1"
-            :before-upload="beforeImport"
-          >
-            <el-button>
-              <template #icon>
-                <i-ep-upload />
-              </template>
-              {{ $t("common.import") }}
-            </el-button>
-          </el-upload>
-        </el-form-item>
-        <el-form-item>
-          <el-button @click="handleExport">
-            <template #icon>
-              <i-ep-download />
-            </template>
-            {{ $t("common.export") }}
-          </el-button>
-        </el-form-item>
-      </el-form>
-    </div>
+  <div class="hui-page hui-workspace panel-settings">
+    <header class="hui-page-heading">
+      <h1>{{ $t("route.configList") }}</h1>
+      <div class="hui-actions">
+        <el-button @click="handleRestartServer">
+          <template #icon><i-ep-refreshRight /></template>{{ $t("config.restartServer") }}
+        </el-button>
+        <el-upload
+          v-model:file-list="fileList"
+          :http-request="handleImport"
+          :show-file-list="false"
+          accept=".json"
+          :limit="1"
+          :before-upload="beforeImport"
+        >
+          <el-button><template #icon><i-ep-upload /></template>{{ $t("common.import") }}</el-button>
+        </el-upload>
+        <el-button @click="handleExport"><template #icon><i-ep-download /></template>{{ $t("common.export") }}</el-button>
+        <el-button type="primary" :icon="Select" @click="submitForm">{{ $t("common.save") }}</el-button>
+      </div>
+    </header>
 
-    <el-card shadow="never" class="appearance-card">
+    <el-card shadow="never" class="hui-panel appearance-card">
       <template #header>
         <div class="card-header">
-          <span>{{ $t("config.appearance") }}</span>
-          <span class="card-description">{{
-            $t("config.appearanceTip")
-          }}</span>
+          <h2 class="hui-section-title">{{ $t("config.appearance") }}</h2>
+          <p class="hui-section-description">{{ $t("config.appearanceTip") }}</p>
         </div>
       </template>
 
@@ -91,7 +67,8 @@
       </div>
     </el-card>
 
-    <el-card shadow="never" class="panel-config-card">
+    <el-card shadow="never" class="hui-panel panel-config-card">
+      <template #header><h2 class="hui-section-title">{{ $t("config.serviceSettings") }}</h2></template>
       <el-form
         ref="dataFormRef"
         :rules="dataFormRules"
@@ -545,28 +522,11 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
-.appearance-card {
-  margin-bottom: 16px;
-}
-
-.card-header {
-  display: flex;
-  gap: 8px 16px;
-  align-items: baseline;
-  justify-content: space-between;
-
-  .card-description {
-    font-size: 12px;
-    color: var(--el-text-color-secondary);
-  }
-}
-
 .appearance-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px 24px;
-  max-width: 800px;
-  margin: 0 auto;
+  max-width: 980px;
 }
 
 .appearance-item {
@@ -574,7 +534,11 @@ onMounted(() => {
   gap: 16px;
   align-items: center;
   justify-content: space-between;
-  min-height: 36px;
+  min-height: 48px;
+  padding: 8px 12px;
+  border: 1px solid var(--hui-border);
+  border-radius: var(--hui-radius-sm);
+  background: var(--hui-canvas);
 }
 
 .theme-item {
@@ -602,16 +566,10 @@ onMounted(() => {
 }
 
 .panel-config-card .el-form {
-  max-width: 800px;
-  margin: 0 auto;
+  max-width: 980px;
 }
 
 @media (width <= 767px) {
-  .card-header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
   .appearance-grid {
     grid-template-columns: 1fr;
   }

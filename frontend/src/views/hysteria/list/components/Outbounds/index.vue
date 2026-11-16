@@ -1,5 +1,5 @@
 <template>
-  <div class="flex gap-2">
+  <div class="flex flex-wrap gap-2">
     <el-tag
       :key="item"
       v-for="item in outbounds"
@@ -16,7 +16,7 @@
     <el-dialog
       :title="dialog.title"
       v-model="dialog.visible"
-      width="600px"
+      width="min(600px, calc(100vw - 24px))"
       append-to-body
       @close="closeDialog"
     >
@@ -165,7 +165,7 @@
     <el-dialog
       :title="outboundInfoDialog.title"
       v-model="outboundInfoDialog.visible"
-      width="600px"
+      width="min(600px, calc(100vw - 24px))"
       append-to-body
       @close="outboundInfoDialog.visible = false"
     >
