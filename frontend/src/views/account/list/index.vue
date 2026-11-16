@@ -64,7 +64,7 @@
     />
 
     <el-card shadow="never">
-      <el-table v-loading="loading" :data="records" class="account-table">
+      <el-table v-loading="loading" :data="records" class="account-table" @row-click="handleUpdate">
         <el-table-column
           key="username"
           :label="$t('account.username')"
@@ -72,8 +72,11 @@
           prop="username"
           min-width="130"
           fixed="left"
-          show-overflow-tooltip
-        />
+        >
+          <template #default="{ row }">
+            <button type="button" class="account-name" @click.stop="handleUpdate(row)">{{ row.username }}</button>
+          </template>
+        </el-table-column>
         <el-table-column
           key="status"
           :label="$t('account.onlineStatus')"
@@ -133,55 +136,21 @@
             <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column
-          :label="$t('common.operate')"
-          align="center"
-          width="150"
-          fixed="right"
-        >
-          <template #default="scope">
-            <el-button type="primary" link @click.stop="handleUpdate(scope.row)"
-              >{{ $t("common.edit") }}
-            </el-button>
-            <el-dropdown
-              trigger="click"
-              @click.stop
-              @command="handleAccountCommand($event, scope.row)"
-            >
-              <el-button type="primary" link @click.stop>
-                {{ $t("common.more") }}<i-ep-arrow-down />
-              </el-button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="subscribe">{{
-                    $t("common.subscribe")
-                  }}</el-dropdown-item>
-                  <el-dropdown-item command="node-url">{{
-                    $t("common.nodeUrl")
-                  }}</el-dropdown-item>
-                  <el-dropdown-item command="node-qr">{{
-                    $t("common.nodeQrCode")
-                  }}</el-dropdown-item>
-                  <el-dropdown-item command="reset-traffic" divided>{{
-                    $t("common.resetTraffic")
-                  }}</el-dropdown-item>
-                  <el-dropdown-item command="kick">{{
-                    $t("account.kick")
-                  }}</el-dropdown-item>
-                  <el-dropdown-item
-                    v-if="
-                      calculateTimeDifference(scope.row.kickUtilTime) !== '-'
-                    "
-                    command="release-kick"
-                  >
-                    {{ $t("account.releaseKick") }}
-                  </el-dropdown-item>
-                  <el-dropdown-item command="delete" divided>
-                    {{ $t("common.delete") }}
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
+        <el-table-column align="right" width="124" fixed="right">
+          <template #default="{ row }">
+            <div class="account-links">
+              <el-tooltip :content="$t('common.subscribe')">
+                <el-button text :icon="Link" :aria-label="$t('common.subscribe')" @click.stop="handleSubscribe(row)" />
+              </el-tooltip>
+              <el-tooltip :content="$t('common.nodeUrl')">
+                <el-button text :icon="Document" :aria-label="$t('common.nodeUrl')" @click.stop="handleNodeUrl(row)" />
+              </el-tooltip>
+              <el-tooltip :content="$t('common.nodeQrCode')">
+                <el-button text :aria-label="$t('common.nodeQrCode')" @click.stop="handleQrCode(row)">
+                  <span class="account-qr-icon" aria-hidden="true"><i /><i /><i /><i /></span>
+                </el-button>
+              </el-tooltip>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -241,7 +210,7 @@
             ref="dataFormConPassRef"
             @input="passwordRequest++"
           >
-            <template v-if="!dataForm.id" #append>
+            <template #append>
               <el-button @click="generatePassword">{{ $t("account.generatePassword") }}</el-button>
             </template>
           </el-input>
@@ -342,14 +311,6 @@
         </el-form-item>
       </el-form>
 
-      <div v-if="drawerAccount" class="drawer-secondary-actions">
-        <div class="drawer-section-title">{{ $t("account.accountTools") }}</div>
-        <el-space wrap>
-          <el-button @click="handleSubscribe(drawerAccount)">{{ $t("common.subscribe") }}</el-button>
-          <el-button @click="handleNodeUrl(drawerAccount)">{{ $t("common.nodeUrl") }}</el-button>
-          <el-button @click="handleQrCode(drawerAccount)">{{ $t("common.nodeQrCode") }}</el-button>
-        </el-space>
-      </div>
       <div v-if="drawerAccount" class="drawer-danger-zone">
         <div class="drawer-section-title">{{ $t("account.dangerZone") }}</div>
         <el-space wrap>
@@ -456,7 +417,7 @@ import {
   getAccountOutboundOptionsApi,
   generateConnectionPasswordApi,
 } from "@/api/account";
-import { Search, Plus, Refresh } from "@element-plus/icons-vue";
+import { Document, Link, Search, Plus, Refresh } from "@element-plus/icons-vue";
 import {
   timestampToCompactDateTime,
   timestampToFullDateTimeWithZone,
@@ -785,10 +746,11 @@ const resetQuery = () => {
 let passwordRequest = 0;
 const generatePassword = async () => {
   const request = ++passwordRequest;
+  const accountID = state.dataForm.id;
   const before = state.dataForm.conPass;
   try {
     const { data } = await generateConnectionPasswordApi();
-    if (request === passwordRequest && dialog.value.visible && !state.dataForm.id && state.dataForm.conPass === before) {
+    if (request === passwordRequest && dialog.value.visible && state.dataForm.id === accountID && state.dataForm.conPass === before) {
       state.dataForm.conPass = data;
     }
   } catch {
@@ -955,35 +917,6 @@ const confirmReleaseKickWithPrompt = (row: { [key: string]: any }) => {
   ).then(() => confirmReleaseKick(row));
 };
 
-const handleAccountCommand = (
-  command: string,
-  row: { [key: string]: any }
-) => {
-  switch (command) {
-    case "subscribe":
-      handleSubscribe(row);
-      break;
-    case "node-url":
-      handleNodeUrl(row);
-      break;
-    case "node-qr":
-      handleQrCode(row);
-      break;
-    case "reset-traffic":
-      confirmResetTraffic(row);
-      break;
-    case "kick":
-      handleKick(row);
-      break;
-    case "release-kick":
-      confirmReleaseKickWithPrompt(row);
-      break;
-    case "delete":
-      handleDelete(row);
-      break;
-  }
-};
-
 /**
  * 关闭用户弹窗
  */
@@ -1081,8 +1014,46 @@ onMounted(() => {
   aspect-ratio: 1;
 }
 
-:deep(.account-table .el-button + .el-dropdown) {
-  margin-left: 8px;
+.account-name {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--el-text-color-primary);
+  font: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.account-links {
+  display: flex;
+  justify-content: flex-end;
+  gap: 2px;
+
+  .el-button {
+    width: 30px;
+    padding: 0;
+    margin: 0;
+  }
+}
+
+.account-qr-icon {
+  display: grid;
+  grid-template-columns: repeat(2, 5px);
+  gap: 2px;
+
+  i {
+    box-sizing: border-box;
+    width: 5px;
+    height: 5px;
+    border: 1px solid currentColor;
+  }
+
+  i:last-child {
+    border-style: dotted;
+  }
 }
 
 :deep(.account-table .el-table__row) {
@@ -1093,7 +1064,6 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
-.drawer-secondary-actions,
 .drawer-danger-zone {
   padding-top: 18px;
   margin-top: 18px;

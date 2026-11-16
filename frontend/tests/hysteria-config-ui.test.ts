@@ -113,7 +113,15 @@ test("HY2 page uses fixed groups and does not expose managed userOutbounds", () 
   assert.match(component, /expandedGroups: \["basic", "tls", "authTraffic", "performance"\]/);
   assert.match(component, /buildHysteria2ConfigPayload/);
   assert.doesNotMatch(component, /v-model="dataForm\.userOutbounds"/);
-  assert.match(component, /catch \{[\s\S]*setConfig\(\);[\s\S]*setRoutingStatus\(\);/);
+  assert.match(component, /v-loading.fullscreen.lock="savingConfig"/);
+  const save = component.slice(component.indexOf("const submitForm ="), component.indexOf("const setConfig ="));
+  assert.match(save, /await beginHysteria2ConfigApplyApi\(params\)/);
+  assert.match(save, /await getHysteria2ConfigApplyStatusApi\(result.id\)/);
+  const failure = save.slice(save.indexOf('result.state === "failed"'), save.indexOf("} else {\n      ElMessage.success"));
+  assert.match(failure, /result.error/);
+  assert.doesNotMatch(failure, /setConfig|state\.dataForm/);
+  assert.equal((save.match(/setConfig\(/g) || []).length, 1);
+  assert.match(save, /finally \{\s*savingConfig.value = false/);
   assert.match(component, /type="password"[\s\S]*v-model="dataForm\.obfs\.salamander\.password"|v-model="dataForm\.obfs\.salamander\.password"[\s\S]*type="password"/);
 });
 

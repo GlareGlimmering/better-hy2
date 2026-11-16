@@ -35,14 +35,20 @@ export function getHysteria2ConfigApi(): AxiosPromise<Hysteria2ServerConfig> {
   });
 }
 
-export function updateHysteria2ConfigApi(
+interface Hysteria2ApplyResult {
+  id: string;
+  state: "pending" | "succeeded" | "failed";
+  error?: string;
+}
+
+export function beginHysteria2ConfigApplyApi(
   data: Hysteria2ServerConfig
-): AxiosPromise {
-  return request({
-    url: "/config/updateHysteria2Config",
-    method: "post",
-    data: data,
-  });
+): AxiosPromise<Hysteria2ApplyResult> {
+  return request({ url: "/config/applyHysteria2Config", method: "post", data });
+}
+
+export function getHysteria2ConfigApplyStatusApi(id: string): AxiosPromise<Hysteria2ApplyResult> {
+  return request({ url: "/config/applyHysteria2Config", method: "get", params: { id } });
 }
 
 export function getConfigApi(data: ConfigDto): AxiosPromise<ConfigVo> {
