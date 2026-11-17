@@ -47,6 +47,9 @@
           {{ $t(routingStatus.ready ? 'account.routingReady' : 'account.routingNotReady') }}
         </span>
         <span class="routing-detail">{{ routingStatusDescription }}</span>
+        <el-button v-if="routingStatus.unboundUsers.length" link type="primary" @click="openRoutingBindings">
+          {{ $t("account.bindUnassigned") }}
+        </el-button>
       </div>
       <el-table v-loading="loading" :data="records" class="hui-table account-table" @row-click="handleUpdate">
         <el-table-column
@@ -162,6 +165,36 @@
       </div>
     </section>
 
+    <el-dialog
+      v-model="routingBindingsVisible"
+      :title="$t('account.bindUnassigned')"
+      :width="useFullscreenDialog ? 'calc(100% - 24px)' : '480px'"
+      :close-on-click-modal="!routingBindingsSaving"
+      :close-on-press-escape="!routingBindingsSaving"
+      :show-close="!routingBindingsSaving"
+    >
+      <p>{{ $t("account.bindUnassignedHelp") }}</p>
+      <el-form label-position="top">
+        <el-form-item v-for="username in routingBindingUsers" :key="username" :label="username">
+          <el-select
+            :model-value="routingBindings.get(username)"
+            :placeholder="$t('account.unbound')"
+            :disabled="routingBindingsSaving"
+            style="width: 100%"
+            @update:model-value="routingBindings.set(username, $event)"
+          >
+            <el-option v-for="item in outboundOptions" :key="item.name" :label="item.name" :value="item.name" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button :disabled="routingBindingsSaving" @click="routingBindingsVisible = false">{{ $t("common.cancel") }}</el-button>
+        <el-button type="primary" :loading="routingBindingsSaving" :disabled="!routingBindingsComplete" @click="saveRoutingBindings">
+          {{ $t("common.save") }}
+        </el-button>
+      </template>
+    </el-dialog>
+
     <el-drawer
       :title="dialog.title"
       v-model="dialog.visible"
@@ -246,6 +279,9 @@
             </el-button>
           </div>
           <div v-else class="form-tip">{{ $t("account.outboundTip") }}</div>
+          <div v-if="dataForm.outbound && routingStatus.unboundUsers.some(user => user !== dataForm.username)" class="form-tip">
+            {{ $t("account.bindUnassignedHelp") }}
+          </div>
           <el-alert v-if="outboundOptionsFailed" type="error" :closable="false" :title="$t('account.outboundLoadFailed')" />
           <el-alert v-else-if="!outboundOptionsLoading && unavailableBinding" type="warning" :closable="false" :title="$t('account.outboundBindingUnavailable', { name: dataForm.outbound })" />
           <div v-if="outboundExcludedCount > 0" class="form-tip">{{ $t('account.outboundHistoricalExcluded') }}</div>
@@ -420,6 +456,7 @@ import {
   resetTrafficApi,
   getAccountOutboundOptionsApi,
   generateConnectionPasswordApi,
+  bindUnassignedOutboundsApi,
 } from "@/api/account";
 import { Document, Link, Search, Plus, Refresh, View } from "@element-plus/icons-vue";
 import {
@@ -463,6 +500,14 @@ const { width: viewportWidth } = useWindowSize();
 const isMobile = computed(() => viewportWidth.value < 768);
 const useFullscreenDialog = computed(() => viewportWidth.value < 520);
 const accountSaving = ref(false);
+const routingBindingsVisible = ref(false);
+const routingBindingsSaving = ref(false);
+const routingBindingUsers = ref<string[]>([]);
+const routingBindings = reactive(new Map<string, string>());
+const routingBindingsComplete = computed(() =>
+  routingBindingUsers.value.length > 0 &&
+  routingBindingUsers.value.every(username => routingBindings.has(username))
+);
 const passwordGenerating = ref(false);
 const passwordVisible = ref(false);
 const outboundOptionsLoading = ref(false);
@@ -721,6 +766,31 @@ const openHysteriaSettings = () => {
 const loadRoutingStatus = async () => {
   const { data } = await hysteria2RoutingStatusApi();
   state.routingStatus = data;
+};
+
+const openRoutingBindings = async () => {
+  await Promise.all([loadRoutingStatus(), loadOutboundOptions()]);
+  if (outboundOptionsFailed.value || !state.routingStatus.unboundUsers.length) return;
+  routingBindings.clear();
+  routingBindingUsers.value = [...state.routingStatus.unboundUsers];
+  routingBindingsVisible.value = true;
+};
+
+const saveRoutingBindings = async () => {
+  if (!routingBindingsComplete.value || routingBindingsSaving.value) return;
+  routingBindingsSaving.value = true;
+  try {
+    const { data } = await bindUnassignedOutboundsApi(Object.fromEntries(routingBindings));
+    if (data.outboundChanged && !data.runtimeApplied) {
+      ElMessage.warning(t("account.outboundSavedHy2Stopped"));
+    } else {
+      ElMessage.success(t("common.success"));
+    }
+    routingBindingsVisible.value = false;
+    await Promise.all([handleQuery(), loadRoutingStatus()]);
+  } finally {
+    routingBindingsSaving.value = false;
+  }
 };
 
 /**

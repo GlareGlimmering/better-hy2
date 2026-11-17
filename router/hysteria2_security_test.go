@@ -50,3 +50,14 @@ func TestHysteria2ConfigApplyRoutesRequireAuthentication(t *testing.T) {
 		}
 	}
 }
+
+func TestBindUnassignedAccountOutboundsRequiresAuthentication(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	Router(engine, nil)
+	w := httptest.NewRecorder()
+	engine.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/hui/account/bindUnassignedOutbounds", nil))
+	if !strings.Contains(w.Body.String(), `"message":"unauthorized"`) {
+		t.Fatalf("unprotected endpoint: %s", w.Body.String())
+	}
+}

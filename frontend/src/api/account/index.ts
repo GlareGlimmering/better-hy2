@@ -18,6 +18,10 @@ import {
   AccountVo,
 } from "./types";
 
+export function bindUnassignedOutboundsApi(bindings: Record<string, string>): AxiosPromise<AccountUpdateResult> {
+  return request({ url: "/account/bindUnassignedOutbounds", method: "post", data: { bindings } });
+}
+
 /**
  * 查询
  */

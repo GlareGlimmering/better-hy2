@@ -80,3 +80,7 @@ test("failed node apply keeps the editor open and restores the local row", () =>
   assert.match(component, /await saveAndApply\(\); editorVisible\.value = false/);
   assert.match(component, /catch \(error\)[\s\S]*settings\.outbounds\.splice\(index, 1, previous\)/);
 });
+
+test("native SOCKS5 tests are available without a running Xray", () => {
+  assert.match(component, /:disabled="!scope\.row\.enabled \|\| \(scope\.row\.protocol !== 'socks5' && !status\.running\) \|\| testing\[scope\.row\.id\]"/);
+});

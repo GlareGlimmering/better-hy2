@@ -11,6 +11,7 @@ import (
 	"h-ui/model/entity"
 	"h-ui/model/vo"
 	"maps"
+	"strings"
 )
 
 type AccountUpdateResult struct {
@@ -225,6 +226,62 @@ func UpdateAccountWithResult(account entity.Account) (AccountUpdateResult, error
 		applyAccountBandwidth(*account.Id, &result)
 	}
 	return result, nil
+}
+
+// BindUnassignedAccountOutbounds lets existing installations enter strict
+// routing without choosing an implicit outbound for any account.
+func BindUnassignedAccountOutbounds(requested map[string]string) (AccountUpdateResult, error) {
+	result := AccountUpdateResult{}
+	hysteria2ConfigApplyMutex.Lock()
+	defer hysteria2ConfigApplyMutex.Unlock()
+
+	before, err := dao.ListAccount("role = ? and deleted = 0", "user")
+	if err != nil {
+		return result, err
+	}
+	config, err := GetHysteria2Config()
+	if err != nil {
+		return result, err
+	}
+	after := append([]entity.Account(nil), before...)
+	previous := make(map[int64]string)
+	for i := range after {
+		account := &after[i]
+		if strings.TrimSpace(AccountOutbound(*account)) != "" {
+			continue
+		}
+		username := *account.Username
+		name := strings.TrimSpace(requested[username])
+		if name == "" {
+			return result, fmt.Errorf("select an outbound for account %q", username)
+		}
+		previous[*account.Id] = AccountOutbound(*account)
+		account.Outbound = &name
+	}
+	if len(previous) == 0 || len(previous) != len(requested) {
+		return result, errors.New("the list of unbound accounts has changed; reload and try again")
+	}
+	bindings, err := accountRoutingBindings(config, after)
+	if err != nil {
+		return result, err
+	}
+	changes := make(map[int64]string, len(previous))
+	for _, account := range after {
+		if _, changed := previous[*account.Id]; changed {
+			changes[*account.Id] = bindings[*account.Username]
+		}
+	}
+	if err := dao.UpdateAccountOutbounds(changes); err != nil {
+		return result, err
+	}
+	result, err = applyAccountRoutingMutation(before)
+	if err == nil {
+		return result, nil
+	}
+	if restoreErr := dao.UpdateAccountOutbounds(previous); restoreErr != nil {
+		return result, fmt.Errorf("%w; restore account bindings failed: %v", err, restoreErr)
+	}
+	return result, fmt.Errorf("%w; previous account bindings restored", err)
 }
 
 func applyAccountRoutingMutation(before []entity.Account) (AccountUpdateResult, error) {

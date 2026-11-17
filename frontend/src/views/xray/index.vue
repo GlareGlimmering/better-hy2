@@ -68,7 +68,7 @@
         </el-table-column>
         <el-table-column :label="$t('common.operate')" :width="compactTable ? 106 : 180" fixed="right" class-name="node-actions-cell">
           <template #default="scope">
-            <el-tooltip :content="$t('xray.tipTest')"><el-button link type="primary" :loading="testing[scope.row.id]" :disabled="!scope.row.enabled || !status.running || testing[scope.row.id]" @click="testOutbound(scope.row)">{{ $t("xray.test") }}</el-button></el-tooltip>
+            <el-tooltip :content="$t('xray.tipTest')"><el-button link type="primary" :loading="testing[scope.row.id]" :disabled="!scope.row.enabled || (scope.row.protocol !== 'socks5' && !status.running) || testing[scope.row.id]" @click="testOutbound(scope.row)">{{ $t("xray.test") }}</el-button></el-tooltip>
             <el-button link type="primary" @click="openEdit(scope.row)">{{ $t("common.update") }}</el-button>
             <el-tooltip :content="$t('xray.tipDelete')"><el-button link type="danger" @click="removeOutbound(scope.row)">{{ $t("common.delete") }}</el-button></el-tooltip>
           </template>
