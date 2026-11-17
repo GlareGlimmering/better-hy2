@@ -43,13 +43,18 @@ test("account row opens the editor and three accessible links stop row clicks", 
   }
 });
 
-test("account password generator works in both modes without overwriting newer input", () => {
+test("account password is read-only and can be regenerated before saving", () => {
   const start = accountPage.indexOf('prop="conPass"');
   const password = accountPage.slice(start, accountPage.indexOf('prop="outbound"', start));
   assert.match(password, /<template #append>/);
   assert.match(password, /@click="generatePassword"/);
-  assert.match(password, /@input="passwordRequest\+\+"/);
-  assert.match(accountPage, /state\.dataForm\.id === accountID && state\.dataForm\.conPass === before/);
+  assert.match(password, /:model-value="dataForm\.conPass"/);
+  assert.match(password, /\breadonly\b/);
+  assert.doesNotMatch(password, /v-model|clearable|@input/);
+  assert.match(password, /:loading="passwordGenerating"/);
+  assert.match(accountPage, /if \(!state\.dataForm\.conPass\) void generatePassword\(\)/);
+  assert.match(accountPage, /request === passwordRequest && dialog\.value\.visible && state\.dataForm\.id === accountID/);
+  assert.match(accountPage, /:disabled="accountSaving \|\| passwordGenerating" @click="submitForm"/);
 });
 
 test("account drawer uses tenths of G and omits unchanged legacy quota", () => {

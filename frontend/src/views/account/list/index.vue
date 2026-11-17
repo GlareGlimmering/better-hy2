@@ -199,17 +199,23 @@
         </el-form-item>
         <el-form-item :label="$t('account.conPass')" prop="conPass">
           <el-input
-            v-model="dataForm.conPass"
+            :model-value="dataForm.conPass"
             :placeholder="$t('account.conPass')"
-            maxlength="50"
-            clearable
-            type="password"
-            show-password
-            ref="dataFormConPassRef"
-            @input="passwordRequest++"
+            :type="passwordVisible ? 'text' : 'password'"
+            readonly
           >
+            <template #suffix>
+              <el-button
+                v-if="dataForm.conPass"
+                link
+                :icon="View"
+                :aria-label="$t('account.conPass')"
+                :aria-pressed="passwordVisible"
+                @click="passwordVisible = !passwordVisible"
+              />
+            </template>
             <template #append>
-              <el-button @click="generatePassword">{{ $t("account.generatePassword") }}</el-button>
+              <el-button :loading="passwordGenerating" :disabled="accountSaving" @click="generatePassword">{{ $t("account.generatePassword") }}</el-button>
             </template>
           </el-input>
         </el-form-item>
@@ -321,7 +327,7 @@
       <template #footer>
         <div class="drawer-footer">
           <el-button @click="closeDialog">{{ $t("common.cancel") }}</el-button>
-          <el-button type="primary" :loading="accountSaving" :disabled="accountSaving" @click="submitForm">{{ $t("common.save") }}</el-button>
+          <el-button type="primary" :loading="accountSaving" :disabled="accountSaving || passwordGenerating" @click="submitForm">{{ $t("common.save") }}</el-button>
         </div>
       </template>
     </el-drawer>
@@ -415,7 +421,7 @@ import {
   getAccountOutboundOptionsApi,
   generateConnectionPasswordApi,
 } from "@/api/account";
-import { Document, Link, Search, Plus, Refresh } from "@element-plus/icons-vue";
+import { Document, Link, Search, Plus, Refresh, View } from "@element-plus/icons-vue";
 import {
   timestampToCompactDateTime,
   timestampToFullDateTimeWithZone,
@@ -457,6 +463,8 @@ const { width: viewportWidth } = useWindowSize();
 const isMobile = computed(() => viewportWidth.value < 768);
 const useFullscreenDialog = computed(() => viewportWidth.value < 520);
 const accountSaving = ref(false);
+const passwordGenerating = ref(false);
+const passwordVisible = ref(false);
 const outboundOptionsLoading = ref(false);
 const outboundOptionsFailed = ref(false);
 const outboundExcludedCount = ref(0);
@@ -464,7 +472,6 @@ let outboundOptionsRequest: Promise<void> | undefined;
 const queryFormRef = ref(ElForm); // 查询表单
 const dataFormRef = ref(ElForm); // 用户表单
 const kickFormRef = ref(ElForm); // 下线表单
-const dataFormConPassRef = ref();
 
 const dataFormAddRules = {
   remark: [
@@ -743,18 +750,21 @@ const resetQuery = () => {
  **/
 let passwordRequest = 0;
 const generatePassword = async () => {
+  if (passwordGenerating.value || accountSaving.value) return;
   const request = ++passwordRequest;
   const accountID = state.dataForm.id;
-  const before = state.dataForm.conPass;
+  passwordGenerating.value = true;
   try {
     const { data } = await generateConnectionPasswordApi();
-    if (request === passwordRequest && dialog.value.visible && state.dataForm.id === accountID && state.dataForm.conPass === before) {
+    if (request === passwordRequest && dialog.value.visible && state.dataForm.id === accountID) {
       state.dataForm.conPass = data;
     }
   } catch {
     if (request === passwordRequest && dialog.value.visible) {
       ElMessage.error(t("account.generatePasswordFailed"));
     }
+  } finally {
+    if (request === passwordRequest) passwordGenerating.value = false;
   }
 };
 
@@ -790,7 +800,7 @@ const handleUpdate = async (row: { [key: string]: any }) => {
  */
 const submitForm = async () => {
   const valid = await dataFormRef.value?.validate().catch(() => false);
-  if (!valid) return;
+  if (!valid || passwordGenerating.value || accountSaving.value) return;
   const quotaValue = unlimitedQuota.value ? -1 : quotaTmp.value;
   const unchangedQuota = state.dataForm.id && quotaValue === quotaInput(state.dataForm.quota);
   const quota = unchangedQuota ? undefined : quotaInputBytes(quotaValue);
@@ -920,6 +930,8 @@ const confirmReleaseKickWithPrompt = (row: { [key: string]: any }) => {
  */
 const closeDialog = () => {
   passwordRequest++;
+  passwordGenerating.value = false;
+  passwordVisible.value = false;
   dialog.value.visible = false;
   dataFormRef.value?.resetFields();
   dataFormRef.value?.clearValidate();
