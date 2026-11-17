@@ -169,7 +169,7 @@ func SaveAccount(c *gin.Context) {
 		Remark:       accountSaveDto.Remark,
 		Outbound:     accountSaveDto.Outbound,
 	}
-	result, err := service.SaveAccountWithResult(account)
+	result, err := service.SaveAccountWithResult(account, accountSaveDto.ExistingBindings)
 	if err != nil {
 		vo.Fail(err.Error(), c)
 		return

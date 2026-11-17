@@ -204,7 +204,7 @@ func TestAccountCreateAndDeleteAutomaticallyApplyUserOutbounds(t *testing.T) {
 	}
 
 	username, outbound := "tousau", "ISP_SOCKS5_1"
-	result, err := SaveAccountWithResult(entity.Account{Username: &username, Outbound: &outbound})
+	result, err := SaveAccountWithResult(entity.Account{Username: &username, Outbound: &outbound}, nil)
 	if err != nil {
 		t.Fatalf("SaveAccountWithResult() error = %v", err)
 	}
@@ -288,7 +288,7 @@ func TestAccountCreateDeleteAndClearRollbackOnApplyFailure(t *testing.T) {
 	}
 
 	username, outbound := "rollback-new", "ISP_SOCKS5_1"
-	if _, err := SaveAccountWithResult(entity.Account{Username: &username, Outbound: &outbound}); err == nil || !strings.Contains(err.Error(), "new account removed") {
+	if _, err := SaveAccountWithResult(entity.Account{Username: &username, Outbound: &outbound}, nil); err == nil || !strings.Contains(err.Error(), "new account removed") {
 		t.Fatalf("create error = %v", err)
 	}
 	if _, err := dao.GetAccount("username = ?", username); err == nil {
@@ -467,4 +467,66 @@ func TestBindUnassignedAccountOutbounds(t *testing.T) {
 	if _, err := BindUnassignedAccountOutbounds(request); err == nil || applyCalls != 2 {
 		t.Fatalf("stale request result: calls=%d error=%v", applyCalls, err)
 	}
+}
+
+func TestCreateSocksAccountWithExistingUnboundAccounts(t *testing.T) {
+	oldID, oldPassword := setupSubscriptionTestDatabase(t)
+	setAccountRoutingTestConfig(t)
+	username, outbound, password := "new-socks", "ISP_SOCKS5_1", "new-socks.Synthetic123!"
+	account := entity.Account{Username: &username, Outbound: &outbound, ConPass: &password}
+	existing := map[string]string{"subscription-test": "DIRECT"}
+	calls, fail := 0, true
+	accountHysteria2IsRunning = func() bool { return true }
+	accountApplyHysteria2Config = func(config bo.Hysteria2ServerConfig) error {
+		calls++
+		prepared, err := PrepareHysteria2OutboundConfig(config)
+		if err != nil {
+			return err
+		}
+		bindings := prepared.UserOutbounds
+		if len(bindings) != 2 || bindings["subscription-test"] != "DIRECT" || bindings[username] != outbound {
+			t.Fatalf("applied bindings: %v", bindings)
+		}
+		if fail {
+			return errors.New("injected HY2 startup failure")
+		}
+		return nil
+	}
+	checkOld := func(expectedOutbound string) {
+		t.Helper()
+		old, err := GetAccount(oldID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if AccountOutbound(old) != expectedOutbound || *old.ConPass != oldPassword || *old.Quota != 1000 {
+			t.Fatal("unexpected changes to existing account")
+		}
+	}
+	if _, err := SaveAccountWithResult(account, nil); err == nil || !strings.Contains(err.Error(), "has no outbound binding") || calls != 0 {
+		t.Fatalf("missing binding should be rejected before apply: calls=%d error=%v", calls, err)
+	}
+	if _, err := SaveAccountWithResult(account, map[string]string{"subscription-test": "MISSING"}); err == nil || calls != 0 {
+		t.Fatalf("unknown binding should be rejected before apply: calls=%d error=%v", calls, err)
+	}
+	checkOld("")
+	if _, err := SaveAccountWithResult(account, existing); err == nil || !strings.Contains(err.Error(), "previous account bindings restored") {
+		t.Fatalf("apply failure error = %v", err)
+	}
+	if _, err := dao.GetAccount("username = ?", username); err == nil {
+		t.Fatal("failed create left new account in database")
+	}
+	checkOld("")
+	fail = false
+	result, err := SaveAccountWithResult(account, existing)
+	if err != nil || !result.RuntimeApplied || calls != 2 {
+		t.Fatalf("result=%+v calls=%d error=%v", result, calls, err)
+	}
+	created, err := dao.GetAccount("username = ?", username)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if AccountOutbound(created) != outbound || *created.ConPass != password {
+		t.Fatal("new account did not retain its own outbound and credential")
+	}
+	checkOld("DIRECT")
 }

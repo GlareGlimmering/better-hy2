@@ -129,6 +129,7 @@ export default {
     boundUsers: "Bound users",
     kernelVersion: "Kernel version",
     bindUnassigned: "Bind unassigned accounts",
+    bindUnassignedOnCreate: "Choose an outbound for each enabled account below. Saving creates the new account and applies these bindings together. HY2 may briefly restart.",
     bindUnassignedHelp: "Strict routing requires an explicit outbound for each enabled account. Use “Bind unassigned accounts” to save them together. Applying may briefly restart HY2.",
     unboundUsers: "Unbound users",
     trafficUsed: "Traffic used",

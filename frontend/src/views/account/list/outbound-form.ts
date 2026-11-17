@@ -14,10 +14,6 @@ export interface AccountOutboundFormState {
   admin: boolean;
 }
 
-export function newAccountOutboundFields() {
-  return { outbound: "", role: "user" as const };
-}
-
 export function buildAccountOutboundFormState(
   outbounds: AccountOutboundOption[],
   role: string | undefined

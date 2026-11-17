@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { editAccountForm, newAccountForm } from "../src/views/account/list/account-form.ts";
 
 import {
   timestampToCompactDateTime,
@@ -52,9 +53,9 @@ test("account password is read-only and can be regenerated before saving", () =>
   assert.match(password, /\breadonly\b/);
   assert.doesNotMatch(password, /v-model|clearable|@input/);
   assert.match(password, /:loading="passwordGenerating"/);
-  assert.match(accountPage, /if \(!state\.dataForm\.conPass\) void generatePassword\(\)/);
+  assert.match(accountPage, /state\.dataForm = newAccountForm\(getMonthLater\(\)\);[\s\S]*void generatePassword\(\)/);
   assert.match(accountPage, /request === passwordRequest && dialog\.value\.visible && state\.dataForm\.id === accountID/);
-  assert.match(accountPage, /:disabled="accountSaving \|\| passwordGenerating" @click="submitForm"/);
+  assert.match(accountPage, /:disabled="accountSaving \|\| passwordGenerating \|\| !creationBindingsComplete" @click="submitForm"/);
 });
 
 test("account drawer uses tenths of G and omits unchanged legacy quota", () => {
@@ -90,4 +91,28 @@ test("strict routing setup requires an explicit selection for every unassigned u
   assert.match(accountPage, /routingBindingUsers\.value\.every\(username => routingBindings\.has\(username\)\)/);
   assert.match(accountPage, /:disabled="!routingBindingsComplete"/);
   assert.match(accountPage, /await bindUnassignedOutboundsApi\(Object\.fromEntries\(routingBindings\)\)/);
+});
+
+test("edit then delete and add starts with a fresh account form", () => {
+  const old = editAccountForm({
+    id: 13, username: "old-user", remark: "old remark", conPass: "unexpected-secret",
+    quota: 200000000, uploadMbps: 3, downloadMbps: 7, expireTime: 123,
+    deviceNo: 2, deleted: 0, role: "user", outbound: "OLD-SOCKS",
+  } as Parameters<typeof editAccountForm>[0]);
+  assert.equal(old.conPass, "");
+  assert.equal(old.outbound, "OLD-SOCKS");
+  old.conPass = "unsaved-generated-password";
+  const fresh = newAccountForm(456);
+  assert.deepEqual(fresh, {
+    username: "", remark: "", conPass: "", quota: 0, uploadMbps: 0, downloadMbps: 0,
+    expireTime: 456, deviceNo: 6, deleted: 0, role: "user", outbound: "",
+  });
+  assert.equal(fresh.id, undefined);
+  assert.match(accountPage, /if \(request !== accountEditorRequest\) return;\s*state\.dataForm = editAccountForm\(data\)/);
+});
+
+test("first bound account creation submits all explicit legacy bindings with the account", () => {
+  assert.match(accountPage, /v-for="username in creationBindingUsers"/);
+  assert.match(accountPage, /creationBindingUsers\.value\.every\(username => !!creationBindings\.get\(username\)\)/);
+  assert.match(accountPage, /await saveAccountApi\(\{[\s\S]*existingBindings: Object\.fromEntries\(creationBindingUsers\.value\.map/);
 });

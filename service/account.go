@@ -31,20 +31,27 @@ func PageAccount(accountPageDto dto.AccountPageDto) ([]entity.Account, int64, er
 }
 
 func SaveAccount(account entity.Account) error {
-	_, err := SaveAccountWithResult(account)
+	_, err := SaveAccountWithResult(account, nil)
 	return err
 }
 
-func SaveAccountWithResult(account entity.Account) (AccountUpdateResult, error) {
+func SaveAccountWithResult(account entity.Account, existingBindings map[string]string) (AccountUpdateResult, error) {
 	result := AccountUpdateResult{}
+	hysteria2ConfigApplyMutex.Lock()
+	defer hysteria2ConfigApplyMutex.Unlock()
+
 	outbound, err := CanonicalAccountOutbound(AccountOutbound(account))
 	if err != nil {
 		return result, err
 	}
 	account.Outbound = &outbound
-
-	hysteria2ConfigApplyMutex.Lock()
-	defer hysteria2ConfigApplyMutex.Unlock()
+	if account.Role == nil {
+		role := "user"
+		account.Role = &role
+	}
+	if len(existingBindings) > 0 && (outbound == "" || *account.Role != "user" || (account.Deleted != nil && *account.Deleted != 0)) {
+		return result, errors.New("creating with existing bindings requires an enabled proxy account with an outbound")
+	}
 	if err := validateBandwidth(account); err != nil {
 		return result, err
 	}
@@ -52,7 +59,15 @@ func SaveAccountWithResult(account entity.Account) (AccountUpdateResult, error) 
 	if err != nil {
 		return result, err
 	}
-	id, err := dao.SaveAccount(account)
+	config, err := GetHysteria2Config()
+	if err != nil {
+		return result, err
+	}
+	changes, previous, err := planAccountOutboundBindings(config, before, existingBindings, &account)
+	if err != nil {
+		return result, err
+	}
+	id, err := dao.CreateAccountWithOutbounds(account, changes)
 	if err != nil {
 		return result, err
 	}
@@ -63,8 +78,11 @@ func SaveAccountWithResult(account entity.Account) (AccountUpdateResult, error) 
 		}
 		return result, nil
 	}
-	if restoreErr := dao.DeleteAccount([]int64{id}); restoreErr != nil {
-		return result, fmt.Errorf("%v; remove new account failed: %w", err, restoreErr)
+	if restoreErr := dao.RestoreAccountCreation(id, previous); restoreErr != nil {
+		return result, fmt.Errorf("%w; restore account creation failed: %v", err, restoreErr)
+	}
+	if len(previous) > 0 {
+		return result, fmt.Errorf("%w; new account removed and previous account bindings restored", err)
 	}
 	return result, fmt.Errorf("%w; new account removed", err)
 }
@@ -243,33 +261,12 @@ func BindUnassignedAccountOutbounds(requested map[string]string) (AccountUpdateR
 	if err != nil {
 		return result, err
 	}
-	after := append([]entity.Account(nil), before...)
-	previous := make(map[int64]string)
-	for i := range after {
-		account := &after[i]
-		if strings.TrimSpace(AccountOutbound(*account)) != "" {
-			continue
-		}
-		username := *account.Username
-		name := strings.TrimSpace(requested[username])
-		if name == "" {
-			return result, fmt.Errorf("select an outbound for account %q", username)
-		}
-		previous[*account.Id] = AccountOutbound(*account)
-		account.Outbound = &name
+	if len(requested) == 0 {
+		return result, errors.New("select outbounds for the unbound accounts")
 	}
-	if len(previous) == 0 || len(previous) != len(requested) {
-		return result, errors.New("the list of unbound accounts has changed; reload and try again")
-	}
-	bindings, err := accountRoutingBindings(config, after)
+	changes, previous, err := planAccountOutboundBindings(config, before, requested, nil)
 	if err != nil {
 		return result, err
-	}
-	changes := make(map[int64]string, len(previous))
-	for _, account := range after {
-		if _, changed := previous[*account.Id]; changed {
-			changes[*account.Id] = bindings[*account.Username]
-		}
 	}
 	if err := dao.UpdateAccountOutbounds(changes); err != nil {
 		return result, err
@@ -282,6 +279,43 @@ func BindUnassignedAccountOutbounds(requested map[string]string) (AccountUpdateR
 		return result, fmt.Errorf("%w; restore account bindings failed: %v", err, restoreErr)
 	}
 	return result, fmt.Errorf("%w; previous account bindings restored", err)
+}
+
+func planAccountOutboundBindings(config bo.Hysteria2ServerConfig, before []entity.Account, requested map[string]string, newAccount *entity.Account) (changes, previous map[int64]string, err error) {
+	after := append([]entity.Account(nil), before...)
+	previous = make(map[int64]string, len(requested))
+	if len(requested) > 0 {
+		for i := range after {
+			account := &after[i]
+			if strings.TrimSpace(AccountOutbound(*account)) != "" {
+				continue
+			}
+			username := *account.Username
+			name := strings.TrimSpace(requested[username])
+			if name == "" {
+				return nil, nil, fmt.Errorf("select an outbound for account %q", username)
+			}
+			previous[*account.Id] = AccountOutbound(*account)
+			account.Outbound = &name
+		}
+		if len(previous) != len(requested) {
+			return nil, nil, errors.New("the list of unbound accounts has changed; reload and try again")
+		}
+	}
+	if newAccount != nil {
+		after = append(after, *newAccount)
+	}
+	bindings, err := accountRoutingBindings(config, after)
+	if err != nil {
+		return nil, nil, err
+	}
+	changes = make(map[int64]string, len(previous))
+	for _, account := range after[:len(before)] {
+		if _, changed := previous[*account.Id]; changed {
+			changes[*account.Id] = bindings[*account.Username]
+		}
+	}
+	return changes, previous, nil
 }
 
 func applyAccountRoutingMutation(before []entity.Account) (AccountUpdateResult, error) {

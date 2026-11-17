@@ -13,16 +13,17 @@ type LoginDto struct {
 }
 
 type AccountSaveDto struct {
-	Username     *string `json:"username" form:"username" validate:"required,min=2,max=32,validateUsername"`
-	ConPass      *string `json:"conPass" form:"conPass" validate:"omitempty,min=6,max=32,validateStr"`
-	Quota        *int64  `json:"quota" form:"quota" validate:"required,min=-1"`
-	ExpireTime   *int64  `json:"expireTime" form:"expireTime" validate:"required,min=0"`
-	DeviceNo     *int64  `json:"deviceNo" form:"deviceNo" validate:"required,min=1"`
-	Deleted      *int64  `json:"deleted" form:"deleted" validate:"required,oneof=0 1"`
-	Remark       *string `json:"remark" form:"remark" validate:"omitempty,min=0,max=32"`
-	UploadMbps   *int64  `json:"uploadMbps" form:"uploadMbps" validate:"omitempty,min=0,max=100000"`
-	DownloadMbps *int64  `json:"downloadMbps" form:"downloadMbps" validate:"omitempty,min=0,max=100000"`
-	Outbound     *string `json:"outbound" form:"outbound" validate:"omitempty,max=64"`
+	Username         *string           `json:"username" form:"username" validate:"required,min=2,max=32,validateUsername"`
+	ConPass          *string           `json:"conPass" form:"conPass" validate:"omitempty,min=6,max=32,validateStr"`
+	Quota            *int64            `json:"quota" form:"quota" validate:"required,min=-1"`
+	ExpireTime       *int64            `json:"expireTime" form:"expireTime" validate:"required,min=0"`
+	DeviceNo         *int64            `json:"deviceNo" form:"deviceNo" validate:"required,min=1"`
+	Deleted          *int64            `json:"deleted" form:"deleted" validate:"required,oneof=0 1"`
+	Remark           *string           `json:"remark" form:"remark" validate:"omitempty,min=0,max=32"`
+	UploadMbps       *int64            `json:"uploadMbps" form:"uploadMbps" validate:"omitempty,min=0,max=100000"`
+	DownloadMbps     *int64            `json:"downloadMbps" form:"downloadMbps" validate:"omitempty,min=0,max=100000"`
+	Outbound         *string           `json:"outbound" form:"outbound" validate:"omitempty,max=64"`
+	ExistingBindings map[string]string `json:"existingBindings" validate:"omitempty,dive,required,max=64"`
 }
 
 type AccountUpdateDto struct {
