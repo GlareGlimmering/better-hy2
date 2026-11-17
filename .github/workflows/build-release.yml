@@ -184,7 +184,7 @@ jobs:
           done < <(find frontend/dist/assets -type f -name '_*' -print)
 
       - name: Exercise uninstall on the disposable systemd runner
-        if: github.ref == 'refs/heads/feat/account-bandwidth-controls'
+        if: steps.release-tag.outputs.paired == 'true' || github.ref == 'refs/heads/feat/account-bandwidth-controls' || github.ref == 'refs/heads/feat/acme-worker'
         run: sudo --preserve-env=GITHUB_ACTIONS,RUNNER_ENVIRONMENT bash scripts/test-systemd-uninstall.sh "$PWD/build/$BINARY_NAME"
 
       - name: Refuse environment-specific release contamination

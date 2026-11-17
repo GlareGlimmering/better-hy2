@@ -61,8 +61,8 @@ Use your own public IP and install only the public CA certificate on clients. Th
 | Follow service logs | `sudo journalctl -u h-ui.service -f` |
 | Follow HY2 request logs | `sudo tail -F /var/lib/hui/hy2_access.log` |
 | Restart the panel and its managed child process | `sudo systemctl restart h-ui.service` |
-| Uninstall, keeping existing data | `sudo hui uninstall` |
-| Inspect the complete-removal plan | `sudo hui uninstall --purge` |
+| Uninstall and remove standard installation data | `sudo hui uninstall` |
+| Uninstall with the legacy confirmation word | `sudo hui uninstall --purge` |
 
 Use **HY2 Management** to start, stop or restart the HY2 child only. The uninstall command lists the paths and asks for confirmation before making changes.
 

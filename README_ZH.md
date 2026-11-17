@@ -61,8 +61,8 @@ socks5:
 | 跟踪服务日志 | `sudo journalctl -u h-ui.service -f` |
 | 跟踪 HY2 请求日志 | `sudo tail -F /var/lib/hui/hy2_access.log` |
 | 重启面板及其受管子进程 | `sudo systemctl restart h-ui.service` |
-| 卸载面板并保留数据 | `sudo hui uninstall` |
-| 查看完整清除计划 | `sudo hui uninstall --purge` |
+| 卸载并清除标准安装数据 | `sudo hui uninstall` |
+| 卸载（旧确认词） | `sudo hui uninstall --purge` |
 
 单独启停或重启 HY2，请在 **HY 管理** 操作。CLI 卸载会先列出路径并要求确认。
 
