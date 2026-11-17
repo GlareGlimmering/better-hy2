@@ -128,6 +128,7 @@ export default {
     boundUsers: "已绑定用户",
     kernelVersion: "内核版本",
     bindUnassigned: "绑定未分配账号",
+    bindUnassignedOnCreate: "请同时为以下未绑定的启用账号选择出站。保存时会一并创建新账号、应用这些绑定，HY2 可能短暂重启。",
     bindUnassignedHelp: "严格路由需要给每个启用的账号明确指定出站。请在账户列表的「绑定未分配账号」中一次性保存。应用时可能会短暂重启 HY2。",
     unboundUsers: "未绑定用户",
     trafficUsed: "已使用流量",

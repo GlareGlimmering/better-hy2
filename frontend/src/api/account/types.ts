@@ -35,6 +35,7 @@ export interface AccountSaveDto {
   deleted: number;
   remark: string;
   outbound: string;
+  existingBindings?: Record<string, string>;
 }
 
 export interface AccountLoginDto {
@@ -77,7 +78,7 @@ export interface AccountInfo {
   roles: string[];
 }
 
-export interface AccountForm extends IdDto {
+export interface AccountForm extends Partial<IdDto> {
   username: string;
   conPass: string;
   quota: number;

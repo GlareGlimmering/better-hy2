@@ -202,16 +202,13 @@
       class="account-drawer"
       append-to-body
       destroy-on-close
-      :close-on-click-modal="true"
-      @close="closeDialog"
+      :close-on-click-modal="!accountSaving"
+      :close-on-press-escape="!accountSaving"
+      :show-close="!accountSaving"
     >
       <el-form
         ref="dataFormRef"
-        :rules="
-          dialog.title === t('common.add')
-            ? dataFormAddRules
-            : dataFormUpdateRules
-        "
+        :rules="dataForm.id === undefined ? dataFormAddRules : dataFormUpdateRules"
         :model="dataForm"
         label-position="top"
       >
@@ -279,13 +276,26 @@
             </el-button>
           </div>
           <div v-else class="form-tip">{{ $t("account.outboundTip") }}</div>
-          <div v-if="dataForm.outbound && routingStatus.unboundUsers.some(user => user !== dataForm.username)" class="form-tip">
+          <div v-if="dataForm.id !== undefined && dataForm.outbound && routingStatus.unboundUsers.some(user => user !== dataForm.username)" class="form-tip">
             {{ $t("account.bindUnassignedHelp") }}
           </div>
           <el-alert v-if="outboundOptionsFailed" type="error" :closable="false" :title="$t('account.outboundLoadFailed')" />
           <el-alert v-else-if="!outboundOptionsLoading && unavailableBinding" type="warning" :closable="false" :title="$t('account.outboundBindingUnavailable', { name: dataForm.outbound })" />
           <div v-if="outboundExcludedCount > 0" class="form-tip">{{ $t('account.outboundHistoricalExcluded') }}</div>
         </el-form-item>
+        <template v-if="creationBindingUsers.length">
+          <p class="form-tip">{{ $t("account.bindUnassignedOnCreate") }}</p>
+          <el-form-item v-for="username in creationBindingUsers" :key="username" :label="username" required>
+            <el-select
+              :model-value="creationBindings.get(username)"
+              :placeholder="$t('account.unbound')"
+              style="width: 100%"
+              @update:model-value="creationBindings.set(username, $event)"
+            >
+              <el-option v-for="item in outboundOptions" :key="item.name" :label="item.name" :value="item.name" />
+            </el-select>
+          </el-form-item>
+        </template>
         <el-form-item :label="$t('account.quota')" prop="quota">
           <el-switch
             v-model="unlimitedQuota"
@@ -362,8 +372,8 @@
       </div>
       <template #footer>
         <div class="drawer-footer">
-          <el-button @click="closeDialog">{{ $t("common.cancel") }}</el-button>
-          <el-button type="primary" :loading="accountSaving" :disabled="accountSaving || passwordGenerating" @click="submitForm">{{ $t("common.save") }}</el-button>
+          <el-button :disabled="accountSaving" @click="closeDialog">{{ $t("common.cancel") }}</el-button>
+          <el-button type="primary" :loading="accountSaving" :disabled="accountSaving || passwordGenerating || !creationBindingsComplete" @click="submitForm">{{ $t("common.save") }}</el-button>
         </div>
       </template>
     </el-drawer>
@@ -440,9 +450,7 @@ export default {
 
 <script setup lang="ts">
 import {
-  AccountForm,
   AccountPageDto,
-  AccountUpdateDto,
   AccountVo,
   KickAccountForm,
 } from "@/api/account/types";
@@ -486,10 +494,10 @@ import {
 } from "@/api/hysteria2/types";
 import copy from "copy-to-clipboard";
 import { useRouter } from "vue-router";
+import { editAccountForm, newAccountForm } from "./account-form";
 import {
   AccountOutboundOption,
   buildAccountOutboundFormState,
-  newAccountOutboundFields,
   hasUnavailableBinding,
 } from "./outbound-form";
 
@@ -640,15 +648,7 @@ const state = reactive({
   dialogKick: {
     visible: false,
   } as DialogType,
-  dataForm: {
-    quota: 0,
-    uploadMbps: 0,
-    downloadMbps: 0,
-    expireTime: getMonthLater(),
-    deviceNo: 6,
-    deleted: 0,
-    ...newAccountOutboundFields(),
-  } as AccountForm,
+  dataForm: newAccountForm(getMonthLater()),
   kickForm: {
     kickUtilTime: getHourLater(),
   } as KickAccountForm,
@@ -723,19 +723,17 @@ const drawerAccount = computed(() =>
 );
 const unavailableBinding = computed(() => hasUnavailableBinding(state.outboundOptions, state.dataForm.outbound));
 
-const resetDataForm = () => {
-  Object.assign(state.dataForm, {
-    id: undefined,
-    quota: 0,
-    uploadMbps: 0,
-    downloadMbps: 0,
-    expireTime: getMonthLater(),
-    deleted: 0,
-    ...newAccountOutboundFields(),
-  });
-  quotaTmp.value = 0;
-  unlimitedQuota.value = false;
-};
+const creationBindings = reactive(new Map<string, string>());
+const creationBindingUsers = computed(() =>
+  state.dataForm.id === undefined && state.dataForm.deleted === 0 && state.dataForm.outbound
+    ? state.routingStatus.unboundUsers
+    : []
+);
+const creationBindingsComplete = computed(() =>
+  creationBindingUsers.value.every(username => !!creationBindings.get(username))
+);
+
+let accountEditorRequest = 0;
 
 const loadOutboundOptions = (): Promise<void> => {
   if (outboundOptionsRequest) return outboundOptionsRequest;
@@ -839,23 +837,28 @@ const generatePassword = async () => {
 };
 
 const handleAdd = async () => {
-  resetDataForm();
-  await loadOutboundOptions();
+  const request = ++accountEditorRequest;
+  await Promise.all([loadOutboundOptions(), loadRoutingStatus().catch(() => {})]);
+  if (request !== accountEditorRequest) return;
+  state.dataForm = newAccountForm(getMonthLater());
+  creationBindings.clear();
+  quotaTmp.value = 0;
+  unlimitedQuota.value = false;
   state.dialog = {
     title: t("common.add"),
     visible: true,
   };
-  if (!state.dataForm.conPass) void generatePassword();
+  void generatePassword();
 };
 
 /**
  * 修改
  **/
-const handleUpdate = async (row: { [key: string]: any }) => {
-  await loadOutboundOptions();
-  const id = row.id;
-  const { data } = await getAccountApi({ id: id });
-  Object.assign(state.dataForm, data);
+const handleUpdate = async (row: AccountVo) => {
+  const request = ++accountEditorRequest;
+  const [, { data }] = await Promise.all([loadOutboundOptions(), getAccountApi({ id: row.id })]);
+  if (request !== accountEditorRequest) return;
+  state.dataForm = editAccountForm(data);
   const input = quotaInput(data.quota);
   unlimitedQuota.value = input < 0;
   quotaTmp.value = Math.max(0, input);
@@ -869,8 +872,9 @@ const handleUpdate = async (row: { [key: string]: any }) => {
  * 表单提交
  */
 const submitForm = async () => {
+  const request = accountEditorRequest;
   const valid = await dataFormRef.value?.validate().catch(() => false);
-  if (!valid || passwordGenerating.value || accountSaving.value) return;
+  if (!valid || request !== accountEditorRequest || passwordGenerating.value || accountSaving.value || !creationBindingsComplete.value) return;
   const quotaValue = unlimitedQuota.value ? -1 : quotaTmp.value;
   const unchangedQuota = state.dataForm.id && quotaValue === quotaInput(state.dataForm.quota);
   const quota = unchangedQuota ? undefined : quotaInputBytes(quotaValue);
@@ -880,12 +884,16 @@ const submitForm = async () => {
   }
   accountSaving.value = true;
   try {
-    const { uploadMbps, downloadMbps, ...fields } = state.dataForm;
-    const bandwidth = state.dataForm.role === "admin" ? {} : { uploadMbps, downloadMbps };
-    const accountUpdateDto: AccountUpdateDto = { ...fields, ...bandwidth, quota };
-    const { data } = state.dataForm.id
-      ? await updateAccountApi(accountUpdateDto)
-      : await saveAccountApi({ ...fields, ...bandwidth, quota: quota! });
+    const { id, role, uploadMbps, downloadMbps, ...fields } = state.dataForm;
+    const bandwidth = role === "admin" ? {} : { uploadMbps, downloadMbps };
+    const { data } = id !== undefined
+      ? await updateAccountApi({ ...fields, ...bandwidth, id, quota })
+      : await saveAccountApi({
+          ...fields,
+          ...bandwidth,
+          quota: quota!,
+          existingBindings: Object.fromEntries(creationBindingUsers.value.map(username => [username, creationBindings.get(username)!])),
+        });
     if (data.outboundChanged && !data.runtimeApplied) {
       ElMessage.warning(t("account.outboundSavedHy2Stopped"));
     } else if (data.bandwidthStatus && data.bandwidthStatus !== "applied" && (uploadMbps || downloadMbps || data.bandwidthStatus === "unconfirmed")) {
@@ -895,6 +903,10 @@ const submitForm = async () => {
     }
     closeDialog();
     await Promise.all([handleQuery(), loadRoutingStatus()]);
+  } catch {
+    // The API interceptor reports the error. Refresh accounts needing a binding
+    // while keeping the current form and choices available for retry.
+    await loadRoutingStatus().catch(() => {});
   } finally {
     accountSaving.value = false;
   }
@@ -999,17 +1011,18 @@ const confirmReleaseKickWithPrompt = (row: { [key: string]: any }) => {
  * 关闭用户弹窗
  */
 const closeDialog = () => {
+  dialog.value.visible = false;
+};
+
+watch(() => dialog.value.visible, visible => {
+  if (visible) return;
+  accountEditorRequest++;
   passwordRequest++;
   passwordGenerating.value = false;
   passwordVisible.value = false;
-  dialog.value.visible = false;
-  dataFormRef.value?.resetFields();
-  dataFormRef.value?.clearValidate();
-
-  if (dialog.value.title == t("common.update")) {
-    resetDataForm();
-  }
-};
+  state.dataForm = newAccountForm(getMonthLater());
+  creationBindings.clear();
+}, { flush: "sync" });
 
 /**
  * 关闭下线弹窗

@@ -45,10 +45,10 @@ test("account create and edit share a responsive drawer", () => {
 });
 
 test("account drawer dismisses without saving", () => {
-  assert.match(accounts, /:close-on-click-modal="true"/);
-  assert.match(accounts, /@close="closeDialog"/);
+  assert.match(accounts, /:close-on-click-modal="!accountSaving"/);
+  assert.match(accounts, /watch\(\(\) => dialog\.value\.visible/);
   const close = accounts.slice(accounts.indexOf("const closeDialog ="), accounts.indexOf("const closeDialogKick ="));
-  assert.match(close, /resetFields/);
+  assert.match(close, /state\.dataForm = newAccountForm\(getMonthLater\(\)\)/);
   assert.doesNotMatch(close, /saveAccountApi|updateAccountApi|submitForm/);
 });
 

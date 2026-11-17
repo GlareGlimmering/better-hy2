@@ -4,19 +4,11 @@ import test from "node:test";
 
 import {
   buildAccountOutboundFormState,
-  newAccountOutboundFields,
   hasUnavailableBinding,
 } from "../src/views/account/list/outbound-form.ts";
 
 const direct = { name: "DIRECT", type: "direct" };
 const socks5 = { name: "TEST_VLESS", type: "socks5" };
-
-test("new accounts start as unbound regular users", () => {
-  assert.deepEqual(newAccountOutboundFields(), {
-    outbound: "",
-    role: "user",
-  });
-});
 
 test("account dialog always renders the outbound field", () => {
   const component = readFileSync(
@@ -42,7 +34,7 @@ test("edit form preserves an existing account binding", () => {
     "utf8"
   );
   assert.match(component, /v-model="dataForm\.outbound"/);
-  assert.match(component, /Object\.assign\(state\.dataForm, data\)/);
+  assert.match(component, /state\.dataForm = editAccountForm\(data\)/);
 });
 
 test("new and edit forms stay visible without outbounds", () => {
@@ -89,8 +81,8 @@ test("selector fetches authoritative options on each open and clears failed stal
   const component = readFileSync(new URL("../src/views/account/list/index.vue", import.meta.url), "utf8");
   assert.match(component, /@visible-change="refreshOutboundOptions"/);
   assert.match(component, /if \(visible\) void loadOutboundOptions\(\)/);
-  assert.match(component, /const handleAdd = async[\s\S]*await loadOutboundOptions\(\)/);
-  assert.match(component, /const handleUpdate = async[\s\S]*await loadOutboundOptions\(\)/);
+  assert.match(component, /const handleAdd = async[\s\S]*await Promise\.all\(\[loadOutboundOptions\(\)/);
+  assert.match(component, /const handleUpdate = async[\s\S]*await Promise\.all\(\[loadOutboundOptions\(\)/);
   assert.match(component, /catch \{\s*state\.outboundOptions = \[\]/);
   assert.match(component, /outboundBindingUnavailable/);
 });
