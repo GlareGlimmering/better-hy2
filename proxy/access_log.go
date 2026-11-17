@@ -29,6 +29,7 @@ type hysteriaEvent struct {
 	ReqAddr   string  `json:"reqAddr"`
 	SessionID *uint32 `json:"sessionID"`
 	Error     string  `json:"error"`
+	Outbound  string  `json:"outbound"`
 }
 
 type udpSessionKey struct {
@@ -132,10 +133,14 @@ func (l *accessLogger) consume(raw string) {
 		return
 	}
 
-	line := fmt.Sprintf("%s from %s %s %s:%s [HY2_IN -> DIRECT] user: %s",
+	outbound := strings.TrimSpace(event.Outbound)
+	if outbound == "" {
+		outbound = "UNKNOWN"
+	}
+	line := fmt.Sprintf("%s from %s %s %s:%s [HY2_IN -> %s] user: %s",
 		l.now().Format("2006/01/02 15:04:05.000000"),
 		sanitizeAccessField(event.Addr), result, protocol,
-		sanitizeAccessField(target), sanitizeAccessField(event.ID))
+		sanitizeAccessField(target), sanitizeAccessField(outbound), sanitizeAccessField(event.ID))
 	if event.Error != "" && result == "error" {
 		line += " error: " + sanitizeAccessField(event.Error)
 	}

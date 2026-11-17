@@ -33,7 +33,7 @@ func readAccessLog(t *testing.T, path string) string {
 
 func TestAccessLoggerTCPRequestUsesRealEventFields(t *testing.T) {
 	l, path := fixedAccessLogger(t)
-	l.consume(`{"level":"debug","msg":"TCP request","addr":"1.83.222.29:26220","id":"alice","reqAddr":"4.213.25.240:443"}`)
+	l.consume(`{"level":"debug","msg":"TCP request","addr":"1.83.222.29:26220","id":"alice","reqAddr":"4.213.25.240:443","outbound":"DIRECT"}`)
 
 	got := readAccessLog(t, path)
 	want := "2026/10/31 12:05:31.870371 from 1.83.222.29:26220 requested tcp:4.213.25.240:443 [HY2_IN -> DIRECT] user: alice\n"
@@ -47,7 +47,7 @@ func TestAccessLoggerParsesHysteriaConsoleEvent(t *testing.T) {
 	l.consume("2026-10-31T20:36:02+08:00\tWARN\tTCP error\t{\"addr\":\"1.83.222.29:26220\",\"id\":\"claude\",\"reqAddr\":\"4.213.25.240:443\",\"error\":\"dial tcp4 4.213.25.240:443: i/o timeout\"}")
 
 	got := readAccessLog(t, path)
-	if !strings.Contains(got, "error tcp:4.213.25.240:443 [HY2_IN -> DIRECT] user: claude") ||
+	if !strings.Contains(got, "error tcp:4.213.25.240:443 [HY2_IN -> UNKNOWN] user: claude") ||
 		!strings.Contains(got, "error: dial tcp4 4.213.25.240:443: i/o timeout") {
 		t.Fatalf("unexpected console event access log: %s", got)
 	}
@@ -58,7 +58,7 @@ func TestAccessLoggerParsesHUIWrappedConsoleEvent(t *testing.T) {
 	l.consume(`{"level":"error","msg":"2026-10-31T20:36:02+08:00\tDEBUG\tTCP request\t{\"addr\":\"1.83.222.29:26220\",\"id\":\"claude\",\"reqAddr\":\"example.com:443\"}"}`)
 
 	got := readAccessLog(t, path)
-	if !strings.Contains(got, "requested tcp:example.com:443 [HY2_IN -> DIRECT] user: claude") {
+	if !strings.Contains(got, "requested tcp:example.com:443 [HY2_IN -> UNKNOWN] user: claude") {
 		t.Fatalf("unexpected wrapped console event access log: %s", got)
 	}
 }
@@ -91,12 +91,12 @@ func TestAccessLoggerInitializeReportsFailure(t *testing.T) {
 
 func TestAccessLoggerUDPIPv6AndSessionCorrelation(t *testing.T) {
 	l, path := fixedAccessLogger(t)
-	l.consume(`{"level":"debug","msg":"UDP request","addr":"[2001:db8::1]:26221","id":"bob","sessionID":17,"reqAddr":"[2606:4700:4700::1111]:53"}`)
-	l.consume(`{"level":"warn","msg":"UDP error","addr":"[2001:db8::1]:26221","id":"bob","sessionID":17,"error":"network unreachable"}`)
+	l.consume(`{"level":"debug","msg":"UDP request","addr":"[2001:db8::1]:26221","id":"bob","sessionID":17,"outbound":"HOME_PROXY","reqAddr":"[2606:4700:4700::1111]:53"}`)
+	l.consume(`{"level":"warn","msg":"UDP error","addr":"[2001:db8::1]:26221","id":"bob","sessionID":17,"outbound":"HOME_PROXY","error":"network unreachable"}`)
 
 	got := readAccessLog(t, path)
-	if !strings.Contains(got, "requested udp:[2606:4700:4700::1111]:53") ||
-		!strings.Contains(got, "error udp:[2606:4700:4700::1111]:53") ||
+	if !strings.Contains(got, "requested udp:[2606:4700:4700::1111]:53 [HY2_IN -> HOME_PROXY]") ||
+		!strings.Contains(got, "error udp:[2606:4700:4700::1111]:53 [HY2_IN -> HOME_PROXY]") ||
 		!strings.Contains(got, "user: bob error: network unreachable") {
 		t.Fatalf("unexpected UDP access log:\n%s", got)
 	}
@@ -136,7 +136,7 @@ func TestAccessLoggerConcurrentWrites(t *testing.T) {
 	if len(lines) != count {
 		t.Fatalf("line count = %d, want %d", len(lines), count)
 	}
-	format := regexp.MustCompile(`^2026/10/31 12:05:31\.870371 from .+ requested tcp:example\.com:443 \[HY2_IN -> DIRECT\] user: user-\d+$`)
+	format := regexp.MustCompile(`^2026/10/31 12:05:31\.870371 from .+ requested tcp:example\.com:443 \[HY2_IN -> UNKNOWN\] user: user-\d+$`)
 	for _, line := range lines {
 		if !format.MatchString(line) {
 			t.Fatalf("malformed concurrent line: %q", line)
@@ -180,5 +180,14 @@ func TestAccessLoggerRotates(t *testing.T) {
 	}
 	if len(matches) == 0 {
 		t.Fatal("expected at least one rotated access log")
+	}
+}
+
+func TestAccessLoggerUDPClosedUsesKernelOutbound(t *testing.T) {
+	l, path := fixedAccessLogger(t)
+	l.consume(`{"msg":"UDP request","addr":"192.0.2.10:5557","id":"test-user","sessionID":4,"reqAddr":"203.0.113.5:443","outbound":"HOME_PROXY"}`)
+	l.consume(`{"msg":"UDP closed","addr":"192.0.2.10:5557","id":"test-user","sessionID":4,"outbound":"HOME_PROXY"}`)
+	if got := readAccessLog(t, path); !strings.Contains(got, "closed udp:203.0.113.5:443 [HY2_IN -> HOME_PROXY] user: test-user") {
+		t.Fatalf("unexpected UDP closed access log: %s", got)
 	}
 }
