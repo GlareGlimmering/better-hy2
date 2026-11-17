@@ -2,7 +2,7 @@
 
 Better HY2 manages a Hysteria2 server, proxy accounts, and outbound nodes from a web panel. A single VPS can serve the panel and subscriptions through a Cloudflare Tunnel while HY2 clients connect directly over UDP.
 
-[中文](README_ZH.md) · [Download v2.0.1](https://github.com/GlareGlimmering/better-hy2/releases/tag/v2.0.1) · [Operations guide](docs/OPERATIONS.md)
+[中文](README_ZH.md) · [Download v2.1.0](https://github.com/GlareGlimmering/better-hy2/releases/tag/v2.1.0) · [Operations guide](docs/OPERATIONS.md)
 
 ## What we added
 
@@ -11,14 +11,14 @@ Better HY2 manages a Hysteria2 server, proxy accounts, and outbound nodes from a
 - **Panel security.** Administrator credentials are separate from HY2 accounts. The panel uses salted Argon2id, login rate limits, trusted-proxy configuration and session revocation on password change. HY2 authentication uses a private loopback listener. Subscription links remain usable and their responses request no caching.
 - **Operations.** Manage HY2, configure TLS, inspect system and access logs, and use CLI installation, checked updates, backups and uninstall. The panel ships with its tested kernel and a compatibility manifest.
 
-## Install v2.0.1
+## Install v2.1.0
 
 Use a **Linux AMD64** host with **systemd**, Bash, curl, coreutils and root privileges. The installer checks the panel version and checksums and installs the paired kernel. On a fresh installation it prints a random panel login once. Xray is optional.
 
 ```bash
 installer=$(mktemp) &&
-curl -fsSL https://github.com/GlareGlimmering/better-hy2/releases/download/v2.0.1/install.sh -o "$installer" &&
-sudo bash "$installer" --version v2.0.1
+curl -fsSL https://github.com/GlareGlimmering/better-hy2/releases/download/v2.1.0/install.sh -o "$installer" &&
+sudo bash "$installer" --version v2.1.0
 ```
 
 The standard panel listens on `http://127.0.0.1:8000`. The installer leaves the firewall and proxy configuration to you.
@@ -56,7 +56,7 @@ Use your own public IP and install only the public CA certificate on clients. Th
 | Show the installed kernel and capabilities | `/usr/local/h-ui/bin/hysteria-linux-amd64 version --json` |
 | Recover administrator access | `sudo hui reset` |
 | Update an installed v2 release within the stable v2 series | `sudo hui update` |
-| Choose an exact v2 version | `sudo hui update v2.0.1` |
+| Choose an exact v2 version | `sudo hui update v2.1.0` |
 | Check the panel service | `systemctl status h-ui.service --no-pager` |
 | Follow service logs | `sudo journalctl -u h-ui.service -f` |
 | Follow HY2 request logs | `sudo tail -F /var/lib/hui/hy2_access.log` |
@@ -66,13 +66,13 @@ Use your own public IP and install only the public CA certificate on clients. Th
 
 Use **HY2 Management** to start, stop or restart the HY2 child only. The uninstall command lists the paths and asks for confirmation before making changes.
 
-## Upgrade to v2.0.1
+## Upgrade to v2.1.0
 
-- **Already on v2, including v2.0.1-rc.1:** Run `sudo hui update v2.0.1`. The updater verifies the installed kernel against the release pair before restarting the service.
+- **Already on v2 with the matching kernel**, including v2.0.2-rc.4: Run `sudo hui update v2.1.0`. The updater checks the installed kernel's SHA256 before restarting the service. A mismatch stops the update before service downtime.
 - **Official v1.0.0 with v2.13.0-hui.4:** Use the explicit [v1 maintenance-window migration](docs/OPERATIONS.md#explicit-migration-from-v100-to-a-v2-release). The legacy GitHub Latest pointer remains on v1 so its old updater selects a compatible release.
 - **Moving to a lower major version:** The current updater and installer reject this before downloading the candidate or stopping the service. Recovery from a failed activation uses the matching executable and database snapshot. Old installers and manual file replacement run outside this guard.
 
-v2.0.1 pairs with the exact `v2.13.0-hui.5-dev` build in the Release (Traffic Stats protocol 2 and bandwidth capability 1). The kernel version retains the suffix used by the tested RCs. Keep older panel binaries paired with their pre-upgrade databases when rolling back. [Backup and recovery](docs/OPERATIONS.md#update-backup-and-recovery)
+v2.1.0 pairs with the exact `v2.13.0-hui.6-dev` build in the Release (Traffic Stats protocol 2 and bandwidth capability 1). The kernel version retains the suffix used by the tested RCs. Keep older panel binaries paired with their pre-upgrade databases when rolling back. [Backup and recovery](docs/OPERATIONS.md#update-backup-and-recovery)
 
 ## Build and credits
 
@@ -85,7 +85,7 @@ pnpm run test:unit
 pnpm run build:prod
 cd ..
 go test ./...
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-X h-ui/model/constant.Version=v2.0.1" -o h-ui-linux-amd64 .
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-X h-ui/model/constant.Version=v2.1.0" -o h-ui-linux-amd64 .
 ```
 
 Based on [H UI](https://github.com/jonssonyan/h-ui), with [Hysteria](https://github.com/apernet/hysteria) and [Xray-core](https://github.com/XTLS/Xray-core). [GPL-3.0](LICENSE) · [Third-party notices](THIRD_PARTY_NOTICES.md) · [Acceptance records](docs/ACCEPTANCE_ZH.md)

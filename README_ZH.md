@@ -2,7 +2,7 @@
 
 Better HY2 是用于管理 Hysteria2 服务、代理账户和出站节点的面板。面板和订阅可以经 Cloudflare Tunnel 提供 HTTPS，HY2 客户端直接通过 UDP 连接 VPS。
 
-[English](README.md) · [下载 v2.0.1](https://github.com/GlareGlimmering/better-hy2/releases/tag/v2.0.1) · [运维文档](docs/OPERATIONS_ZH.md)
+[English](README.md) · [下载 v2.1.0](https://github.com/GlareGlimmering/better-hy2/releases/tag/v2.1.0) · [运维文档](docs/OPERATIONS_ZH.md)
 
 ## 做了什么
 
@@ -11,14 +11,14 @@ Better HY2 是用于管理 Hysteria2 服务、代理账户和出站节点的面�
 - **面板安全**。管理员与代理账户独立，使用带盐 Argon2id、登录限流、可信反代和改密后会话撤销。HY2 认证回调使用独立的本机入口，原有订阅地址可继续使用，订阅响应要求禁用缓存。
 - **部署与排查**。从面板管理 HY2 与 TLS，查阅内核日志、访问日志和流量数据。CLI 支持安装、校验升级、快照回退和卸载。Release 提供经过配套验证的内核及兼容清单。
 
-## 安装 v2.0.1
+## 安装 v2.1.0
 
 需要 **Linux AMD64**、**systemd**、Bash、curl、coreutils 和 root 权限。安装器校验面板版本与制品哈希，并安装配套内核。全新安装会输出一次随机管理员凭据。使用 DIRECT 无需安装 Xray。
 
 ```bash
 installer=$(mktemp) &&
-curl -fsSL https://github.com/GlareGlimmering/better-hy2/releases/download/v2.0.1/install.sh -o "$installer" &&
-sudo bash "$installer" --version v2.0.1
+curl -fsSL https://github.com/GlareGlimmering/better-hy2/releases/download/v2.1.0/install.sh -o "$installer" &&
+sudo bash "$installer" --version v2.1.0
 ```
 
 标准安装的面板监听 `http://127.0.0.1:8000`。反代和防火墙由操作者设置。
@@ -56,7 +56,7 @@ socks5:
 | 查看内核版本和能力 | `/usr/local/h-ui/bin/hysteria-linux-amd64 version --json` |
 | 本机恢复管理员访问 | `sudo hui reset` |
 | 更新现有 v2 到同系列正式版 | `sudo hui update` |
-| 指定 v2 版本 | `sudo hui update v2.0.1` |
+| 指定 v2 版本 | `sudo hui update v2.1.0` |
 | 查看面板服务状态 | `systemctl status h-ui.service --no-pager` |
 | 跟踪服务日志 | `sudo journalctl -u h-ui.service -f` |
 | 跟踪 HY2 请求日志 | `sudo tail -F /var/lib/hui/hy2_access.log` |
@@ -66,13 +66,13 @@ socks5:
 
 单独启停或重启 HY2，请在 **HY 管理** 操作。CLI 卸载会先列出路径并要求确认。
 
-## 升级到 v2.0.1
+## 升级到 v2.1.0
 
-- **已运行 v2，包括 v2.0.1-rc.1**：执行 `sudo hui update v2.0.1`。更新器会核对已安装内核与目标配套清单，再重启服务。
+- **已运行 v2 且内核匹配**，包括 v2.0.2-rc.4：执行 `sudo hui update v2.1.0`。更新器在重启服务前核对已安装内核的 SHA256。哈希不一致时会在停服务前退出。
 - **官方 v1.0.0 与 v2.13.0-hui.4**：按[显式迁移流程](docs/OPERATIONS_ZH.md#从-v100-显式迁移到-v2)操作。GitHub 的旧 Latest 入口继续供 v1 更新器使用。
 - **回退到较低主版本**：新版更新器和安装器会在下载目标程序和停止服务前拒绝。升级失败时仍可用原程序及对应数据库快照恢复。旧版安装脚本和手工替换文件不受新版命令约束。
 
-v2.0.1 配套的是 Release 中精确构建的 `v2.13.0-hui.5-dev`，支持 Traffic Stats 协议 2 和账号限速能力 1。内核版本沿用已测试 RC 的标识。[备份和恢复](docs/OPERATIONS_ZH.md)
+v2.1.0 配套的是 Release 中精确构建的 `v2.13.0-hui.6-dev`，支持 Traffic Stats 协议 2 和账号限速能力 1。内核版本沿用已测试 RC 的标识。[备份和恢复](docs/OPERATIONS_ZH.md)
 
 ## 构建与致谢
 
@@ -85,7 +85,7 @@ pnpm run test:unit
 pnpm run build:prod
 cd ..
 go test ./...
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-X h-ui/model/constant.Version=v2.0.1" -o h-ui-linux-amd64 .
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-X h-ui/model/constant.Version=v2.1.0" -o h-ui-linux-amd64 .
 ```
 
 基于 [H UI](https://github.com/jonssonyan/h-ui)，感谢 [Hysteria](https://github.com/apernet/hysteria) 和 [Xray-core](https://github.com/XTLS/Xray-core) 贡献者。[GPL-3.0](LICENSE) · [第三方许可说明](THIRD_PARTY_NOTICES.md) · [验收记录](docs/ACCEPTANCE_ZH.md)
