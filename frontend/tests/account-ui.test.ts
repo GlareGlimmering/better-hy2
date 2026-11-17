@@ -83,3 +83,11 @@ test("pending password change stays on login without storing a session", () => {
   assert.match(login, /if \(!signedIn\) \{\s*passwordChangeRequired\.value = true;\s*changingPassword\.value = true;\s*return;/);
   assert.match(store, /if \(data\.passwordChangeRequired\) \{\s*resetToken\(\);\s*return false;/);
 });
+
+test("strict routing setup requires an explicit selection for every unassigned user", () => {
+  assert.match(accountPage, /v-for="username in routingBindingUsers"/);
+  assert.match(accountPage, /routingBindings\.clear\(\);/);
+  assert.match(accountPage, /routingBindingUsers\.value\.every\(username => routingBindings\.has\(username\)\)/);
+  assert.match(accountPage, /:disabled="!routingBindingsComplete"/);
+  assert.match(accountPage, /await bindUnassignedOutboundsApi\(Object\.fromEntries\(routingBindings\)\)/);
+});

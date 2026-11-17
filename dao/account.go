@@ -74,6 +74,24 @@ func UpdateAccount(ids []int64, updates map[string]interface{}) error {
 	return nil
 }
 
+// UpdateAccountOutbounds changes a set of active proxy bindings in one transaction.
+func UpdateAccountOutbounds(bindings map[int64]string) error {
+	return sqliteDB.Transaction(func(tx *gorm.DB) error {
+		for id, outbound := range bindings {
+			update := tx.Model(&entity.Account{}).
+				Where("id = ? and role = ? and deleted = 0", id, "user").
+				Updates(map[string]interface{}{
+					"outbound":    outbound,
+					"update_time": time.Now().Format("2006-01-02 15:04:05"),
+				})
+			if update.Error != nil || update.RowsAffected != 1 {
+				return errors.New("could not update account outbound bindings")
+			}
+		}
+		return nil
+	})
+}
+
 func UpdateAccountTraffic(username string, download int64, upload int64) error {
 	if upload != 0 || download != 0 {
 		updates := map[string]interface{}{}

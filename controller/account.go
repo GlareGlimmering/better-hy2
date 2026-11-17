@@ -13,6 +13,22 @@ import (
 	"time"
 )
 
+func BindUnassignedAccountOutbounds(c *gin.Context) {
+	var input struct {
+		Bindings map[string]string `json:"bindings"`
+	}
+	if c.ShouldBindJSON(&input) != nil || len(input.Bindings) == 0 {
+		vo.Fail(constant.InvalidError, c)
+		return
+	}
+	result, err := service.BindUnassignedAccountOutbounds(input.Bindings)
+	if err != nil {
+		vo.Fail(err.Error(), c)
+		return
+	}
+	vo.Success(result, c)
+}
+
 func AccountOutboundOptions(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	options, err := service.GetAccountOutboundOptions()

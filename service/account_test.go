@@ -387,3 +387,84 @@ func TestPanelAdminMigrationAndPasswordGate(t *testing.T) {
 		t.Fatal("legacy hash was not upgraded to native Argon2id", err)
 	}
 }
+
+func TestBindUnassignedAccountOutbounds(t *testing.T) {
+	accountID, _ := setupSubscriptionTestDatabase(t)
+	setAccountRoutingTestConfig(t)
+	second := "other-user"
+	secondID, err := dao.SaveAccount(entity.Account{Username: &second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	existing, existingRoute, disabled := "existing-user", "US_HTTP_1", "disabled-user"
+	disabledFlag := int64(1)
+	existingID, err := dao.SaveAccount(entity.Account{Username: &existing, Outbound: &existingRoute})
+	if err != nil {
+		t.Fatal(err)
+	}
+	disabledID, err := dao.SaveAccount(entity.Account{Username: &disabled, Deleted: &disabledFlag})
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkBinding := func(id int64, want string) {
+		t.Helper()
+		account, err := GetAccount(id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if AccountOutbound(account) != want {
+			t.Fatalf("account %d outbound = %q, want %q", id, AccountOutbound(account), want)
+		}
+	}
+	applyCalls, failApply := 0, true
+	accountHysteria2IsRunning = func() bool { return true }
+	accountApplyHysteria2Config = func(config bo.Hysteria2ServerConfig) error {
+		applyCalls++
+		prepared, err := PrepareHysteria2OutboundConfig(config)
+		if err != nil {
+			return err
+		}
+		bindings := prepared.UserOutbounds
+		if len(bindings) != 3 || bindings["subscription-test"] != "ISP_SOCKS5_1" ||
+			bindings[second] != "DIRECT" || bindings[existing] != existingRoute {
+			t.Fatalf("unexpected applied bindings: %v", bindings)
+		}
+		if failApply {
+			return errors.New("injected apply failure")
+		}
+		return nil
+	}
+	for _, request := range []map[string]string{
+		{"subscription-test": "ISP_SOCKS5_1"},
+		{"subscription-test": "unknown", second: "DIRECT"},
+		{"subscription-test": "ISP_SOCKS5_1", second: "DIRECT", existing: "DIRECT"},
+		{"subscription-test": "ISP_SOCKS5_1", second: "DIRECT", disabled: "DIRECT"},
+	} {
+		if _, err := BindUnassignedAccountOutbounds(request); err == nil {
+			t.Fatalf("accepted invalid request: %v", request)
+		}
+	}
+	if applyCalls != 0 {
+		t.Fatalf("invalid request reached apply: %d calls", applyCalls)
+	}
+	request := map[string]string{"subscription-test": "isp_socks5_1", second: "DIRECT"}
+	if _, err := BindUnassignedAccountOutbounds(request); err == nil || !strings.Contains(err.Error(), "previous account bindings restored") {
+		t.Fatalf("unexpected apply failure: %v", err)
+	}
+	checkBinding(accountID, "")
+	checkBinding(secondID, "")
+	checkBinding(existingID, existingRoute)
+
+	failApply = false
+	result, err := BindUnassignedAccountOutbounds(request)
+	if err != nil || !result.RuntimeApplied || applyCalls != 2 {
+		t.Fatalf("apply result=%+v calls=%d error=%v", result, applyCalls, err)
+	}
+	checkBinding(accountID, "ISP_SOCKS5_1")
+	checkBinding(secondID, "DIRECT")
+	checkBinding(existingID, existingRoute)
+	checkBinding(disabledID, "")
+	if _, err := BindUnassignedAccountOutbounds(request); err == nil || applyCalls != 2 {
+		t.Fatalf("stale request result: calls=%d error=%v", applyCalls, err)
+	}
+}
