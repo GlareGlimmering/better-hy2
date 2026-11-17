@@ -19,9 +19,11 @@ const (
 	Hysteria2CustomRepo                = "hysteria"
 	Hysteria2CustomSHA256              = "f1577bff290f5591a651b88596103045390581a6c0a6e999611cab8baa653d9e"
 
-	SystemLogPath          = "logs/h-ui.log"
-	Hysteria2LogPath       = "logs/hysteria2.log"
-	Hysteria2AccessLogPath = "/var/lib/hui/hy2_access.log"
+	SystemLogPath               = "logs/h-ui.log"
+	Hysteria2LogPath            = "logs/hysteria2.log"
+	Hysteria2AccessLogPath      = "/var/lib/hui/hy2_access.log"
+	Hysteria2PortHoppingTable   = "hui_porthopping"
+	Hysteria2PortHoppingComment = "hui_hysteria_porthopping"
 
 	XrayDataDir         = "/var/lib/h-ui/xray"
 	XrayVersionsDir     = "/var/lib/h-ui/xray/versions"

@@ -14,8 +14,8 @@ var (
 	ingressInterface string
 	Add              = "add"
 	Delete           = "delete"
-	Table            = "hui_porthopping"
-	Comment          = "hui_hysteria_porthopping"
+	Table            = constant.Hysteria2PortHoppingTable
+	Comment          = constant.Hysteria2PortHoppingComment
 )
 
 func InitForward() {

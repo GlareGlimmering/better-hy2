@@ -108,11 +108,11 @@ Sign in with the old administrator username. If the password was shared with the
 
 ## Uninstall
 
-Run `sudo hui uninstall` (or `sudo /usr/local/h-ui/h-ui uninstall`). Review the displayed plan, then type `UNINSTALL` to stop and disable the standard systemd panel service and remove its unit, executable and matching symlink. Enter alone cancels the operation. The database, configuration, logs and backups are retained by default.
+Run `sudo hui uninstall` (or `sudo /usr/local/h-ui/h-ui uninstall`). Review the removal plan and type `UNINSTALL`. Press Enter to cancel. The command stops and removes the standard panel service and its managed HY2 child, deletes the matching hui symlink and the standard installation tree, and removes upgrade backups and HY2 access logs including rotated files. The older `--purge` spelling is equivalent and asks for `PURGE`.
 
-Use `sudo hui uninstall --purge` and type `PURGE` to additionally remove the displayed panel data, log and export directories and upgrade backups. Copy the executable to a private location outside these directories first if you need to run a separate purge later. The command refuses custom or overridden panel units and unsafe data paths. The managed HY2 child stops with the panel. Existing HY2 binaries/configuration, Xray services and their files, external certificates and independently installed commands/services are preserved because their exclusive ownership is not recorded.
+The standard Better HY2 Xray unit, runtime files and dedicated service account are also removed when their ownership checks pass. Independent or modified services and their associated files are preserved. External certificate paths, shared system journals, external backups, and Cloudflare services are outside the uninstall scope. Filesystem removal does not overwrite disk blocks. Save a private backup elsewhere before confirming if you need the data later. If the command reports an incomplete uninstall, correct the error and rerun it to review remaining items.
 
-An incomplete uninstall returns an error and lists remaining items. Correct the reported issue and re-run the same command using the retained executable or your private copy.
+New account deletions use SQLite secure deletion. Existing backup snapshots, historical logs, and earlier free-space or journal copies require separate retention decisions.
 
 ## Troubleshooting
 

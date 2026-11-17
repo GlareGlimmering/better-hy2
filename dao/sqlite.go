@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm/schema"
 	"h-ui/model/constant"
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,7 +31,16 @@ func InitSqliteDB() error {
 	if err = protectSQLiteFiles(databasePath); err != nil {
 		return err
 	}
-	sqliteDB, err = gorm.Open(sqlite.Open(databasePath), &gorm.Config{
+	// Each pooled connection must use secure_delete, including those opened
+	// after startup. A one-off PRAGMA would only configure one connection.
+	dsn := url.URL{Scheme: "file", Path: filepath.ToSlash(databasePath), RawQuery: "_pragma=secure_delete%28ON%29"}
+	if !filepath.IsAbs(databasePath) {
+		dsn.Opaque = (&url.URL{Path: filepath.ToSlash(databasePath)}).EscapedPath()
+		dsn.Path = ""
+	} else if filepath.VolumeName(databasePath) != "" {
+		dsn.Path = "/" + dsn.Path
+	}
+	sqliteDB, err = gorm.Open(sqlite.Open(dsn.String()), &gorm.Config{
 		TranslateError: true,
 		Logger: logger.New(
 			log.New(os.Stdout, "\r\n", log.LstdFlags),
