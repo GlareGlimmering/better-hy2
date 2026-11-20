@@ -136,6 +136,10 @@ export function releaseKickAccountApi(data: IdDto): AxiosPromise {
   });
 }
 
+export function getConnectionPasswordApi(data: IdDto): AxiosPromise<string> {
+  return request({ url: "/account/getConnectionPassword", method: "get", params: data });
+}
+
 export function generateConnectionPasswordApi(): AxiosPromise<string> {
   return request({ url: "/account/generateConnectionPassword", method: "post" });
 }

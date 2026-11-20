@@ -202,7 +202,14 @@ func DeleteAccount(c *gin.Context) {
 
 func UpdateAccount(c *gin.Context) {
 	var accountUpdateDto dto.AccountUpdateDto
-	if c.ShouldBindJSON(&accountUpdateDto) != nil || validate.Struct(&accountUpdateDto) != nil {
+	if c.ShouldBindJSON(&accountUpdateDto) != nil {
+		vo.Fail(constant.InvalidError, c)
+		return
+	}
+	if accountUpdateDto.ConPass != nil && *accountUpdateDto.ConPass == "" {
+		accountUpdateDto.ConPass = nil
+	}
+	if validate.Struct(&accountUpdateDto) != nil {
 		vo.Fail(constant.InvalidError, c)
 		return
 	}
@@ -311,6 +318,20 @@ func GetAccount(c *gin.Context) {
 			(account.ConPass == nil || !legacyHomeProxyUserinfo.MatchString(*account.ConPass)),
 	}
 	vo.Success(accountVo, c)
+}
+
+func GetConnectionPassword(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	id, err := validateField(c, dto.IdDto{})
+	if err != nil {
+		return
+	}
+	account, err := service.GetAccount(*id.Id)
+	if err != nil || account.Role == nil || *account.Role != "user" || account.ConPass == nil || *account.ConPass == "" {
+		vo.Fail("connection password unavailable", c)
+		return
+	}
+	vo.Success(*account.ConPass, c)
 }
 
 func ReleaseKickAccount(c *gin.Context) {

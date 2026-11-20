@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { editAccountForm, newAccountForm } from "../src/views/account/list/account-form.ts";
+import { accountExpiryAfterMonths, accountExpiryMonths, editAccountForm, newAccountForm, permanentAccountExpiry } from "../src/views/account/list/account-form.ts";
 
 import {
   timestampToCompactDateTime,
@@ -49,11 +49,11 @@ test("account password is read-only and can be regenerated before saving", () =>
   const password = accountPage.slice(start, accountPage.indexOf('prop="outbound"', start));
   assert.match(password, /<template #append>/);
   assert.match(password, /@click="generatePassword"/);
-  assert.match(password, /:model-value="dataForm\.conPass"/);
+  assert.match(password, /:model-value="connectionPasswordDisplay"/);
   assert.match(password, /\breadonly\b/);
   assert.doesNotMatch(password, /v-model|clearable|@input/);
   assert.match(password, /:loading="passwordGenerating"/);
-  assert.match(accountPage, /state\.dataForm = newAccountForm\(getMonthLater\(\)\);[\s\S]*void generatePassword\(\)/);
+  assert.match(accountPage, /state\.dataForm = newAccountForm\(accountExpiryAfterMonths\(1\)\);[\s\S]*void generatePassword\(\)/);
   assert.match(accountPage, /request === passwordRequest && dialog\.value\.visible && state\.dataForm\.id === accountID/);
   assert.match(accountPage, /:disabled="accountSaving \|\| passwordGenerating \|\| !creationBindingsComplete" @click="submitForm"/);
 });
@@ -115,4 +115,29 @@ test("first bound account creation submits all explicit legacy bindings with the
   assert.match(accountPage, /v-for="username in creationBindingUsers"/);
   assert.match(accountPage, /creationBindingUsers\.value\.every\(username => !!creationBindings\.get\(username\)\)/);
   assert.match(accountPage, /await saveAccountApi\(\{[\s\S]*existingBindings: Object\.fromEntries\(creationBindingUsers\.value\.map/);
+});
+
+test("editing keeps the old credential out of the save payload and reveals only on demand", () => {
+  assert.match(accountPage, /conPass: conPass \|\| undefined/);
+  assert.match(accountPage, /@click="togglePasswordVisibility"/);
+  assert.match(accountPage, /await getConnectionPasswordApi\(\{ id \}\)/);
+  assert.match(accountPage, /passwordVisible \? 'text' : 'password'/);
+  assert.match(accountPage, /revealedConnectionPassword\.value = ""/);
+});
+
+test("expiry presets keep the chosen calendar day or clamp it at month end", () => {
+  assert.deepEqual(accountExpiryMonths, [1, 2, 3, 6, 12]);
+  const january = new Date(2024, 0, 31, 12, 15, 30);
+  assert.equal(accountExpiryAfterMonths(1, january), new Date(2024, 1, 29, 12, 15, 30).getTime());
+  assert.equal(accountExpiryAfterMonths(2, january), new Date(2024, 2, 31, 12, 15, 30).getTime());
+  assert.equal(permanentAccountExpiry, 253370736000000);
+  assert.match(accountPage, /v-model="accountExpiryDate"/);
+});
+
+test("subscription and node URL actions use copy without a prompt", () => {
+  assert.equal((accountPage.match(/await copyText\(data\.url\)/g) || []).length, 2);
+  const clipboard = readFileSync(new URL("../src/utils/clipboard.ts", import.meta.url), "utf8");
+  assert.match(clipboard, /await navigator\.clipboard\.writeText/);
+  assert.match(clipboard, /return document\.execCommand\("copy"\)/);
+  assert.doesNotMatch(clipboard, /\bprompt\s*\(/);
 });

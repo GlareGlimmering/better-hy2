@@ -6,7 +6,7 @@ export interface AccountPageDto extends BaseDto {
 
 export interface AccountUpdateDto extends IdDto {
   username: string;
-  conPass: string;
+  conPass?: string;
   quota?: number;
   expireTime: number;
   deviceNo: number;

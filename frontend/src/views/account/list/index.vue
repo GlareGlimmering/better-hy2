@@ -123,8 +123,9 @@
           width="151"
         >
           <template #default="scope">
+            <span v-if="scope.row.expireTime >= permanentAccountExpiry">{{ $t("account.expirePermanent") }}</span>
             <el-tooltip
-              v-if="scope.row.expireTime"
+              v-else-if="scope.row.expireTime"
               :content="timestampToFullDateTimeWithZone(scope.row.expireTime)"
               placement="top"
             >
@@ -229,23 +230,25 @@
         </el-form-item>
         <el-form-item :label="$t('account.conPass')" prop="conPass">
           <el-input
-            :model-value="dataForm.conPass"
+            :model-value="connectionPasswordDisplay"
             :placeholder="$t('account.conPass')"
             :type="passwordVisible ? 'text' : 'password'"
             readonly
           >
             <template #suffix>
               <el-button
-                v-if="dataForm.conPass"
+                v-if="dataForm.conPass || dataForm.id !== undefined"
                 link
                 :icon="View"
-                :aria-label="$t('account.conPass')"
+                :loading="passwordRevealing"
+                :disabled="passwordGenerating"
+                :aria-label="$t(passwordVisible ? 'account.hidePassword' : 'account.showPassword')"
                 :aria-pressed="passwordVisible"
-                @click="passwordVisible = !passwordVisible"
+                @click="togglePasswordVisibility"
               />
             </template>
             <template #append>
-              <el-button :loading="passwordGenerating" :disabled="accountSaving" @click="generatePassword">{{ $t("account.generatePassword") }}</el-button>
+              <el-button :loading="passwordGenerating" :disabled="accountSaving || passwordRevealing" @click="generatePassword">{{ $t("account.generatePassword") }}</el-button>
             </template>
           </el-input>
         </el-form-item>
@@ -354,15 +357,20 @@
         </el-form-item>
         <el-form-item :label="$t('account.expireTime')" prop="expireTime">
           <el-date-picker
-            v-model="dataForm.expireTime"
+            v-model="accountExpiryDate"
             type="datetime"
-            :placeholder="$t('account.expireTime')"
+            :placeholder="$t(dataForm.expireTime >= permanentAccountExpiry ? 'account.expirePermanent' : 'account.expireTime')"
             value-format="x"
             format="YYYY-MM-DD HH:mm:ss"
-            :shortcuts="shortcuts"
-            clearable
+            :clearable="false"
             style="width: 100%"
           />
+          <div class="account-expiry-presets">
+            <el-button v-for="months in accountExpiryMonths" :key="months" size="small" @click="dataForm.expireTime = accountExpiryAfterMonths(months)">
+              {{ $t("account.expireInMonths", { months }) }}
+            </el-button>
+            <el-button size="small" @click="dataForm.expireTime = permanentAccountExpiry">{{ $t("account.expirePermanent") }}</el-button>
+          </div>
         </el-form-item>
         <el-form-item :label="$t('common.deleted')" prop="deleted">
           <el-radio-group v-model="dataForm.deleted">
@@ -485,6 +493,7 @@ import {
   resetTrafficApi,
   getAccountOutboundOptionsApi,
   generateConnectionPasswordApi,
+  getConnectionPasswordApi,
   bindUnassignedOutboundsApi,
 } from "@/api/account";
 import { Document, Link, Search, Plus, Refresh, View } from "@element-plus/icons-vue";
@@ -493,7 +502,6 @@ import {
   timestampToFullDateTimeWithZone,
   getMonthLater,
   getWeekLater,
-  getYearLater,
   calculateTimeDifference,
   getHourLater,
   getDayLater,
@@ -513,9 +521,9 @@ import {
   Hysteria2UrlDto,
   Hysteria2RoutingStatus,
 } from "@/api/hysteria2/types";
-import copy from "copy-to-clipboard";
+import { copyText } from "@/utils/clipboard";
 import { useRouter } from "vue-router";
-import { editAccountForm, newAccountForm } from "./account-form";
+import { accountExpiryAfterMonths, accountExpiryMonths, editAccountForm, newAccountForm, permanentAccountExpiry } from "./account-form";
 import {
   AccountOutboundOption,
   buildAccountOutboundFormState,
@@ -541,6 +549,8 @@ const passwordGenerating = ref(false);
 const savedHomeProxyCredentialIncompatible = ref(false);
 const legacyHomeProxyUsername = /^[-A-Za-z0-9+_.]+$/;
 const passwordVisible = ref(false);
+const passwordRevealing = ref(false);
+const revealedConnectionPassword = ref("");
 const outboundOptionsLoading = ref(false);
 const outboundOptionsFailed = ref(false);
 const outboundExcludedCount = ref(0);
@@ -627,21 +637,6 @@ const dataFormUpdateRules = {
   ],
 };
 
-const shortcuts = [
-  {
-    text: "A week later",
-    value: getWeekLater,
-  },
-  {
-    text: "A month later",
-    value: getMonthLater,
-  },
-  {
-    text: "A year later",
-    value: getYearLater,
-  },
-];
-
 const shortcutsKick = [
   {
     text: "A hour later",
@@ -671,7 +666,7 @@ const state = reactive({
   dialogKick: {
     visible: false,
   } as DialogType,
-  dataForm: newAccountForm(getMonthLater()),
+  dataForm: newAccountForm(accountExpiryAfterMonths(1)),
   kickForm: {
     kickUtilTime: getHourLater(),
   } as KickAccountForm,
@@ -839,7 +834,47 @@ const resetQuery = () => {
 /**
  * 保存
  **/
+const accountExpiryDate = computed({
+  get: () => state.dataForm.expireTime >= permanentAccountExpiry ? "" : String(state.dataForm.expireTime),
+  set: (value: string) => {
+    if (value && Number.isFinite(Number(value))) state.dataForm.expireTime = Number(value);
+  },
+});
+const connectionPasswordDisplay = computed(() => {
+  const form = state.dataForm;
+  if (form.conPass || form.id === undefined) return form.conPass;
+  return passwordVisible.value ? revealedConnectionPassword.value : "••••••••";
+});
+
 let passwordRequest = 0;
+const togglePasswordVisibility = async () => {
+  if (passwordGenerating.value || passwordRevealing.value) return;
+  if (passwordVisible.value) {
+    passwordVisible.value = false;
+    revealedConnectionPassword.value = "";
+    return;
+  }
+  const { id, conPass } = state.dataForm;
+  if (conPass) {
+    passwordVisible.value = true;
+    return;
+  }
+  if (id === undefined) return;
+
+  const request = ++passwordRequest;
+  passwordRevealing.value = true;
+  try {
+    const { data } = await getConnectionPasswordApi({ id });
+    if (request === passwordRequest && dialog.value.visible && state.dataForm.id === id) {
+      revealedConnectionPassword.value = data;
+      passwordVisible.value = true;
+    }
+  } catch {
+    // The API interceptor reports the error.
+  } finally {
+    if (request === passwordRequest) passwordRevealing.value = false;
+  }
+};
 const generatePassword = async () => {
   if (passwordGenerating.value || accountSaving.value) return;
   const request = ++passwordRequest;
@@ -864,7 +899,7 @@ const handleAdd = async () => {
   await Promise.all([loadOutboundOptions(), loadRoutingStatus().catch(() => {})]);
   if (request !== accountEditorRequest) return;
   savedHomeProxyCredentialIncompatible.value = false;
-  state.dataForm = newAccountForm(getMonthLater());
+  state.dataForm = newAccountForm(accountExpiryAfterMonths(1));
   creationBindings.clear();
   quotaTmp.value = 0;
   unlimitedQuota.value = false;
@@ -909,13 +944,14 @@ const submitForm = async () => {
   }
   accountSaving.value = true;
   try {
-    const { id, role, uploadMbps, downloadMbps, ...fields } = state.dataForm;
+    const { id, role, uploadMbps, downloadMbps, conPass, ...fields } = state.dataForm;
     const bandwidth = role === "admin" ? {} : { uploadMbps, downloadMbps };
     const { data } = id !== undefined
-      ? await updateAccountApi({ ...fields, ...bandwidth, id, quota })
+      ? await updateAccountApi({ ...fields, ...bandwidth, id, quota, conPass: conPass || undefined })
       : await saveAccountApi({
           ...fields,
           ...bandwidth,
+          conPass,
           quota: quota!,
           existingBindings: Object.fromEntries(creationBindingUsers.value.map(username => [username, creationBindings.get(username)!])),
         });
@@ -1044,8 +1080,10 @@ watch(() => dialog.value.visible, visible => {
   accountEditorRequest++;
   passwordRequest++;
   passwordGenerating.value = false;
+  passwordRevealing.value = false;
   passwordVisible.value = false;
-  state.dataForm = newAccountForm(getMonthLater());
+  revealedConnectionPassword.value = "";
+  state.dataForm = newAccountForm(accountExpiryAfterMonths(1));
   creationBindings.clear();
 }, { flush: "sync" });
 
@@ -1066,8 +1104,8 @@ const handleSubscribe = async (row: { [key: string]: any }) => {
       host: window.location.host,
     };
     const { data } = await hysteria2SubscribeUrlApi(dto);
-    copy(data.url);
-    ElMessage.success(t("common.copySuccess"));
+    if (await copyText(data.url)) ElMessage.success(t("common.copySuccess"));
+    else ElMessage.error(t("common.copyFailed"));
   } catch (e) {
     /* empty */
   }
@@ -1080,8 +1118,8 @@ const handleNodeUrl = async (row: { [key: string]: any }) => {
       hostname: window.location.hostname,
     };
     const { data } = await hysteria2UrlApi(dto);
-    copy(data.url);
-    ElMessage.success(t("common.copySuccess"));
+    if (await copyText(data.url)) ElMessage.success(t("common.copySuccess"));
+    else ElMessage.error(t("common.copyFailed"));
   } catch (e) {
     /* empty */
   }
@@ -1281,6 +1319,8 @@ onMounted(() => {
 }
 
 .account-usage { margin-bottom: 18px; }
+.account-expiry-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.account-expiry-presets .el-button + .el-button { margin-left: 0; }
 
 .drawer-danger-zone {
   padding: 14px;
