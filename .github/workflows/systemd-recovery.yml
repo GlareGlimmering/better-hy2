@@ -37,8 +37,6 @@ jobs:
           - { state: active, baseline: rc.7 }
           - { state: active, baseline: v2-stable }
     env:
-      KERNEL_SHA: dc6b01106be3ca86c21cf7a9695e858b8145671e
-      KERNEL_VERSION: v2.13.0-hui.6-dev
       PANEL_TEST_VERSION: v2.0.2-rc.1
     steps:
       - name: Require a real systemd VM
@@ -49,11 +47,17 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      - name: Read the approved kernel pin
+        if: inputs.artifact == ''
+        id: kernel-pin
+        run: |
+          jq -r '"commit=\(.commit)", "version=\(.version)", "sha256=\(.sha256)"' model/constant/hy2-pair.json >> "$GITHUB_OUTPUT"
+
       - if: inputs.artifact == ''
         uses: actions/checkout@v7
         with:
           repository: GlareGlimmering/hysteria
-          ref: ${{ env.KERNEL_SHA }}
+          ref: ${{ steps.kernel-pin.outputs.commit }}
           path: kernel-source
           persist-credentials: false
       - if: inputs.artifact == ''
@@ -75,6 +79,8 @@ jobs:
       - name: Build the candidate pair
         if: inputs.artifact == ''
         env:
+          KERNEL_SHA: ${{ steps.kernel-pin.outputs.commit }}
+          KERNEL_VERSION: ${{ steps.kernel-pin.outputs.version }}
           CGO_ENABLED: '0'
           GOOS: linux
           GOARCH: amd64

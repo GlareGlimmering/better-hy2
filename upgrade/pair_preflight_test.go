@@ -103,9 +103,10 @@ func compiledPairFixture(t *testing.T) (string, string, releasePair) {
 	if version == "" {
 		version = "v1.1.0-rc.1"
 	}
+	kernelVersion, _ := constant.ManagedHysteria2Pin()
 	return panel, kernel, releasePair{
 		Panel:  pairArtifact{version, os.Getenv("HUI_PAIR_TEST_PANEL_COMMIT"), fmt.Sprintf("%x", sha256.Sum256(readPairFixture(t, panel)))},
-		Kernel: pairArtifact{constant.Hysteria2AccountConsistencyVersion, os.Getenv("HUI_PAIR_TEST_KERNEL_COMMIT"), fmt.Sprintf("%x", sha256.Sum256(readPairFixture(t, kernel)))},
+		Kernel: pairArtifact{kernelVersion, os.Getenv("HUI_PAIR_TEST_KERNEL_COMMIT"), fmt.Sprintf("%x", sha256.Sum256(readPairFixture(t, kernel)))},
 		OS:     "linux", Arch: "amd64", AccountConsistency: 2, AccountBandwidth: 1,
 	}
 }

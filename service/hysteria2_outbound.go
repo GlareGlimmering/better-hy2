@@ -132,7 +132,8 @@ func EnsureHysteria2UserRoutingCompatible(config bo.Hysteria2ServerConfig) error
 }
 
 func supportsUserOutboundRouting(version string) bool {
-	return version == util.ManagedHysteria2Version() || version == constant.Hysteria2AccountConsistencyVersion
+	pairedVersion, _ := constant.ManagedHysteria2Pin()
+	return version == util.ManagedHysteria2Version() || version == pairedVersion
 }
 
 func Hysteria2RoutingStatus() (vo.Hysteria2RoutingStatusVo, error) {
