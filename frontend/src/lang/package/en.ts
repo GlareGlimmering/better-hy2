@@ -180,8 +180,6 @@ export default {
     appearance: "Appearance",
     appearanceTip: "Appearance preferences are saved in this browser",
     darkMode: "Dark mode",
-    fixedHeader: "Fixed header",
-    sidebarLogo: "Show sidebar logo",
     themeColor: "Theme color",
     huiWebPort: "Better HY2 Web Port",
     huiWebContext: "Better HY2 Web Context",

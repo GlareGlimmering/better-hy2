@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { accountExpiryAfterMonths, accountExpiryMonths, editAccountForm, newAccountForm, permanentAccountExpiry } from "../src/views/account/list/account-form.ts";
+import { accountExpiryAfterMonths, accountExpiryMonths, accountExpiryPickerDate, editAccountForm, newAccountForm, permanentAccountExpiry } from "../src/views/account/list/account-form.ts";
 
 import {
   timestampToCompactDateTime,
@@ -132,6 +132,18 @@ test("expiry presets keep the chosen calendar day or clamp it at month end", () 
   assert.equal(accountExpiryAfterMonths(2, january), new Date(2024, 2, 31, 12, 15, 30).getTime());
   assert.equal(permanentAccountExpiry, 253370736000000);
   assert.match(accountPage, /v-model="accountExpiryDate"/);
+});
+
+test("expiry calendar receives a Date instead of trying to parse milliseconds as a date string", () => {
+  const expected = new Date(2026, 10, 20, 12, 15, 30);
+  const date = accountExpiryPickerDate(expected.getTime());
+  assert.ok(date instanceof Date);
+  assert.equal(date.getTime(), expected.getTime());
+  assert.equal(accountExpiryPickerDate(permanentAccountExpiry), undefined);
+  const expiryPicker = accountPage.match(/<el-date-picker[^>]*v-model="accountExpiryDate"[^>]*>/)?.[0] || "";
+  assert.ok(expiryPicker);
+  assert.doesNotMatch(expiryPicker, /value-format/);
+  assert.match(accountPage, /state\.dataForm\.expireTime = value\.getTime\(\)/);
 });
 
 test("subscription and node URL actions use copy without a prompt", () => {

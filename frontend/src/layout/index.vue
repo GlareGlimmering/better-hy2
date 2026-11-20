@@ -5,13 +5,11 @@ import { useWindowSize } from "@vueuse/core";
 import { AppMain, Navbar } from "./components";
 import Sidebar from "./components/Sidebar/index.vue";
 import { useAppStore } from "@/store/modules/app";
-import { useSettingsStore } from "@/store/modules/settings";
 
 const { width } = useWindowSize();
 const viewport = computed(() => width.value < 992 ? "mobile" : width.value < 1200 ? "compact" : "wide");
 const route = useRoute();
 const appStore = useAppStore();
-const settingsStore = useSettingsStore();
 
 const classObj = computed(() => ({
   hideSidebar: !appStore.sidebar.opened,
@@ -44,9 +42,7 @@ watch(() => route.path, closeMobileMenu);
     />
     <Sidebar class="sidebar-container" />
     <div class="main-container">
-      <div :class="{ 'fixed-header': settingsStore.fixedHeader }">
-        <Navbar />
-      </div>
+      <Navbar />
       <AppMain />
     </div>
   </div>
@@ -64,12 +60,6 @@ watch(() => route.path, closeMobileMenu);
     position: fixed;
     inset: 0;
   }
-}
-
-.fixed-header {
-  position: sticky;
-  top: 0;
-  z-index: 9;
 }
 
 .drawer-bg {

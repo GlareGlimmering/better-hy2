@@ -6,14 +6,6 @@ interface DefaultSettings {
   title: string;
 
   /**
-   *是否固定头部
-   */
-  fixedHeader: boolean;
-  /**
-   * 是否显示侧边栏Logo
-   */
-  sidebarLogo: boolean;
-  /**
    * 导航栏布局
    */
   layout: string;
@@ -39,8 +31,6 @@ interface DefaultSettings {
 
 const defaultSettings: DefaultSettings = {
   title: "Better HY2",
-  fixedHeader: false,
-  sidebarLogo: true,
   layout: "left",
   themeColor: "#409EFF",
   /**

@@ -14,6 +14,11 @@ export function accountExpiryAfterMonths(months: number, now = new Date()): numb
   return expiry.getTime();
 }
 
+export function accountExpiryPickerDate(expireTime: number): Date | undefined {
+  if (!Number.isFinite(expireTime) || expireTime <= 0 || expireTime >= permanentAccountExpiry) return undefined;
+  return new Date(expireTime);
+}
+
 export function newAccountForm(expireTime: number): AccountForm {
   return {
     username: "",

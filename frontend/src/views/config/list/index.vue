@@ -41,14 +41,6 @@
             inactive-color="var(--el-color-primary)"
           />
         </div>
-        <div class="appearance-item">
-          <span>{{ $t("config.fixedHeader") }}</span>
-          <el-switch v-model="settingsStore.fixedHeader" />
-        </div>
-        <div class="appearance-item">
-          <span>{{ $t("config.sidebarLogo") }}</span>
-          <el-switch v-model="settingsStore.sidebarLogo" />
-        </div>
         <div class="appearance-item theme-item">
           <span>{{ $t("config.themeColor") }}</span>
           <div class="theme-colors">
