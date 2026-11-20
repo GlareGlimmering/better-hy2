@@ -48,7 +48,7 @@ test("account drawer dismisses without saving", () => {
   assert.match(accounts, /:close-on-click-modal="!accountSaving"/);
   assert.match(accounts, /watch\(\(\) => dialog\.value\.visible/);
   const close = accounts.slice(accounts.indexOf("const closeDialog ="), accounts.indexOf("const closeDialogKick ="));
-  assert.match(close, /state\.dataForm = newAccountForm\(getMonthLater\(\)\)/);
+  assert.match(close, /state\.dataForm = newAccountForm\(accountExpiryAfterMonths\(1\)\)/);
   assert.doesNotMatch(close, /saveAccountApi|updateAccountApi|submitForm/);
 });
 

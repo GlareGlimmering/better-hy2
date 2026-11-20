@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http/httptest"
 	"strings"
@@ -64,10 +65,38 @@ func TestShortProxyUsernameCreateAndEdit(t *testing.T) {
 		t.Fatal(err)
 	}
 	id := *account.Id
+	originalCredential := *account.ConPass
 	request(UpdateAccount, fmt.Sprintf(`{"id":%d,"username":"a"}`, id), false)
-	request(UpdateAccount, fmt.Sprintf(`{"id":%d,"username":"ab","remark":"edited"}`, id), true)
+	request(UpdateAccount, fmt.Sprintf(`{"id":%d,"username":"ab","remark":"edited","conPass":""}`, id), true)
 	account, err = dao.GetAccount("id = ?", id)
-	if err != nil || *account.Remark != "edited" || *account.Quota != 1073741824 {
-		t.Fatalf("remark update must preserve legacy quota: %v", err)
+	if err != nil || *account.Remark != "edited" || *account.Quota != 1073741824 || *account.ConPass != originalCredential {
+		t.Fatalf("remark update must preserve legacy quota and credential: %v", err)
+	}
+}
+
+func TestGetConnectionPasswordReturnsOnlyRequestedCredentialWithoutCaching(t *testing.T) {
+	credential := setupControllerSubscriptionTestDatabase(t)
+	account, err := dao.GetAccount("con_pass = ?", credential)
+	if err != nil {
+		t.Fatal(err)
+	}
+	get := func(id int64) *httptest.ResponseRecorder {
+		response := httptest.NewRecorder()
+		context, _ := gin.CreateTestContext(response)
+		context.Request = httptest.NewRequest("GET", fmt.Sprintf("/?id=%d", id), nil)
+		GetConnectionPassword(context)
+		return response
+	}
+	response := get(*account.Id)
+	var body struct {
+		Data string
+	}
+	if response.Header().Get("Cache-Control") != "no-store" ||
+		json.Unmarshal(response.Body.Bytes(), &body) != nil || body.Data != credential {
+		t.Fatal("credential reveal did not return the stored value with no-store")
+	}
+	if response := get(*account.Id + 1000); response.Header().Get("Cache-Control") != "no-store" ||
+		strings.Contains(response.Body.String(), `"type":"ok"`) {
+		t.Fatal("credential reveal succeeded for a nonexistent account")
 	}
 }
