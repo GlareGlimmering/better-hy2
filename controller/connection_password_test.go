@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -19,7 +20,10 @@ func TestGeneratedConnectionPassword(t *testing.T) {
 			t.Fatal("invalid or repeated generated password")
 		}
 		seen[password] = true
-		for _, class := range []string{"ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz", "0123456789", "!@#$&*_"} {
+		if !regexp.MustCompile("^[-A-Za-z0-9_.]{24}$").MatchString(password) {
+			t.Fatal("generated password contains a character unsupported by older HomeProxy versions")
+		}
+		for _, class := range []string{"ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz", "0123456789", "-._"} {
 			if !strings.ContainsAny(password, class) {
 				t.Fatal("missing required character class")
 			}

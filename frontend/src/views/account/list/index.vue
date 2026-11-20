@@ -249,6 +249,27 @@
             </template>
           </el-input>
         </el-form-item>
+        <el-alert
+          v-if="dataForm.role === 'user' && dataForm.username && !legacyHomeProxyUsername.test(dataForm.username)"
+          class="account-usage"
+          type="warning"
+          :closable="false"
+          :title="$t('account.homeProxyUsernameWarning')"
+        />
+        <el-alert
+          v-else-if="dataForm.role === 'user' && !dataForm.conPass && savedHomeProxyCredentialIncompatible"
+          class="account-usage"
+          type="warning"
+          :closable="false"
+          :title="$t('account.homeProxyCredentialWarning')"
+        />
+        <el-alert
+          v-if="dataForm.role === 'user' && dataForm.id !== undefined && dataForm.conPass"
+          class="account-usage"
+          type="info"
+          :closable="false"
+          :title="$t('account.homeProxyRotationNotice')"
+        />
         <el-form-item :label="$t('account.outbound')" prop="outbound">
           <el-select
             v-model="dataForm.outbound"
@@ -517,6 +538,8 @@ const routingBindingsComplete = computed(() =>
   routingBindingUsers.value.every(username => routingBindings.has(username))
 );
 const passwordGenerating = ref(false);
+const savedHomeProxyCredentialIncompatible = ref(false);
+const legacyHomeProxyUsername = /^[-A-Za-z0-9+_.]+$/;
 const passwordVisible = ref(false);
 const outboundOptionsLoading = ref(false);
 const outboundOptionsFailed = ref(false);
@@ -840,6 +863,7 @@ const handleAdd = async () => {
   const request = ++accountEditorRequest;
   await Promise.all([loadOutboundOptions(), loadRoutingStatus().catch(() => {})]);
   if (request !== accountEditorRequest) return;
+  savedHomeProxyCredentialIncompatible.value = false;
   state.dataForm = newAccountForm(getMonthLater());
   creationBindings.clear();
   quotaTmp.value = 0;
@@ -859,6 +883,7 @@ const handleUpdate = async (row: AccountVo) => {
   const [, { data }] = await Promise.all([loadOutboundOptions(), getAccountApi({ id: row.id })]);
   if (request !== accountEditorRequest) return;
   state.dataForm = editAccountForm(data);
+  savedHomeProxyCredentialIncompatible.value = data.homeProxyCredentialIncompatible === true;
   const input = quotaInput(data.quota);
   unlimitedQuota.value = input < 0;
   quotaTmp.value = Math.max(0, input);
