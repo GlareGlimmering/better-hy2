@@ -4,14 +4,17 @@ import (
 	"crypto/rand"
 	"io"
 	"math/big"
+	"regexp"
 
 	"github.com/gin-gonic/gin"
 	"h-ui/model/vo"
 )
 
+var legacyHomeProxyUserinfo = regexp.MustCompile("^[-A-Za-z0-9+_.]+$")
+
 func generateConnectionPassword(source io.Reader) (string, error) {
 	const length = 24
-	classes := []string{"ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz", "0123456789", "!@#$&*_"}
+	classes := []string{"ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz", "0123456789", "-._"}
 	var alphabet string
 	var password [length]byte
 	for _, class := range classes {

@@ -307,6 +307,8 @@ func GetAccount(c *gin.Context) {
 		Deleted:      *account.Deleted,
 		Remark:       *account.Remark,
 		Outbound:     service.AccountOutbound(account),
+		HomeProxyCredentialIncompatible: *account.Role == "user" &&
+			(account.ConPass == nil || !legacyHomeProxyUserinfo.MatchString(*account.ConPass)),
 	}
 	vo.Success(accountVo, c)
 }

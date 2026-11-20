@@ -64,6 +64,7 @@ export interface AccountVo extends IdDto {
   conAt: number;
   remark: string;
   outbound: string;
+  homeProxyCredentialIncompatible?: boolean;
 }
 
 export interface AccountLoginVo {

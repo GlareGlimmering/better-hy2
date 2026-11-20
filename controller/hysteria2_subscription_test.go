@@ -2,10 +2,13 @@ package controller
 
 import (
 	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -51,6 +54,92 @@ func TestHysteria2SubscribeBase64IgnoresTunnelHost(t *testing.T) {
 	}
 	if strings.Contains(string(decoded), context.Request.Host) {
 		t.Errorf("decoded node URI unexpectedly contains tunnel host %q", context.Request.Host)
+	}
+}
+
+func TestGeneratedSubscriptionCredentialImportsIntoLegacyHomeProxy(t *testing.T) {
+	setupControllerSubscriptionTestDatabase(t)
+	t.Setenv("HUI_NODE_ADDRESS", "93.184.216.34")
+	gin.SetMode(gin.TestMode)
+	const username = "HP+legacy-1._"
+	legacyUserinfo := regexp.MustCompile("^[-A-Za-z0-9+_.]+$")
+	request := func(method, path, body string, handler gin.HandlerFunc) *httptest.ResponseRecorder {
+		t.Helper()
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(method, path, strings.NewReader(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+		handler(c)
+		return w
+	}
+	created := request("POST", "/", fmt.Sprintf(
+		`{"username":%q,"quota":-1,"expireTime":4102444800000,"deviceNo":3,"deleted":0}`, username,
+	), SaveAccount)
+	if !strings.Contains(created.Body.String(), `"type":"ok"`) {
+		t.Fatal("creating the account with a generated password failed")
+	}
+	verifySubscription := func() string {
+		t.Helper()
+		account, err := dao.GetAccount("username = ?", username)
+		if err != nil {
+			t.Fatal(err)
+		}
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest("GET", "/hui/subscription", nil)
+		c.Request.Header.Set("User-Agent", "Wget/1.21 (HomeProxy, like v2rayN)")
+		c.Params = []gin.Param{{Key: "conPass", Value: url.QueryEscape(*account.ConPass)}}
+		Hysteria2Subscribe(c)
+		body, err := base64.StdEncoding.DecodeString(w.Body.String())
+		if w.Code != 200 || err != nil {
+			t.Fatal("expected the real HomeProxy user agent to receive a Base64 subscription")
+		}
+		parsed, err := url.Parse(string(body))
+		if err != nil || parsed.Scheme != "hysteria2" || parsed.User == nil || parsed.Hostname() != "93.184.216.34" {
+			t.Fatal("expected a complete Hysteria2 URI with authentication")
+		}
+		rawUserinfo, _, hasAuth := strings.Cut(strings.TrimPrefix(string(body), "hysteria2://"), "@")
+		if !hasAuth || !legacyUserinfo.MatchString(rawUserinfo) || !strings.HasPrefix(rawUserinfo, username+".") {
+			t.Fatal("legacy HomeProxy would reject the full authentication segment")
+		}
+		// LuCI's urldecode leaves literal '+' intact when called without decode_plus.
+		imported, err := url.PathUnescape(rawUserinfo)
+		if err != nil || imported != *account.ConPass || len(strings.TrimPrefix(imported, username+".")) != 24 {
+			t.Fatal("imported credential does not match the saved account credential")
+		}
+		authenticated, found, err := dao.FindHysteria2AuthAccount(imported)
+		if err != nil || !found || *authenticated.Id != *account.Id {
+			t.Fatal("imported credential did not resolve to the expected account in HY2 auth")
+		}
+		return imported
+	}
+	legacy, err := dao.GetAccount("username = ?", "controller-subscription-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	details := request("GET", fmt.Sprintf("/?id=%d", *legacy.Id), "", GetAccount)
+	if !strings.Contains(details.Body.String(), `"homeProxyCredentialIncompatible":true`) ||
+		strings.Contains(details.Body.String(), "conPass") {
+		t.Fatal("account details must report legacy incompatibility without exposing the credential")
+	}
+	initial := verifySubscription()
+	account, err := dao.GetAccount("username = ?", username)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := request("GET", "/", "", GenerateConnectionPassword)
+	var response struct {
+		Data string
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil || len(response.Data) != 24 {
+		t.Fatal("password regeneration did not return a 24-character password")
+	}
+	updated := request("POST", "/", fmt.Sprintf(`{"id":%d,"conPass":%q}`, *account.Id, response.Data), UpdateAccount)
+	if !strings.Contains(updated.Body.String(), `"type":"ok"`) {
+		t.Fatal("saving the regenerated password failed")
+	}
+	if verifySubscription() == initial {
+		t.Fatal("regenerating the password did not rotate the credential")
 	}
 }
 
