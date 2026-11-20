@@ -1,0 +1,66 @@
+name: Better HY2 kernel candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      upstream_tag:
+        description: Official tag without app/, for example v2.14.0
+        type: string
+      candidate_sha:
+        description: Full reviewed merge commit on the Better HY2 kernel fork (after resolving conflicts)
+        type: string
+      candidate_version:
+        description: Optional v2.x.y-hui.N-dev version
+        type: string
+  push:
+    branches:
+      - 'feature/hy2-kernel-pipeline'
+    paths:
+      - '.github/workflows/hy2-candidate.yml'
+      - 'model/constant/hy2-pair.json'
+      - 'scripts/hy2-candidate.py'
+
+permissions:
+  contents: read
+
+jobs:
+  candidate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install kernel test dependencies
+        run: sudo apt-get update && sudo apt-get install -y iproute2 iptables openssl
+      - name: Prepare isolated source and detect conflicts
+        env:
+          UPSTREAM_TAG: ${{ inputs.upstream_tag }}
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          CANDIDATE_VERSION: ${{ inputs.candidate_version }}
+        run: |
+          args=("$RUNNER_TEMP/hy2-candidate")
+          if [[ -n "$UPSTREAM_TAG" ]]; then args+=(--tag "$UPSTREAM_TAG"); fi
+          if [[ -n "$CANDIDATE_SHA" ]]; then args+=(--candidate "$CANDIDATE_SHA"); fi
+          if [[ -n "$CANDIDATE_VERSION" ]]; then args+=(--version "$CANDIDATE_VERSION"); fi
+          python3 scripts/hy2-candidate.py prepare "${args[@]}"
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: ${{ runner.temp }}/hy2-candidate/source/app/go.mod
+          cache: false
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: '0.10.12'
+      - name: Build and verify candidate
+        run: python3 scripts/hy2-candidate.py verify "$RUNNER_TEMP/hy2-candidate"
+      - name: Upload source or conflict report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hy2-candidate-source
+          path: ${{ runner.temp }}/hy2-candidate/report/
+      - name: Upload verified kernel
+        uses: actions/upload-artifact@v7
+        with:
+          name: hy2-kernel-verified
+          path: ${{ runner.temp }}/hy2-candidate/verified/

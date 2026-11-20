@@ -51,11 +51,10 @@ func DownloadHysteria2(version string) error {
 	return downloadHysteria2WithDependencies(version, deps)
 }
 
-const pairedHysteria2SHA256 = "cece1fcd469368887d5eed488407c0720e30950bd3ccd12e70e86ff27e5ae7be"
-
 func ManagedHysteria2Version() string {
 	if strings.HasPrefix(constant.Version, "v2.") {
-		return constant.Hysteria2AccountConsistencyVersion
+		version, _ := constant.ManagedHysteria2Pin()
+		return version
 	}
 	return constant.Hysteria2CustomVersion
 }
@@ -64,8 +63,7 @@ func managedHysteria2DownloadPolicy(panelVersion string, deps hysteria2DownloadD
 	if !strings.HasPrefix(panelVersion, "v2.") {
 		return deps
 	}
-	deps.expectedVersion = constant.Hysteria2AccountConsistencyVersion
-	deps.expectedSHA256 = pairedHysteria2SHA256
+	deps.expectedVersion, deps.expectedSHA256 = constant.ManagedHysteria2Pin()
 	platformAsset := deps.assetName
 	deps.assetName = func() (string, error) {
 		if _, err := platformAsset(); err != nil {

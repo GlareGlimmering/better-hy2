@@ -204,12 +204,18 @@ jobs:
           sha256sum "${BINARY_NAME}" install.sh > SHA256SUMS
           sha256sum --check SHA256SUMS
 
+      - name: Read the approved kernel pin
+        if: steps.release-tag.outputs.paired == 'true'
+        id: kernel-pin
+        run: |
+          jq -r '"commit=\(.commit)", "version=\(.version)", "sha256=\(.sha256)"' model/constant/hy2-pair.json >> "$GITHUB_OUTPUT"
+
       - name: Check out the paired kernel
         if: steps.release-tag.outputs.paired == 'true'
         uses: actions/checkout@v7
         with:
           repository: GlareGlimmering/hysteria
-          ref: dc6b01106be3ca86c21cf7a9695e858b8145671e
+          ref: ${{ steps.kernel-pin.outputs.commit }}
           path: kernel-source
           persist-credentials: false
 
@@ -226,7 +232,8 @@ jobs:
           CGO_ENABLED: '0'
           GOOS: linux
           GOARCH: amd64
-          KERNEL_VERSION: v2.13.0-hui.6-dev
+          KERNEL_VERSION: ${{ steps.kernel-pin.outputs.version }}
+          KERNEL_SHA256: ${{ steps.kernel-pin.outputs.sha256 }}
           PANEL_VERSION: ${{ steps.release-tag.outputs.tag }}
         shell: bash
         run: |
@@ -245,7 +252,7 @@ jobs:
           HUI_PAIR_TEST_KERNEL_COMMIT="$kernel_sha" \
           go test ./upgrade -run '^TestPairPreflightCompiledArtifacts(UpgradesWithMatchingInstalledKernel)?$' -count=1 -v
           cd build
-          printf '%s  %s\n' cece1fcd469368887d5eed488407c0720e30950bd3ccd12e70e86ff27e5ae7be hysteria-linux-amd64 | sha256sum --check
+          printf '%s  %s\n' "$KERNEL_SHA256" hysteria-linux-amd64 | sha256sum --check
           files=(h-ui-linux-amd64 hysteria-linux-amd64 HY2-PAIR.json)
           if [[ "$PANEL_VERSION" == v2.* || "${{ steps.release-tag.outputs.prerelease }}" != "true" ]]; then
             files+=(install.sh)

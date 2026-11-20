@@ -255,13 +255,14 @@ func TestV2ManagedKernelPolicyPinsPairedAsset(t *testing.T) {
 			return "", errors.New("fixture stops before download")
 		},
 	})
-	if deps.expectedVersion != constant.Hysteria2AccountConsistencyVersion || deps.expectedSHA256 != pairedHysteria2SHA256 {
+	version, digest := constant.ManagedHysteria2Pin()
+	if deps.expectedVersion != version || deps.expectedSHA256 != digest {
 		t.Fatal("v2 did not pin the paired kernel")
 	}
 	if err := downloadHysteria2WithDependencies(constant.Hysteria2CustomVersion, deps); err == nil || !strings.Contains(err.Error(), "unsupported managed") {
 		t.Fatalf("v2 accepted the older kernel: %v", err)
 	}
-	if err := downloadHysteria2WithDependencies(constant.Hysteria2AccountConsistencyVersion, deps); err == nil || !strings.Contains(err.Error(), "fixture stops") {
+	if err := downloadHysteria2WithDependencies(version, deps); err == nil || !strings.Contains(err.Error(), "fixture stops") {
 		t.Fatalf("v2 did not resolve the release's kernel asset: %v", err)
 	}
 }
