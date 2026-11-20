@@ -13,15 +13,6 @@ export const useSettingsStore = defineStore("setting", () => {
     set: (dark: boolean) => { colorMode.value = dark ? "dark" : "light"; },
   });
   // state
-  const fixedHeader = useStorage<boolean>(
-    "fixedHeader",
-    defaultSettings.fixedHeader
-  );
-  const sidebarLogo = useStorage<boolean>(
-    "sidebarLogo",
-    defaultSettings.sidebarLogo
-  );
-
   const layout = useStorage<string>("layout", defaultSettings.layout);
 
   const themeColor = useStorage<string>(
@@ -33,12 +24,6 @@ export const useSettingsStore = defineStore("setting", () => {
   function changeSetting(param: { key: string; value: any }) {
     const { key, value } = param;
     switch (key) {
-      case "fixedHeader":
-        fixedHeader.value = value;
-        break;
-      case "sidevarLogo":
-        sidebarLogo.value = value;
-        break;
       case "layout":
         layout.value = value;
         break;
@@ -52,8 +37,6 @@ export const useSettingsStore = defineStore("setting", () => {
 
   return {
     isDark,
-    fixedHeader,
-    sidebarLogo,
     layout,
     themeColor,
     changeSetting,

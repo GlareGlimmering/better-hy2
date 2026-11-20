@@ -179,8 +179,6 @@ export default {
     appearance: "外观设置",
     appearanceTip: "外观偏好保存在当前浏览器中",
     darkMode: "深色模式",
-    fixedHeader: "固定顶部导航栏",
-    sidebarLogo: "显示侧边栏 Logo",
     themeColor: "主题颜色",
     huiWebPort: "Better HY2 Web 端口",
     huiWebContext: "Better HY2 Web 上下文",

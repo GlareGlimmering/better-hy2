@@ -360,7 +360,6 @@
             v-model="accountExpiryDate"
             type="datetime"
             :placeholder="$t(dataForm.expireTime >= permanentAccountExpiry ? 'account.expirePermanent' : 'account.expireTime')"
-            value-format="x"
             format="YYYY-MM-DD HH:mm:ss"
             :clearable="false"
             style="width: 100%"
@@ -523,7 +522,7 @@ import {
 } from "@/api/hysteria2/types";
 import { copyText } from "@/utils/clipboard";
 import { useRouter } from "vue-router";
-import { accountExpiryAfterMonths, accountExpiryMonths, editAccountForm, newAccountForm, permanentAccountExpiry } from "./account-form";
+import { accountExpiryAfterMonths, accountExpiryMonths, accountExpiryPickerDate, editAccountForm, newAccountForm, permanentAccountExpiry } from "./account-form";
 import {
   AccountOutboundOption,
   buildAccountOutboundFormState,
@@ -835,9 +834,9 @@ const resetQuery = () => {
  * 保存
  **/
 const accountExpiryDate = computed({
-  get: () => state.dataForm.expireTime >= permanentAccountExpiry ? "" : String(state.dataForm.expireTime),
-  set: (value: string) => {
-    if (value && Number.isFinite(Number(value))) state.dataForm.expireTime = Number(value);
+  get: () => accountExpiryPickerDate(state.dataForm.expireTime),
+  set: (value: Date | undefined) => {
+    if (value instanceof Date && Number.isFinite(value.getTime())) state.dataForm.expireTime = value.getTime();
   },
 });
 const connectionPasswordDisplay = computed(() => {

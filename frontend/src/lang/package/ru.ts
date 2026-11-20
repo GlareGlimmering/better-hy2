@@ -181,8 +181,6 @@ export default {
     appearance: "Внешний вид",
     appearanceTip: "Настройки внешнего вида сохраняются в этом браузере",
     darkMode: "Тёмная тема",
-    fixedHeader: "Закрепить верхнюю панель",
-    sidebarLogo: "Показывать логотип в боковом меню",
     themeColor: "Цвет темы",
     huiWebPort: "Веб-порт Better HY2",
     huiWebContext: "Веб-контекст Better HY2",
