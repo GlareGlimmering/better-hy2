@@ -37,8 +37,8 @@ const (
 	panelHealthInterval = time.Second
 )
 
-// Stable SemVer and the legacy custom release line are both installable.
-var releaseTagPattern = regexp.MustCompile(`^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-custom\.(0|[1-9]\d*)(?:-rc\.(0|[1-9]\d*))?|-rc\.(0|[1-9]\d*))?$`)
+// Stable, regular RC, legacy custom, and v2 test RC tags are installable.
+var releaseTagPattern = regexp.MustCompile(`^v(?:(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-custom\.(0|[1-9]\d*)(?:-rc\.(0|[1-9]\d*))?|-rc\.(0|[1-9]\d*))?|2\.(0|[1-9]\d*)\.(0|[1-9]\d*)-trc\.(0|[1-9]\d*))$`)
 var scriptPattern = regexp.MustCompile(`<script[^>]+src=["']([^"']+)["']`)
 
 type Options struct {
@@ -147,7 +147,7 @@ func Run(ctx context.Context, opts Options, deps Dependencies) error {
 	}
 	if opts.Version == "latest" {
 		isRCTag := strings.Contains(release.TagName, "-rc.")
-		if !opts.Prerelease && (release.Prerelease || isRCTag) {
+		if !opts.Prerelease && (release.Prerelease || isPrereleaseTag(release.TagName)) {
 			return errors.New("stable channel returned a prerelease; refusing upgrade")
 		}
 		if opts.Prerelease && (!release.Prerelease || !isRCTag) {
@@ -157,9 +157,9 @@ func Run(ctx context.Context, opts Options, deps Dependencies) error {
 			return fmt.Errorf("no upgrade available: current %s is newer than automatic channel target %s; refusing automatic downgrade", opts.CurrentVersion, release.TagName)
 		}
 	}
-	if opts.Version != "latest" && strings.Contains(opts.CurrentVersion, "-rc.") &&
+	if opts.Version != "latest" && isPrereleaseTag(opts.CurrentVersion) &&
 		releaseTagPattern.MatchString(opts.CurrentVersion) && !release.Prerelease &&
-		!strings.Contains(release.TagName, "-rc.") && compareReleaseTags(release.TagName, opts.CurrentVersion) < 0 {
+		!isPrereleaseTag(release.TagName) && compareReleaseTags(release.TagName, opts.CurrentVersion) < 0 {
 		return errors.New("refusing prerelease-to-stable downgrade; restore the matching pre-upgrade snapshot")
 	}
 	if err := requireSupportedMajor(current[0], release.TagName); err != nil {
@@ -182,7 +182,7 @@ func Run(ctx context.Context, opts Options, deps Dependencies) error {
 	}
 	paired := standardRCTag.MatchString(release.TagName) || usesPairedStableLine(release.TagName)
 	if paired {
-		if release.Draft || release.Prerelease != strings.Contains(release.TagName, "-rc.") {
+		if release.Draft || release.Prerelease != isPrereleaseTag(release.TagName) {
 			return errors.New("paired release tag and published channel do not match")
 		}
 		if err := verifyPairExecutable(candidate); err != nil {
@@ -423,6 +423,10 @@ func compareReleaseTags(left, right string) int {
 	return 0
 }
 
+func isPrereleaseTag(tag string) bool {
+	return strings.Contains(tag, "-rc.") || strings.Contains(tag, "-trc.")
+}
+
 func releaseTagParts(tag string) ([6]int, bool) {
 	match := releaseTagPattern.FindStringSubmatch(tag)
 	if match == nil {
@@ -447,9 +451,12 @@ func releaseTagParts(tag string) ([6]int, bool) {
 	if len(numeric) == 3 {
 		parts[3] = int(^uint(0) >> 1) // stable SemVer follows any custom prerelease of the same core
 		parts[4] = 1
-	} else if len(numeric) == 4 && strings.Contains(tag, "-rc.") {
+	} else if len(numeric) == 4 && isPrereleaseTag(tag) {
 		parts[5] = parts[3]
-		parts[3] = int(^uint(0) >> 1) // Standard RCs precede the matching stable release.
+		parts[3] = int(^uint(0) >> 1)
+		if strings.Contains(tag, "-trc.") {
+			parts[4] = -1 // Test RCs precede regular RCs of the same version.
+		}
 	} else if len(numeric) == 5 {
 		parts[4] = 0 // prerelease sorts before the matching stable release
 		parts[5], _ = strconv.Atoi(numeric[4])

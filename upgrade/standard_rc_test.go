@@ -9,7 +9,7 @@ import (
 )
 
 func TestStandardRCOrdering(t *testing.T) {
-	tags := []string{"v1.0.0", "v1.1.0-custom.8-rc.23", "v1.1.0-rc.9", "v1.1.0-rc.10", "v1.1.0"}
+	tags := []string{"v1.0.0", "v1.1.0-custom.8-rc.23", "v1.1.0-rc.9", "v1.1.0-rc.10", "v1.1.0", "v2.3.1-trc.9", "v2.3.1-trc.10", "v2.3.1-rc.1", "v2.3.1"}
 	for i, tag := range tags {
 		if !releaseTagPattern.MatchString(tag) {
 			t.Fatalf("invalid tag %s", tag)
@@ -19,14 +19,21 @@ func TestStandardRCOrdering(t *testing.T) {
 		}
 	}
 	prefix := "HUI_INSTALLER_TEST=1; source " + shellQuote(installerPath(t)) + "; "
-	script := prefix + `allowed_version v1.1.0-rc.10 && version_is_older v1.1.0-rc.9 v1.1.0-rc.10 && version_is_older v1.1.0-rc.10 v1.1.0 && select_latest_prerelease '[{"tag_name":"v1.1.0-rc.10"},{"tag_name":"v1.1.0-rc.9"},{"tag_name":"v1.0.0-custom.8-rc.23"}]'`
+	script := prefix + `allowed_version v2.3.1-trc.10 && ! allowed_version v2.3.1-trc.01 &&
+      version_is_older v2.3.1-trc.9 v2.3.1-trc.10 && version_is_older v2.3.1-trc.10 v2.3.1-rc.1 &&
+      [[ "$(requested_version=v2.3.1-trc.10; resolve_version)" == v2.3.1-trc.10 ]] &&
+      allowed_version v1.1.0-rc.10 && version_is_older v1.1.0-rc.9 v1.1.0-rc.10 &&
+      version_is_older v1.1.0-rc.10 v1.1.0 &&
+      select_latest_prerelease '[{"tag_name":"v2.3.1-trc.10"},{"tag_name":"v1.1.0-rc.10"},{"tag_name":"v1.1.0-rc.9"},{"tag_name":"v1.0.0-custom.8-rc.23"}]'`
 	output, err := runBash(t, script)
 	if err != nil || strings.TrimSpace(output) != "v1.1.0-rc.10" {
 		t.Fatalf("installer selection: %v %s", err, output)
 	}
-	script = prefix + `requested_version=v1.0.0; ensure_no_automatic_downgrade v1.0.0 v1.1.0-rc.1`
-	if output, err := runBash(t, script); err == nil || !strings.Contains(output, "matching pre-upgrade snapshot") {
-		t.Fatalf("installer accepted incompatible downgrade: %v %s", err, output)
+	for _, current := range []string{"v2.3.1-rc.1", "v2.3.1-trc.1"} {
+		script = prefix + "requested_version=v2.3.0; ensure_no_automatic_downgrade v2.3.0 " + shellQuote(current)
+		if output, err := runBash(t, script); err == nil || !strings.Contains(output, "matching pre-upgrade snapshot") {
+			t.Fatalf("installer accepted incompatible downgrade from %s: %v %s", current, err, output)
+		}
 	}
 }
 

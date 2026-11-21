@@ -20,6 +20,8 @@ python3 scripts/hy2-candidate.py verify "$work"
 
 工作流进入默认分支后，可在 GitHub Actions 的 Better HY2 kernel candidate 手动输入标签、已审查的候选提交和候选版本。合入前，本地命令可完整运行，开发分支上的工作流改动触发一次批准基线验证。工作流仅上传内部构建产物，不创建 Release。
 
+内核联调使用 Better HY2 测试预发布标签 `v2.x.y-trc.N`，例如 `v2.3.1-trc.1`。使用对应发布页的安装脚本并显式传入版本。常规稳定和 RC 通道只自动发现各自渠道的版本。
+
 ## 接入面板前的验证
 
 候选通过内核测试后，再验证与面板的兼容性。特别检查 HTTP 认证、TCP/UDP 用户级出站与 Fail-Closed、计量批次确认与重试、连接限制、踢线、账号限速，以及 Worker DNS-01 和传统 Cloudflare DNS-01。使用面板已有的配套制品和 systemd 回归，另外验证实际域名请求不会先从本机解析器发出。
