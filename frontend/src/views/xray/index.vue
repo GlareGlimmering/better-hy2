@@ -21,6 +21,11 @@
       </el-row>
       <el-alert v-if="status.error || status.lastApplyError" class="status-error" :title="status.lastApplyError || status.error" type="error" :closable="false" show-icon />
       <el-space wrap class="service-actions">
+        <el-tooltip :content="$t('xray.tipInstall')">
+          <el-button :type="status.versionInstalled ? 'default' : 'primary'" :loading="loading" @click="install">
+            {{ $t("xray.installKernel") }} · {{ settings.version }}
+          </el-button>
+        </el-tooltip>
         <el-tooltip v-if="!status.running" :content="status.runtimeReady ? $t('xray.tipStart') : (status.error || $t('xray.notAppliedState'))"><el-button type="success" :loading="loading" :disabled="!status.runtimeReady" @click="runAction('start')">{{ $t("xray.startService") }}</el-button></el-tooltip>
         <template v-else>
           <el-tooltip :content="$t('xray.tipRestart')"><el-button :loading="loading" @click="runAction('restart')">{{ $t("xray.restartService") }}</el-button></el-tooltip>
@@ -83,15 +88,9 @@
       <div class="apply-time">{{ $t("xray.lastApplied") }}: {{ formatTestTime(status.lastAppliedAt) }}</div>
       <el-form label-position="top" class="advanced-form">
         <el-row :gutter="16">
-          <el-col :xs="24" :md="12"><el-form-item :label="$t('xray.version')"><el-space wrap><strong>{{ settings.version }}</strong><el-tooltip :content="$t('xray.tipInstall')"><el-button :loading="loading" @click="install">{{ $t("xray.installKernel") }}</el-button></el-tooltip></el-space></el-form-item></el-col>
           <el-col :xs="24" :md="12"><el-form-item :label="$t('xray.caCertificate')"><el-upload :auto-upload="false" :show-file-list="false" accept=".crt,.pem" :on-change="uploadCA"><el-button>{{ $t("xray.uploadCA") }}</el-button></el-upload><span class="detail">{{ status.ca.valid ? status.ca.subject : status.ca.error || $t("xray.systemCaAvailable") }}</span></el-form-item></el-col>
         </el-row>
       </el-form>
-      <el-space wrap>
-        <el-tooltip :content="$t('xray.tipApply')"><el-button type="primary" :loading="loading" @click="saveAndApply">{{ $t("xray.applyChanges") }}</el-button></el-tooltip>
-        <el-tooltip :content="$t('xray.tipSaveDraft')"><el-button :loading="loading" @click="saveDraft">{{ $t("xray.saveDraft") }}</el-button></el-tooltip>
-        <el-tooltip :content="$t('xray.tipValidate')"><el-button :loading="loading" @click="validateConfig">{{ $t("xray.checkConfig") }}</el-button></el-tooltip>
-      </el-space>
     </el-card>
 
     <el-drawer v-model="editorVisible" :title="editingId ? $t('xray.editOutbound') : $t('xray.addOutbound')" :size="compactTable ? '100%' : '560px'" class="hui-editor-drawer" append-to-body destroy-on-close :close-on-click-modal="false">
@@ -125,7 +124,7 @@
 import { useWindowSize } from "@vueuse/core";
 import { ElMessage, ElMessageBox, FormInstance, FormRules, UploadFile } from "element-plus";
 import { useI18n } from "vue-i18n";
-import { applyXrayApi, getXraySettingsApi, getXrayStatusApi, installXrayApi, restartXrayApi, saveXrayDraftApi, startXrayApi, stopXrayApi, testXrayOutboundApi, uploadXrayCAApi, validateXrayApi } from "@/api/xray";
+import { applyXrayApi, getXraySettingsApi, getXrayStatusApi, installXrayApi, restartXrayApi, saveXrayDraftApi, startXrayApi, stopXrayApi, testXrayOutboundApi, uploadXrayCAApi } from "@/api/xray";
 import type { XrayOutbound, XraySettings, XrayStatus, XrayTestResult } from "@/api/xray/types";
 import { validateOutboundEditor } from "./outbound-form";
 import { failedTestResult, relativeTestTime, visibleExitIp } from "./test-result";
@@ -168,10 +167,8 @@ const openEdit = (outbound: XrayOutbound) => { editingId.value = outbound.id; Ob
 const nextPort = () => { const used = new Set(settings.outbounds.map(item => item.socksPort)); let port = 10808; while (used.has(port)) port++; return port; };
 const saveEditor = async () => { await editorRef.value?.validate(); const validationError = validateOutboundEditor(editor, settings.outbounds, editingId.value); if (validationError) { ElMessage.error(t(`xray.validation.${validationError}`)); return; } const copy = JSON.parse(JSON.stringify(editor)) as XrayOutbound; copy.name = copy.name.trim(); copy.address = copy.address.trim(); const index = settings.outbounds.findIndex(item => item.id === editingId.value); const previous = index >= 0 ? JSON.parse(JSON.stringify(settings.outbounds[index])) as XrayOutbound : undefined; if (index >= 0) settings.outbounds.splice(index, 1, copy); else settings.outbounds.push(copy); dirty.value = true; try { await saveAndApply(); editorVisible.value = false; } catch (error) { if (index >= 0 && previous) settings.outbounds.splice(index, 1, previous); else settings.outbounds.pop(); throw error; } };
 const removeOutbound = async (outbound: XrayOutbound) => { await ElMessageBox.confirm(t("xray.deleteConfirm", { name: outbound.name }), t("common.confirm")); const index = settings.outbounds.findIndex(item => item.id === outbound.id); if (index < 0) return; const before = settings.outbounds.map(item => ({ ...item })); settings.outbounds.splice(index, 1); dirty.value = true; try { await saveAndApply(); } catch (error) { try { await saveXrayDraftApi({ ...settings, outbounds: before }); await load(); } catch { await load(); } throw error; } };
-const saveDraft = async () => { loading.value = true; try { await saveXrayDraftApi(settings); ElMessage.success(t("xray.saved")); await load(); } finally { loading.value = false; } };
 const saveAndApply = async () => { loading.value = true; try { await saveXrayDraftApi(settings); await applyXrayApi(); dirty.value = false; ElMessage.success(t("xray.applied")); await load(); } catch (error) { dirty.value = true; await refreshStatus(); throw error; } finally { loading.value = false; } };
-const validateConfig = async () => { loading.value = true; try { await saveXrayDraftApi(settings); await validateXrayApi(); ElMessage.success(t("xray.validationPassed")); } finally { loading.value = false; } };
-const install = async () => { if (!settings.version) { ElMessage.error(t("xray.versionRequired")); return; } loading.value = true; try { await installXrayApi(settings.version); ElMessage.success(t("xray.installed")); await refreshStatus(); } finally { loading.value = false; } };
+const install = async () => { if (!settings.version) { ElMessage.error(t("xray.versionRequired")); return; } loading.value = true; try { await installXrayApi(settings.version); await refreshStatus(); ElMessage.success(t("xray.installed")); } finally { loading.value = false; } };
 const runAction = async (action: "start" | "stop" | "restart") => { if (action === "stop") await ElMessageBox.confirm(t("xray.stopConfirm"), t("common.confirm")); loading.value = true; try { if (action === "start") await startXrayApi(); else if (action === "stop") await stopXrayApi(); else await restartXrayApi(); ElMessage.success(t("common.success")); await refreshStatus(); } finally { loading.value = false; } };
 const testOutbound = async (outbound: XrayOutbound) => {
   testing[outbound.id] = true;

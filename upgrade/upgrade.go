@@ -170,6 +170,11 @@ func Run(ctx context.Context, opts Options, deps Dependencies) error {
 		return nil
 	}
 
+	releaseLock, err := lockUpgrade(opts.InstallDir)
+	if err != nil {
+		return err
+	}
+	defer releaseLock()
 	workDir, err := os.MkdirTemp(opts.InstallDir, ".upgrade-download-*")
 	if err != nil {
 		return fmt.Errorf("create upgrade staging directory: %w", err)
@@ -193,23 +198,27 @@ func Run(ctx context.Context, opts Options, deps Dependencies) error {
 		return err
 	}
 
-	verifyInstalledKernel := func() error { return nil }
+	var kernelDigest string
+	var sourcePair *migrationSourcePair
 	if paired {
-		kernelDigest, err := preflightReleasePair(ctx, release, candidate, checksumPath, workDir, deps)
+		kernelDigest, err = preflightReleasePair(ctx, release, candidate, checksumPath, workDir, deps)
 		if err != nil {
 			return fmt.Errorf("paired upgrade preflight: %w", err)
 		}
 		kernelPath := filepath.Join(opts.DataDir, util.GetHysteria2BinPath())
-		verifyInstalledKernel = func() error {
-			if err := verifyFileDigest(kernelPath, kernelDigest); err != nil {
-				return fmt.Errorf("installed HY2 kernel does not match the target release pair: %w; automatic joint activation is unavailable; use a verified maintenance-mode installation", err)
+		if err := verifyFileDigest(kernelPath, kernelDigest); err != nil {
+			if current[0] != 2 || !usesPairedStableLine(release.TagName) {
+				return fmt.Errorf("installed HY2 kernel does not match the target release pair: %w; use the verified migration installer", err)
 			}
-			return nil
+			source, err := readInstalledPair(ctx, opts, workDir, deps)
+			if err != nil {
+				return fmt.Errorf("identify source pair before maintenance upgrade: %w", err)
+			}
+			sourcePair = &source
+			fmt.Fprintln(opts.Output, "The target uses a different HY2 kernel; a maintenance window will replace both components.")
+		} else {
+			fmt.Fprintln(opts.Output, "Installed HY2 kernel matches the target pair; upgrading the panel only.")
 		}
-		if err := verifyInstalledKernel(); err != nil {
-			return err
-		}
-		fmt.Fprintln(opts.Output, "Installed HY2 kernel matches the target pair; upgrading the panel only.")
 	}
 
 	channel := "stable"
@@ -226,9 +235,18 @@ func Run(ctx context.Context, opts Options, deps Dependencies) error {
 		}
 	}
 
-	if !opts.Yes {
-		if err := verifyInstalledKernel(); err != nil {
+	if sourcePair != nil {
+		opts.Version = release.TagName
+		if err := migratePairLocked(ctx, workDir, opts, deps, *sourcePair, nil); err != nil {
 			return err
+		}
+		pruneBackups(filepath.Join(opts.StateDir, "backups"), opts.BackupLimit)
+		return nil
+	}
+	if kernelDigest != "" {
+		kernelPath := filepath.Join(opts.DataDir, util.GetHysteria2BinPath())
+		if err := verifyFileDigest(kernelPath, kernelDigest); err != nil {
+			return fmt.Errorf("installed HY2 kernel changed during upgrade preflight: %w", err)
 		}
 	}
 

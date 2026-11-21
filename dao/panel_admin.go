@@ -85,17 +85,45 @@ func ReplacePanelAdminPassword(admin PanelAdmin, hash string) error {
 }
 
 func ResetPanelAdmin(newUsername, hash string) (string, error) {
+	return updatePanelAdminCredentials(nil, &hash, newUsername)
+}
+
+func UpdatePanelAdminCredentials(username, hash *string) (string, error) {
+	fallback, err := util.RandomString(6)
+	if err != nil {
+		return "", err
+	}
+	return updatePanelAdminCredentials(username, hash, fallback)
+}
+
+func updatePanelAdminCredentials(username, hash *string, fallback string) (string, error) {
 	var admin PanelAdmin
 	err := sqliteDB.Transaction(func(tx *gorm.DB) error {
 		err := tx.Order("id ASC").First(&admin).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			admin = PanelAdmin{Username: newUsername, PasswordHash: hash}
+			if hash == nil {
+				return errors.New("no administrator exists; use hui reset to initialize credentials")
+			}
+			if username != nil {
+				fallback = *username
+			}
+			admin = PanelAdmin{Username: fallback, PasswordHash: *hash}
 			return tx.Create(&admin).Error
 		}
 		if err != nil {
 			return err
 		}
-		return tx.Model(&admin).Updates(map[string]any{"password_hash": hash, "legacy": false, "must_change": false}).Error
+		changes := map[string]any{}
+		if username != nil {
+			admin.Username = *username
+			changes["username"] = *username
+		}
+		if hash != nil {
+			changes["password_hash"] = *hash
+			changes["legacy"] = false
+			changes["must_change"] = false
+		}
+		return tx.Model(&PanelAdmin{}).Where("id = ?", admin.ID).Updates(changes).Error
 	})
 	return admin.Username, err
 }

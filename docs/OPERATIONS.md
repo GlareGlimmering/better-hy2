@@ -18,6 +18,8 @@ This resets only administrator credentials, not proxy accounts. `HUI_DATA` can e
 
 ## Panel administrators in v1.1.0-rc.4 and later
 
+To customize local administrator credentials, use `sudo hui reset --interactive` for both fields, `sudo hui reset username` to change only the username, or `sudo hui reset password` to change only the password. Password prompts are hidden. Scripts can read one line from standard input with `hui reset --username <name> --password-stdin` or `hui reset password --stdin`. Plain `hui reset` still generates a password.
+
 Panel passwords and HY2 connection credentials are separate. Existing active administrator usernames migrate automatically. If the old panel password was also used as a proxy credential, sign in with it once and complete the required password change to obtain a new session. If anyone else knows the old password, use local recovery with `sudo hui reset` before exposing the login page. Reset keeps the existing administrator username when available, outputs a new panel-only password, and revokes that administrator's sessions. Sign out and use **Change password** on the login page to set a personal password.
 
 Move any clients still using old administrator credentials to an independent proxy account before upgrading. Ordinary proxy accounts and their subscriptions carry forward. Account import and export are removed. Historical export files are retained and may contain connection credentials. Review and handle them privately.
@@ -86,7 +88,7 @@ Select an enabled node in the account drawer and save. In strict mode every effe
 
 ## Update, backup and recovery
 
-For RC.7 use the version-pinned v2.0.1 installer in the README. It delegates to the v2 updater, verifies the release pair and refuses a mismatched installed kernel before stopping the service. On v2, `sudo hui update` selects the highest available stable v2 release. The legacy `upgrade` command remains. v1 installations with their original kernel require a separate v2 installation or an independently verified migration.
+Use the target release’s version-pinned installer when the local updater is older. It delegates to the verified target updater. The new updater verifies release assets before stopping the service. A matching kernel hash permits a panel-only upgrade. A changed hash on a running standard v2 installation triggers verification of the installed source pair and a coordinated maintenance upgrade. On v2, `sudo hui update` selects the highest available stable v2 release. The legacy `upgrade` command remains. v1 installations with their original kernel require a separate v2 installation or an independently verified migration.
 
 Upgrade snapshots under `/var/lib/h-ui/backups/upgrade-*` contain a SQLite-consistent database copy, previous binary, systemd unit, HY2 YAML, and relevant Xray config/CA files, with ownership metadata. Five newest snapshots are retained. Startup/HTTP/frontend failure restores the snapshot and prior running state; an unsuccessful rollback is reported explicitly. Existing configuration, bindings and certificate paths are retained.
 

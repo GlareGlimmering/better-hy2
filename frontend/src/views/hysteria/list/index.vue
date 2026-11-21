@@ -35,76 +35,6 @@
       @close="configSaveError = ''"
     />
 
-    <el-card shadow="never" class="hui-panel lifecycle-panel">
-      <template #header>
-        <div class="lifecycle-header">
-          <h2 class="hui-section-title">{{ $t("monitor.hysteria2Running") }}</h2>
-          <small>{{ hysteria2Monitor.version || "—" }}</small>
-        </div>
-      </template>
-      <el-form inline class="lifecycle-toolbar">
-        <el-form-item>
-          <span class="hui-status" :class="hysteria2Monitor.running ? 'is-live' : ''">
-            {{ $t(hysteria2Monitor.running ? "hysteria.runningState" : "hysteria.stoppedState") }}
-          </span>
-        </el-form-item>
-        <el-form-item v-if="hysteria2Monitor.running">
-          <el-button
-            :loading="lifecycleLoading"
-            :disabled="lifecycleLoading"
-            @click="handleLifecycleAction('restart')"
-          >
-            {{ $t("hysteria.restartService") }}
-          </el-button>
-          <el-button
-            type="danger"
-            :loading="lifecycleLoading"
-            :disabled="lifecycleLoading"
-            @click="handleLifecycleAction('stop')"
-          >
-            {{ $t("hysteria.stopService") }}
-          </el-button>
-        </el-form-item>
-        <el-form-item v-else>
-          <el-button
-            type="success"
-            :loading="lifecycleLoading"
-            :disabled="lifecycleLoading"
-            @click="handleLifecycleAction('start')"
-          >
-            {{ $t("hysteria.startService") }}
-          </el-button>
-        </el-form-item>
-        <el-form-item>
-          <div class="hui-actions kernel-actions">
-            <el-select
-              v-model="hysteria2Version"
-              :placeholder="$t('hysteria.hysteria2Version')"
-              class="kernel-select"
-            >
-              <el-option
-                v-for="item in hysteria2Versions"
-                :key="item"
-                :label="item"
-                :value="item"
-              />
-            </el-select>
-            <el-button
-              @click="handleHysteria2ChangeVersion"
-              >{{ $t("hysteria.hysteria2ChangeVersion") }}
-            </el-button>
-          </div>
-        </el-form-item>
-      </el-form>
-
-      <el-alert
-        :title="$t('hysteria.lifecycleNotice')"
-        type="info"
-        :closable="false"
-        show-icon
-      />
-    </el-card>
-
     <el-card shadow="never" class="hui-panel hy2-configuration">
       <el-alert
         :type="routingStatus.ready ? 'success' : 'warning'"
@@ -297,7 +227,7 @@
               :content="$t('hysteria.config.acme.email')"
               placement="bottom"
             >
-              <el-form-item label="acme.email" prop="acme.email">
+              <el-form-item :label="$t('hysteria.acmeContact')" prop="acme.email">
                 <el-input v-model="dataForm.acme.email" clearable />
               </el-form-item>
             </el-tooltip>
@@ -401,10 +331,14 @@
               placement="bottom"
             >
               <el-form-item label="acme.dns.config" prop="acme.dns.config">
+                <worker-credentials
+                  v-if="dataForm.acme.dns.name === 'worker'"
+                  v-model="dataForm.acme.dns.config"
+                />
                 <dns-credentials
+                  v-else
                   v-model="dataForm.acme.dns.config"
                   :provider="dataForm.acme.dns.name"
-                  :fixed-keys="dataForm.acme.dns.name === 'worker' ? acmeWorkerKeys : undefined"
                 />
               </el-form-item>
             </el-tooltip>
@@ -1243,6 +1177,76 @@
         </div>
       </el-form>
     </el-card>
+
+    <el-card shadow="never" class="hui-panel lifecycle-panel">
+      <template #header>
+        <div class="lifecycle-header">
+          <h2 class="hui-section-title">{{ $t("monitor.hysteria2Running") }}</h2>
+          <small>{{ hysteria2Monitor.version || "—" }}</small>
+        </div>
+      </template>
+      <el-form inline class="lifecycle-toolbar">
+        <el-form-item>
+          <span class="hui-status" :class="hysteria2Monitor.running ? 'is-live' : ''">
+            {{ $t(hysteria2Monitor.running ? "hysteria.runningState" : "hysteria.stoppedState") }}
+          </span>
+        </el-form-item>
+        <el-form-item v-if="hysteria2Monitor.running">
+          <el-button
+            :loading="lifecycleLoading"
+            :disabled="lifecycleLoading"
+            @click="handleLifecycleAction('restart')"
+          >
+            {{ $t("hysteria.restartService") }}
+          </el-button>
+          <el-button
+            type="danger"
+            :loading="lifecycleLoading"
+            :disabled="lifecycleLoading"
+            @click="handleLifecycleAction('stop')"
+          >
+            {{ $t("hysteria.stopService") }}
+          </el-button>
+        </el-form-item>
+        <el-form-item v-else>
+          <el-button
+            type="success"
+            :loading="lifecycleLoading"
+            :disabled="lifecycleLoading"
+            @click="handleLifecycleAction('start')"
+          >
+            {{ $t("hysteria.startService") }}
+          </el-button>
+        </el-form-item>
+        <el-form-item>
+          <div class="hui-actions kernel-actions">
+            <el-select
+              v-model="hysteria2Version"
+              :placeholder="$t('hysteria.hysteria2Version')"
+              class="kernel-select"
+            >
+              <el-option
+                v-for="item in hysteria2Versions"
+                :key="item"
+                :label="item"
+                :value="item"
+              />
+            </el-select>
+            <el-button
+              @click="handleHysteria2ChangeVersion"
+              >{{ $t("hysteria.hysteria2ChangeVersion") }}
+            </el-button>
+          </div>
+        </el-form-item>
+      </el-form>
+
+      <el-alert
+        :title="$t('hysteria.lifecycleNotice')"
+        type="info"
+        :closable="false"
+        show-icon
+      />
+    </el-card>
   </div>
 </template>
 
@@ -1255,6 +1259,7 @@ export default {
 <script setup lang="ts">
 import type { Hysteria2ApplyResult } from "@/api/config";
 import DnsCredentials from "./dns-credentials.vue";
+import WorkerCredentials from "./worker-credentials.vue";
 import {
   ConfigsUpdateDto,
   defaultHysteria2ServerConfig,
@@ -1324,7 +1329,6 @@ const congestionTypes = ref<string[]>(["bbr", "reno"]);
 const bbrProfiles = ref<string[]>(["standard", "conservative", "aggressive"]);
 const tlsSniGuards = ref<string[]>(["dns-san", "disable", "strict"]);
 const aclTypes = ref<string[]>(["file", "inline"]);
-const acmeWorkerKeys = ["worker_url", "worker_token"];
 const onACMEDNSProviderChange = () => {
   if (dataForm.value.acme?.dns) dataForm.value.acme.dns.config = {};
 };

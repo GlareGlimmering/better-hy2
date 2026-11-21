@@ -12,14 +12,14 @@
         <el-button v-if="modelValue[key]" text type="danger" @click="remove(String(key))">{{ $t("common.delete") }}</el-button>
       </div>
     </div>
-    <el-button v-if="!fixedKeys" @click="edit('')">+</el-button>
+    <el-button @click="edit('')">+</el-button>
     <el-dialog v-model="editing" append-to-body width="min(420px, 95vw)" :title="$t('hysteria.config.acme.dns.config')" @closed="clearDraft">
       <el-form label-position="top">
         <el-form-item label="key">
           <el-input v-model="draftKey" :disabled="!!originalKey" />
         </el-form-item>
         <el-form-item label="value">
-          <el-input v-model="draftValue" :type="provider === 'worker' && originalKey === 'worker_url' ? 'url' : 'password'" autocomplete="new-password" />
+          <el-input v-model="draftValue" type="password" autocomplete="new-password" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -37,10 +37,10 @@ import { useI18n } from "vue-i18n";
 import { readACMEDNSValueApi } from "@/api/config";
 import { copyConfirmedDNSValue } from "./dns-copy";
 
-const props = defineProps<{ modelValue: Record<string, string>; provider: string; fixedKeys?: string[] }>();
+const props = defineProps<{ modelValue: Record<string, string>; provider: string }>();
 const emit = defineEmits<{ (e: "update:modelValue", values: Record<string, string>): void }>();
 const { t } = useI18n();
-const keys = computed(() => props.fixedKeys ?? Object.keys(props.modelValue));
+const keys = computed(() => Object.keys(props.modelValue));
 const redacted = "********";
 const editing = ref(false);
 const originalKey = ref("");

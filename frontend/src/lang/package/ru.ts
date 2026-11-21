@@ -287,6 +287,11 @@ export default {
   hysteria: {
     copyDNSKey: "Копировать ключ",
     copyDNSValue: "Копировать значение",
+    acmeContact: "Контактный адрес учётной записи ACME (необязательно)",
+    workerCredentialsFormat: "Введите адрес HTTPS, пробел и ключ узла",
+    workerCredentialsSaved: "Сохранено. Введите новую пару для замены.",
+    copyWorkerCredentials: "Копировать данные Worker",
+    copyWorkerWarning: "Адрес Worker и ключ узла будут скопированы в буфер обмена. Убедитесь, что это безопасно.",
     copyDNSWarning: "Это учётные данные API DNS-провайдера. Они будут помещены в буфер обмена. Убедитесь, что это безопасно.",
     copyDNSFailed: "Не удалось скопировать учётные данные DNS. Проверьте разрешение на доступ к буферу обмена.",
     tlsFilesMissing: "Укажите сертификат TLS и закрытый ключ.",

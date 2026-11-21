@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -45,7 +44,9 @@ var upgradeCmd = &cobra.Command{
 		if len(args) == 1 {
 			opts.Version = args[0]
 		}
-		if err := upgradeop.Run(context.Background(), opts, upgradeop.DefaultDependencies()); err != nil {
+		ctx, cancel := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+		defer cancel()
+		if err := upgradeop.Run(ctx, opts, upgradeop.DefaultDependencies()); err != nil {
 			return fmt.Errorf("upgrade: %w", err)
 		}
 		return nil
