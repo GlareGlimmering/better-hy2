@@ -28,28 +28,39 @@ const (
 	migrationKernelSHA = "f1577bff290f5591a651b88596103045390581a6c0a6e999611cab8baa653d9e"
 )
 
+type migrationSourcePair struct {
+	version, panelSHA, kernelSHA string
+	paired                       bool
+}
+
 func MigrateV1(ctx context.Context, assets string, opts Options, deps Dependencies) error {
-	if err := normalizeAndValidate(&opts, &deps); err != nil {
-		return err
-	}
 	if !usesPairedStableLine(opts.Version) {
 		return errors.New("migration requires an explicit v2 release")
 	}
-	opts.CurrentVersion = migrationSource
+	return migratePair(ctx, assets, opts, deps, migrationSourcePair{
+		version: migrationSource, panelSHA: migrationPanelSHA, kernelSHA: migrationKernelSHA,
+	}, nil)
+}
+
+func migratePair(ctx context.Context, assets string, opts Options, deps Dependencies, source migrationSourcePair, pinnedAssets map[string]string) error {
+	if err := normalizeAndValidate(&opts, &deps); err != nil {
+		return err
+	}
+	opts.CurrentVersion = source.version
 	binary := filepath.Join(opts.InstallDir, "h-ui")
 	kernel := filepath.Join(opts.DataDir, util.GetHysteria2BinPath())
 	database := filepath.Join(opts.DataDir, constant.SqliteDBPath)
 	liveConfig := filepath.Join(opts.DataDir, constant.Hysteria2ConfigPath)
-	unitState, err := checkV1MigrationSource(opts, deps, binary, kernel, database)
+	unitState, err := checkMigrationSource(opts, deps, binary, kernel, database, source)
 	if err != nil {
 		return err
 	}
-	enabled, err := migrationHY2Enabled(database, false)
+	enabled, err := migrationHY2Enabled(database, source.paired)
 	if err != nil {
 		return err
 	}
 	if enabled {
-		if err := waitMigrationHY2(ctx, liveConfig, false, deps); err != nil {
+		if err := waitMigrationHY2(ctx, liveConfig, source.paired, deps); err != nil {
 			return fmt.Errorf("source HY2 is not ready: %w", err)
 		}
 	}
@@ -69,6 +80,11 @@ func MigrateV1(ctx context.Context, assets string, opts Options, deps Dependenci
 		if err := copyFile(filepath.Join(assets, name), filepath.Join(work, name), 0600); err != nil {
 			return fmt.Errorf("stage migration asset %s: %w", name, err)
 		}
+		if digest := pinnedAssets[name]; digest != "" {
+			if err := verifyFileDigest(filepath.Join(work, name), digest); err != nil {
+				return fmt.Errorf("verify pinned release asset: %w", err)
+			}
+		}
 	}
 	candidate, candidateKernel := filepath.Join(work, BinaryAsset), filepath.Join(work, pairKernelAsset)
 	sums := filepath.Join(work, ChecksumAsset)
@@ -83,21 +99,21 @@ func MigrateV1(ctx context.Context, assets string, opts Options, deps Dependenci
 	}
 	snap, err := createSnapshot(opts, opts.Version, deps)
 	if err != nil {
-		return fmt.Errorf("prepare v1 snapshot: %w", err)
+		return fmt.Errorf("prepare migration snapshot: %w", err)
 	}
 	state, _ := json.Marshal(map[string]string{"activeState": "active", "unitFileState": unitState})
 	if err := os.WriteFile(filepath.Join(snap.Dir, "service-state.json"), state, 0600); err != nil {
 		return err
 	}
-	fmt.Fprintf(opts.Output, "Verified v1.0.0 and target %s. Recovery snapshot: %s\n", opts.Version, snap.Dir)
-	latestState, err := checkV1MigrationSource(opts, deps, binary, kernel, database)
+	fmt.Fprintf(opts.Output, "Verified %s and target %s. Recovery snapshot: %s\n", source.version, opts.Version, snap.Dir)
+	latestState, err := checkMigrationSource(opts, deps, binary, kernel, database, source)
 	if err != nil {
 		return err
 	}
 	if latestState != unitState {
 		return errors.New("source systemd boot state changed while preparing migration")
 	}
-	currentEnabled, err := migrationHY2Enabled(database, false)
+	currentEnabled, err := migrationHY2Enabled(database, source.paired)
 	if err != nil || currentEnabled != enabled {
 		return errors.New("source HY2 enable state changed while preparing migration")
 	}
@@ -107,22 +123,22 @@ func MigrateV1(ctx context.Context, assets string, opts Options, deps Dependenci
 	}
 	fmt.Fprintln(opts.Output, "Maintenance window: stopping h-ui and its HY2 child.")
 	if _, err := deps.Command("systemctl", "stop", opts.ServiceName); err != nil {
-		return migrationRestartUnchanged(opts, deps, fmt.Errorf("stop old h-ui: %w", err))
+		return migrationRestartUnchanged(opts, deps, source.version, fmt.Errorf("stop old h-ui: %w", err))
 	}
 	if err := migrationRequireStopped(opts, deps); err != nil {
-		return migrationRestartUnchanged(opts, deps, err)
+		return migrationRestartUnchanged(opts, deps, source.version, err)
 	}
 	// Refresh the already prepared backup after the old writer has stopped.
 	// The first consistent copy stays intact until the replacement is complete.
 	stoppedDB := filepath.Join(snap.Dir, "h_ui.db.stopped")
 	if err := deps.BackupDatabase(database, stoppedDB); err != nil {
-		return migrationRestartUnchanged(opts, deps, fmt.Errorf("snapshot stopped SQLite database: %w", err))
+		return migrationRestartUnchanged(opts, deps, source.version, fmt.Errorf("snapshot stopped SQLite database: %w", err))
 	}
 	if err := os.Rename(stoppedDB, snap.Files[database]); err != nil {
-		return migrationRestartUnchanged(opts, deps, fmt.Errorf("commit stopped SQLite snapshot: %w", err))
+		return migrationRestartUnchanged(opts, deps, source.version, fmt.Errorf("commit stopped SQLite snapshot: %w", err))
 	}
-	if err := writeUpgradeRecord(snap.Dir, migrationSource, opts.Version, "activating-pair", deps.Now()); err != nil {
-		return migrationRestartUnchanged(opts, deps, err)
+	if err := writeUpgradeRecord(snap.Dir, source.version, opts.Version, "activating-pair", deps.Now()); err != nil {
+		return migrationRestartUnchanged(opts, deps, source.version, err)
 	}
 
 	applyErr := func() error {
@@ -157,7 +173,7 @@ func MigrateV1(ctx context.Context, assets string, opts Options, deps Dependenci
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		return writeUpgradeRecord(snap.Dir, migrationSource, opts.Version, "success", deps.Now())
+		return writeUpgradeRecord(snap.Dir, source.version, opts.Version, "success", deps.Now())
 	}()
 	if applyErr == nil {
 		fmt.Fprintf(opts.Output, "Migration successful: running %s with its matching HY2 kernel. Snapshot retained at %s\n", opts.Version, snap.Dir)
@@ -168,25 +184,25 @@ func MigrateV1(ctx context.Context, assets string, opts Options, deps Dependenci
 		return fmt.Errorf("migration failed: %v; CRITICAL: rollback failed: %w; snapshot: %s", applyErr, err, snap.Dir)
 	}
 	if enabled {
-		if err := waitMigrationHY2(context.Background(), liveConfig, false, deps); err != nil {
-			return fmt.Errorf("migration failed: %v; v1 files and panel restored but old HY2 health failed: %w; snapshot: %s", applyErr, err, snap.Dir)
+		if err := waitMigrationHY2(context.Background(), liveConfig, source.paired, deps); err != nil {
+			return fmt.Errorf("migration failed: %v; source files and panel restored but old HY2 health failed: %w; snapshot: %s", applyErr, err, snap.Dir)
 		}
 	}
-	_ = writeUpgradeRecord(snap.Dir, migrationSource, opts.Version, "rolled-back", deps.Now())
-	return fmt.Errorf("migration failed: %v; rollback successful: v1.0.0 and its original kernel are running; snapshot: %s", applyErr, snap.Dir)
+	_ = writeUpgradeRecord(snap.Dir, source.version, opts.Version, "rolled-back", deps.Now())
+	return fmt.Errorf("migration failed: %v; rollback successful: %s with its original kernel and service state restored; snapshot: %s", applyErr, source.version, snap.Dir)
 }
 
-func checkV1MigrationSource(opts Options, deps Dependencies, binary, kernel, database string) (string, error) {
+func checkMigrationSource(opts Options, deps Dependencies, binary, kernel, database string, source migrationSourcePair) (string, error) {
 	for _, path := range []string{opts.InstallDir, opts.StateDir, opts.SystemdUnitPath, binary, kernel, database} {
 		if resolved, err := filepath.EvalSymlinks(path); err != nil || resolved != path {
-			return "", fmt.Errorf("unsupported v1 installation layout: expected a non-symlink at %s", path)
+			return "", fmt.Errorf("unsupported source installation layout: expected a non-symlink at %s", path)
 		}
 	}
-	if err := verifyFileDigest(binary, migrationPanelSHA); err != nil {
-		return "", fmt.Errorf("only the official Better HY2 v1.0.0 panel is a supported source: %w", err)
+	if err := verifyFileDigest(binary, source.panelSHA); err != nil {
+		return "", fmt.Errorf("only the exact Better HY2 %s panel is a supported source: %w", source.version, err)
 	}
-	if err := verifyFileDigest(kernel, migrationKernelSHA); err != nil {
-		return "", fmt.Errorf("only the official v2.13.0-hui.4 kernel is a supported source: %w", err)
+	if err := verifyFileDigest(kernel, source.kernelSHA); err != nil {
+		return "", fmt.Errorf("source kernel does not match the Better HY2 %s pair: %w", source.version, err)
 	}
 	out, err := deps.Command("systemctl", "show", opts.ServiceName, "--property=ActiveState,UnitFileState,FragmentPath,DropInPaths,WorkingDirectory,Environment,EnvironmentFiles,ExecStart,ExecStartPre,ExecStartPost,ExecCondition,ExecStop,ExecStopPost,User,Type,KillMode,RootDirectory,RootImage,BindPaths,BindReadOnlyPaths,PassEnvironment,UnsetEnvironment")
 	if err != nil {
@@ -204,7 +220,7 @@ func checkV1MigrationSource(opts Options, deps Dependencies, binary, kernel, dat
 		properties["Environment"] != expectedEnvironment || properties["User"] != "root" || properties["Type"] != "simple" ||
 		properties["KillMode"] != "control-group" || strings.Count(properties["ExecStart"], "argv[]=") != 1 ||
 		!strings.Contains(properties["ExecStart"], expectedArgv) {
-		return "", errors.New("unsupported systemd layout: migration requires the standard v1.0.0 h-ui.service on port 8000")
+		return "", errors.New("unsupported systemd layout: migration requires the standard h-ui.service on port 8000")
 	}
 	for _, property := range []string{"DropInPaths", "EnvironmentFiles", "ExecStartPre", "ExecStartPost", "ExecCondition", "ExecStop", "ExecStopPost", "RootDirectory", "RootImage", "BindPaths", "BindReadOnlyPaths", "PassEnvironment", "UnsetEnvironment"} {
 		if properties[property] != "" {
@@ -212,7 +228,7 @@ func checkV1MigrationSource(opts Options, deps Dependencies, binary, kernel, dat
 		}
 	}
 	if properties["ActiveState"] != "active" || (properties["UnitFileState"] != "enabled" && properties["UnitFileState"] != "disabled") {
-		return "", errors.New("migration requires a running v1.0.0 service with enabled or disabled boot state")
+		return "", errors.New("migration requires a running h-ui service with enabled or disabled boot state")
 	}
 	return properties["UnitFileState"], nil
 }
@@ -225,11 +241,11 @@ func migrationRequireStopped(opts Options, deps Dependencies) error {
 	return nil
 }
 
-func migrationRestartUnchanged(opts Options, deps Dependencies, cause error) error {
+func migrationRestartUnchanged(opts Options, deps Dependencies, sourceVersion string, cause error) error {
 	if err := restartAndVerifyPrevious(opts, deps); err != nil {
-		return fmt.Errorf("migration stopped before replacement: %v; CRITICAL: could not restart v1: %w", cause, err)
+		return fmt.Errorf("migration stopped before replacement: %v; CRITICAL: could not restart %s: %w", cause, sourceVersion, err)
 	}
-	return fmt.Errorf("migration stopped before replacement: %w; v1.0.0 is running", cause)
+	return fmt.Errorf("migration stopped before replacement: %w; %s is running", cause, sourceVersion)
 }
 
 func migrationHY2Enabled(path string, migrated bool) (bool, error) {
