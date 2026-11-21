@@ -6,7 +6,7 @@ trap 'printf "Recovery check failed at line %s\n" "$LINENO" >&2' ERR
 [[ $EUID == 0 && ${HUI_DISPOSABLE_VM:-} == 1 ]]
 [[ $(cat /proc/1/comm) == systemd ]]
 systemctl show --property=SystemState >/dev/null
-[[ ${2:-} == active || ${2:-} == stopped || ${2:-} == migration ]]
+[[ ${2:-} == active || ${2:-} == stopped || ${2:-} == migration || ${2:-} == trc ]]
 case ${3:-stable} in
   stable) old_version=v1.0.0 ;;
   rc.1) old_version=v1.1.0-rc.1 ;;
@@ -14,6 +14,7 @@ case ${3:-stable} in
   rc.4) old_version=v1.1.0-rc.4 ;;
   rc.7) old_version=v1.1.0-rc.7 ;;
   v2-stable) old_version=v2.0.1 ;;
+  trc.1) old_version=v2.3.1-trc.1 ;;
   *) echo "Unsupported recovery baseline: $3" >&2; exit 1 ;;
 esac
 artifacts=$(realpath "$1")
@@ -22,8 +23,9 @@ root=$(mktemp -d /var/tmp/hui-recovery.XXXXXX)
 live=$root/live
 unit=better-hy2-recovery-test.service
 unitfile=/etc/systemd/system/$unit
-if [[ $2 == migration ]]; then
-  [[ ${GITHUB_ACTIONS:-} == true && $old_version == v1.0.0 ]]
+if [[ $2 == migration || $2 == trc ]]; then
+  [[ ${GITHUB_ACTIONS:-} == true ]]
+  [[ ( $2 == migration && $old_version == v1.0.0 ) || ( $2 == trc && $old_version == v2.3.1-trc.1 ) ]]
   live=/usr/local/h-ui
   unit=h-ui.service
   unitfile=/etc/systemd/system/$unit
@@ -135,7 +137,7 @@ EOF
 openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=localhost \
   -keyout "$root/key.pem" -out "$root/cert.pem" >"$root/openssl.log" 2>&1
 
-if [[ $2 == migration ]]; then
+if [[ $2 == migration || $2 == trc ]]; then
   (HUI_INSTALLER_TEST=1; source "$(dirname "$0")/../install.sh"; install_systemd_unit)
 else
 cat >"$unitfile" <<EOF
@@ -185,6 +187,11 @@ PY
 systemctl start "$unit"
 check_panel
 check_proxy "$artifacts/old-kernel"
+if [[ $2 == trc ]]; then
+  source "$(dirname "$0")/test-trc-maintenance.sh"
+  exercise_trc_maintenance
+  exit 0
+fi
 if [[ $2 == migration ]]; then
   source "$(dirname "$0")/test-cross-generation-migration.sh"
   exercise_cross_generation_migration

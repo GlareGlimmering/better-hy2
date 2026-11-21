@@ -1,0 +1,56 @@
+name: Better HY2 TRC pair maintenance
+
+on:
+  push:
+    branches:
+      - codex/sjc-trc-maintenance
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  maintenance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Compile the maintenance helper
+        env:
+          CGO_ENABLED: '0'
+          GOOS: linux
+          GOARCH: amd64
+        run: |
+          go build -trimpath -o "$RUNNER_TEMP/trc-maintenance" ./scripts/trc-maintenance
+          bash -n scripts/test-systemd-recovery.sh
+          bash -n scripts/test-trc-maintenance.sh
+      - name: Fetch the published test releases
+        working-directory: ${{ runner.temp }}
+        run: |
+          for tag in v2.3.1-trc.1 v2.3.1-trc.2; do
+            mkdir "$tag"
+            for asset in h-ui-linux-amd64 hysteria-linux-amd64 HY2-PAIR.json install.sh SHA256SUMS; do
+              curl -fsSL --retry 3 -o "$tag/$asset" "https://github.com/GlareGlimmering/better-hy2/releases/download/$tag/$asset"
+            done
+            (cd "$tag" && sha256sum --check SHA256SUMS)
+          done
+          mv v2.3.1-trc.1/h-ui-linux-amd64 v2.3.1-trc.2/old-panel
+          mv v2.3.1-trc.1/hysteria-linux-amd64 v2.3.1-trc.2/old-kernel
+          mv trc-maintenance v2.3.1-trc.2/
+          chmod 0755 v2.3.1-trc.2/{old-panel,old-kernel,h-ui-linux-amd64,hysteria-linux-amd64}
+      - name: Verify real systemd activation and health failure rollback
+        run: |
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          sudo -n env HUI_DISPOSABLE_VM=1 GITHUB_ACTIONS=true \
+            bash scripts/test-systemd-recovery.sh "$RUNNER_TEMP/v2.3.1-trc.2" trc trc.1
+      - name: Upload the tested maintenance helper
+        uses: actions/upload-artifact@v7
+        with:
+          name: trc-1-to-trc-2-linux-amd64
+          path: ${{ runner.temp }}/v2.3.1-trc.2/trc-maintenance
+          if-no-files-found: error
