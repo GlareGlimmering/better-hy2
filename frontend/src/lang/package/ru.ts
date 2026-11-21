@@ -287,6 +287,7 @@ export default {
   hysteria: {
     copyDNSKey: "Копировать ключ",
     copyDNSValue: "Копировать значение",
+    kernelDerivedFrom: "На основе официальной Hysteria2 {upstream} · Сборка {build}",
     acmeContact: "Контактный адрес учётной записи ACME (необязательно)",
     workerCredentialsFormat: "Введите адрес HTTPS, пробел и ключ узла",
     workerCredentialsSaved: "Сохранено. Введите новую пару для замены.",

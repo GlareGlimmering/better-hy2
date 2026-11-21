@@ -283,6 +283,7 @@ export default {
   hysteria: {
     copyDNSKey: "复制键",
     copyDNSValue: "复制值",
+    kernelDerivedFrom: "派生自官方 Hysteria2 {upstream} · 构建 {build}",
     acmeContact: "ACME 账户联系邮箱（可选）",
     workerCredentialsFormat: "填写 HTTPS 根地址、空格、节点凭据",
     workerCredentialsSaved: "已保存。输入一对新凭据可替换。",

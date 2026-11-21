@@ -1182,7 +1182,9 @@
       <template #header>
         <div class="lifecycle-header">
           <h2 class="hui-section-title">{{ $t("monitor.hysteria2Running") }}</h2>
-          <small>{{ hysteria2Monitor.version || "—" }}</small>
+          <small :title="kernelTooltip(hysteria2Monitor.version)">
+            {{ describeHY2Kernel(hysteria2Monitor.version).label }}
+          </small>
         </div>
       </template>
       <el-form inline class="lifecycle-toolbar">
@@ -1224,13 +1226,16 @@
               v-model="hysteria2Version"
               :placeholder="$t('hysteria.hysteria2Version')"
               class="kernel-select"
+              :title="kernelTooltip(hysteria2Version)"
             >
               <el-option
                 v-for="item in hysteria2Versions"
                 :key="item"
-                :label="item"
+                :label="describeHY2Kernel(item).label"
                 :value="item"
-              />
+              >
+                <span :title="kernelTooltip(item)">{{ describeHY2Kernel(item).label }}</span>
+              </el-option>
             </el-select>
             <el-button
               @click="handleHysteria2ChangeVersion"
@@ -1282,6 +1287,7 @@ import {
   uploadCertFileApi,
 } from "@/api/config";
 import { useI18n } from "vue-i18n";
+import { describeHY2Kernel } from "@/utils/hy2-kernel";
 import { assignWith, deepCopy } from "@/utils/copy";
 import {
   UploadFile,
@@ -1667,6 +1673,11 @@ const setHysteria2Versions = async () => {
   state.hysteria2Versions = data;
 };
 
+const kernelTooltip = (version?: string) => {
+  const { upstream, channel } = describeHY2Kernel(version);
+  if (!upstream) return undefined;
+  return [channel, t("hysteria.kernelDerivedFrom", { upstream, build: version })].filter(Boolean).join(" · ");
+};
 const setHysteria2Monitor = async () => {
   const { data } = await monitorHysteria2Api();
   Object.assign(state.hysteria2Monitor, data);

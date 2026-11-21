@@ -49,7 +49,10 @@
           </span>
           <span v-else>—</span>
         </div>
-        <small>HY2 {{ hysteria2Monitor.version || "—" }} · Better HY2 {{ systemMonitor.huiVersion || "—" }}</small>
+        <small>
+          <span :title="kernelTooltip">HY2 {{ kernelDisplay.label }}</span>
+          · Better HY2 {{ systemMonitor.huiVersion || "—" }}
+        </small>
       </div>
       <div class="service-cell">
         <span>{{ $t("monitor.hysteria2UserTotal") }}</span>
@@ -120,6 +123,7 @@ import {
 } from "@/api/monitor/types";
 import { useAccountStore } from "@/store/modules/account";
 import { formatTrafficG } from "@/utils/account-quota";
+import { describeHY2Kernel } from "@/utils/hy2-kernel";
 import { timestampToCompactDateTime } from "@/utils/time";
 import { createDashboardPolling } from "./polling";
 
@@ -166,6 +170,14 @@ const {
   systemError,
   trafficError,
 } = toRefs(state);
+const kernelDisplay = computed(() => describeHY2Kernel(hysteria2Monitor.value.version));
+const kernelTooltip = computed(() => {
+  const { upstream, channel } = kernelDisplay.value;
+  if (!upstream) return undefined;
+  const source = t("hysteria.kernelDerivedFrom", { upstream, build: hysteria2Monitor.value.version });
+  return [channel, source].filter(Boolean).join(" · ");
+});
+
 
 let componentActive = true;
 
