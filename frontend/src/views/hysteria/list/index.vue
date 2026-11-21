@@ -1253,6 +1253,7 @@ export default {
 </script>
 
 <script setup lang="ts">
+import type { Hysteria2ApplyResult } from "@/api/config";
 import DnsCredentials from "./dns-credentials.vue";
 import {
   ConfigsUpdateDto,
@@ -1553,6 +1554,18 @@ const configSaveError = ref("");
 let pageClosed = false;
 onBeforeUnmount(() => { pageClosed = true; });
 
+const waitForHysteria2Job = async (initial: Hysteria2ApplyResult) => {
+  let result = initial;
+  // Applying a configuration can include both a DNS-01 start and a rollback.
+  const deadline = Date.now() + 14 * 60_000;
+  while (!pageClosed && result.state === "pending" && Date.now() < deadline) {
+    await new Promise(resolve => window.setTimeout(resolve, 2_000));
+    if (pageClosed) break;
+    ({ data: result } = await getHysteria2ConfigApplyStatusApi(result.id));
+  }
+  return result;
+};
+
 const submitForm = async () => {
   if (savingConfig.value || state.lifecycleLoading) return;
   if (!await dataFormRef.value.validate().catch(() => false) ||
@@ -1577,13 +1590,8 @@ const submitForm = async () => {
     await updateConfigsApi({ configUpdateDtos: configs });
     if (pageClosed) return;
     awaitingResult = true;
-    let { data: result } = await beginHysteria2ConfigApplyApi(params);
-    const deadline = Date.now() + 12 * 60_000;
-    while (result.state === "pending" && Date.now() < deadline) {
-      await new Promise(resolve => window.setTimeout(resolve, 2_000));
-      if (pageClosed) return;
-      ({ data: result } = await getHysteria2ConfigApplyStatusApi(result.id));
-    }
+    const { data: job } = await beginHysteria2ConfigApplyApi(params);
+    const result = await waitForHysteria2Job(job);
     if (pageClosed) return;
     if (result.state === "pending") {
       configSaveError.value = t("hysteria.configResultUnknown");
@@ -1677,10 +1685,27 @@ const handleLifecycleAction = async (
   state.lifecycleLoading = true;
   let completed = false;
   try {
-    if (action === "start") await startHysteria2Api();
-    else if (action === "stop") await stopHysteria2Api();
-    else await restartHysteria2Api();
-    completed = true;
+    const begin = {
+      start: startHysteria2Api,
+      stop: stopHysteria2Api,
+      restart: restartHysteria2Api,
+    }[action];
+    const { data: job } = await begin();
+    let result: Hysteria2ApplyResult;
+    try {
+      result = await waitForHysteria2Job(job);
+    } catch {
+      if (!pageClosed) ElMessage.error(t("hysteria.lifecycleResultUnknown"));
+      return;
+    }
+    if (pageClosed) return;
+    if (result.state === "pending") {
+      ElMessage.error(t("hysteria.lifecycleResultUnknown"));
+    } else if (result.state === "failed") {
+      ElMessage.error(result.error || t("hysteria.lifecycleResultUnknown"));
+    } else {
+      completed = true;
+    }
   } finally {
     try {
       await setHysteria2Monitor();

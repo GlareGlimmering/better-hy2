@@ -17,8 +17,8 @@ func TestACMEDNSStartupAllowsPropagationWindow(t *testing.T) {
 	if got := hysteria2StartupAttemptsForConfig(&config); got != hysteria2ACMEDNSStartupAttempts {
 		t.Fatalf("DNS-01 startup attempts=%d want %d", got, hysteria2ACMEDNSStartupAttempts)
 	}
-	if time.Duration(hysteria2ACMEDNSStartupAttempts)*hysteria2StartupInterval < 2*time.Minute {
-		t.Fatal("DNS-01 readiness window is shorter than CertMagic propagation timeout")
+	if time.Duration(hysteria2ACMEDNSStartupAttempts)*hysteria2StartupInterval <= 6*time.Minute {
+		t.Fatal("DNS-01 readiness window must cover kernel startup and TXT cleanup")
 	}
 	if got := hysteria2StartupAttemptsForConfig(&bo.Hysteria2ServerConfig{}); got != hysteria2StartupAttempts {
 		t.Fatalf("ordinary startup attempts=%d want %d", got, hysteria2StartupAttempts)

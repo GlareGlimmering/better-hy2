@@ -18,7 +18,7 @@ type hysteria2ApplyResult struct {
 	Error string `json:"error,omitempty"`
 }
 
-// Configuration application can outlive an individual HTTP proxy request.
+// HY2 operations can outlive an individual HTTP proxy request.
 type hysteria2ApplyJobs struct {
 	mu      sync.Mutex
 	results []hysteria2ApplyResult
@@ -30,7 +30,7 @@ func (jobs *hysteria2ApplyJobs) begin(apply func() error) (hysteria2ApplyResult,
 	jobs.mu.Lock()
 	defer jobs.mu.Unlock()
 	if n := len(jobs.results); n > 0 && jobs.results[n-1].State == "pending" {
-		return hysteria2ApplyResult{}, errors.New("a Hysteria2 configuration is already being applied")
+		return hysteria2ApplyResult{}, errors.New("a Hysteria2 operation is already running")
 	}
 	id, err := uuid.NewRandom()
 	if err != nil {
@@ -71,7 +71,11 @@ func BeginHysteria2ConfigApply(c *gin.Context) {
 	if err != nil {
 		return
 	}
-	result, err := configApplyJobs.begin(func() error { return applyHysteria2Config(config) })
+	beginHysteria2Job(c, func() error { return applyHysteria2Config(config) })
+}
+
+func beginHysteria2Job(c *gin.Context, operation func() error) {
+	result, err := configApplyJobs.begin(operation)
 	if err != nil {
 		vo.Fail(err.Error(), c)
 		return

@@ -130,6 +130,10 @@ func Hysteria2Restart(c *gin.Context) {
 }
 
 func hysteria2LifecycleResponse(c *gin.Context, operation func() error) {
+	if c.Query("async") == "1" {
+		beginHysteria2Job(c, operation)
+		return
+	}
 	if err := operation(); err != nil {
 		vo.Fail(err.Error(), c)
 		return
