@@ -48,6 +48,7 @@ SH
   chmod 0755 "$root/wrappers/systemctl"
   local -a update=("$helper" "$artifacts")
   if [[ -n ${HUI_TRC_UPGRADER_TEST:-} ]]; then
+    export HUI_TRC_ASSETS="$artifacts"
     update=("$HUI_TRC_UPGRADER_TEST" -test.run '^TestTRCPairUpgradeOnDisposableSystemd$' -test.v)
   fi
   touch "$root/fail-next-start"
