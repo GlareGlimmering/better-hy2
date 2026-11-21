@@ -150,7 +150,7 @@ func TestPairPreflightCompiledArtifactsUpgradesWithMatchingInstalledKernel(t *te
 	defer server.Close()
 	f.opts.APIBase = server.URL
 	mux.HandleFunc("/repos/"+DefaultRepository+"/releases/tags/"+pair.Panel.Version, func(w http.ResponseWriter, r *http.Request) {
-		release := releaseInfo{TagName: pair.Panel.Version, Prerelease: strings.Contains(pair.Panel.Version, "-rc.")}
+		release := releaseInfo{TagName: pair.Panel.Version, Prerelease: isPrereleaseTag(pair.Panel.Version)}
 		for _, asset := range []string{BinaryAsset, ChecksumAsset, pairManifestAsset, pairKernelAsset} {
 			release.Assets = append(release.Assets, releaseAsset{Name: asset, URL: server.URL + "/" + asset})
 		}

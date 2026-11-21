@@ -100,7 +100,12 @@ preflight_environment() {
 }
 
 allowed_version() {
-  [[ "$1" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-custom\.(0|[1-9][0-9]*)(-rc\.(0|[1-9][0-9]*))?|-rc\.(0|[1-9][0-9]*))?$ ]]
+  [[ "$1" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-custom\.(0|[1-9][0-9]*)(-rc\.(0|[1-9][0-9]*))?|-rc\.(0|[1-9][0-9]*))?$ ]] ||
+    [[ "$1" =~ ^v2\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-trc\.(0|[1-9][0-9]*)$ ]]
+}
+
+is_prerelease_version() {
+  [[ "$1" == *-rc.* || "$1" == *-trc.* ]]
 }
 
 version_is_older() {
@@ -123,8 +128,10 @@ version_components() {
     printf '%d %d %d 2147483647 1 0\n' "$((10#${BASH_REMATCH[1]}))" "$((10#${BASH_REMATCH[2]}))" "$((10#${BASH_REMATCH[3]}))"
     return
   fi
-  if [[ "$version" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)-rc\.([0-9]+)$ ]]; then
-    printf '%d %d %d 2147483647 0 %d\n' "$((10#${BASH_REMATCH[1]}))" "$((10#${BASH_REMATCH[2]}))" "$((10#${BASH_REMATCH[3]}))" "$((10#${BASH_REMATCH[4]}))"
+  if [[ "$version" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)-(rc|trc)\.([0-9]+)$ ]]; then
+    release_rank=0
+    if [[ "${BASH_REMATCH[4]}" == trc ]]; then release_rank=-1; fi
+    printf '%d %d %d 2147483647 %d %d\n' "$((10#${BASH_REMATCH[1]}))" "$((10#${BASH_REMATCH[2]}))" "$((10#${BASH_REMATCH[3]}))" "$release_rank" "$((10#${BASH_REMATCH[5]}))"
     return
   fi
   [[ "$version" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)-custom\.([0-9]+)(-rc\.([0-9]+))?$ ]] || return 1
@@ -161,7 +168,7 @@ ensure_no_automatic_downgrade() {
   if ((10#${target_major%%.*} < 10#${current_major%%.*})); then
     fail "refusing major-version downgrade from ${current} to ${target}; restore the matching pre-upgrade snapshot"
   fi
-  if [[ "$current" == *-rc.* && "$target" != *-rc.* ]] && allowed_version "$current" && version_is_older "$target" "$current"; then
+  if is_prerelease_version "$current" && ! is_prerelease_version "$target" && allowed_version "$current" && version_is_older "$target" "$current"; then
     fail "refusing prerelease-to-stable downgrade; restore the matching pre-upgrade snapshot"
   fi
   if [[ "$requested_version" == "latest" ]] && allowed_version "$current" && version_is_older "$target" "$current"; then
@@ -187,7 +194,7 @@ resolve_version() {
     tag="$(printf '%s\n' "$releases_json" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1 || true)"
   fi
   [[ -n "$tag" ]] && allowed_version "$tag" || fail "GitHub did not return an allowed release version"
-  if ((!use_prerelease)) && [[ "$tag" == *-rc.* ]]; then fail "stable channel returned a prerelease tag"; fi
+  if ((!use_prerelease)) && is_prerelease_version "$tag"; then fail "stable channel returned a prerelease tag"; fi
   printf '%s\n' "$tag"
 }
 

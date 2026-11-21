@@ -136,7 +136,8 @@ func TestInstallerStableMigrationAndChannelGuard(t *testing.T) {
 
 func TestV2StableChannelSelectsItsOwnStableLine(t *testing.T) {
 	const releases = `[{"tag_name":"v1.0.0"},{"tag_name":"v2.0.1"},{"tag_name":"v2.0.10"},
-  {"tag_name":"v2.8.0-rc.1","prerelease":true},{"tag_name":"v2.9.0","draft":true}]`
+  {"tag_name":"v2.8.0-rc.1","prerelease":true},{"tag_name":"v2.9.0","draft":true},
+  {"tag_name":"v2.9.0-trc.1","prerelease":true}]`
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/repos/" + DefaultRepository + "/releases/latest":
@@ -150,12 +151,17 @@ func TestV2StableChannelSelectsItsOwnStableLine(t *testing.T) {
 	defer server.Close()
 	opts := DefaultOptions()
 	opts.APIBase = server.URL
-	for current, want := range map[string]string{"v1.0.0": "v1.0.0", "v2.0.0": "v2.0.10"} {
+	for current, want := range map[string]string{"v1.0.0": "v1.0.0", "v2.0.0": "v2.0.10", "v2.0.0-trc.1": "v2.0.10"} {
 		opts.CurrentVersion = current
 		release, err := resolveRelease(context.Background(), opts, DefaultDependencies())
 		if err != nil || release.TagName != want {
 			t.Fatalf("current %s: got %s, want %s (%v)", current, release.TagName, want, err)
 		}
+	}
+	opts.Prerelease = true
+	release, err := resolveRelease(context.Background(), opts, DefaultDependencies())
+	if err != nil || release.TagName != "v2.8.0-rc.1" {
+		t.Fatalf("regular prerelease channel selected %s (%v)", release.TagName, err)
 	}
 }
 
