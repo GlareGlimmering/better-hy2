@@ -35,7 +35,7 @@ export function getHysteria2ConfigApi(): AxiosPromise<Hysteria2ServerConfig> {
   });
 }
 
-interface Hysteria2ApplyResult {
+export interface Hysteria2ApplyResult {
   id: string;
   state: "pending" | "succeeded" | "failed";
   error?: string;

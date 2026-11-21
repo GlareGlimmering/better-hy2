@@ -290,6 +290,7 @@ export default {
     applyingConfig: "正在应用 HY2 配置，证书申请可能需要几分钟",
     configApplied: "HY2 配置已保存",
     configNotConfirmed: "HY2 配置未确认",
+    lifecycleResultUnknown: "无法确认 HY2 操作结果，请先检查服务状态。",
     configResultUnknown: "无法确认应用结果。服务端可能仍在处理中，草稿已保留，请先检查服务状态。",
     acmeDNSMissing: "请选择 DNS 服务商并配置所需凭据。",
     enable: "开启",

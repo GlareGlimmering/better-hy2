@@ -292,6 +292,7 @@ export default {
     applyingConfig: "Applying HY2 configuration. Certificate issuance may take a few minutes.",
     configApplied: "HY2 configuration saved",
     configNotConfirmed: "HY2 configuration could not be confirmed",
+    lifecycleResultUnknown: "The HY2 operation result is unknown. Check the service status before retrying.",
     configResultUnknown: "The server may still be applying the configuration. Your draft is intact. Check the service status before retrying.",
     acmeDNSMissing: "Select a DNS provider and enter its credentials.",
     enable: "Enable",

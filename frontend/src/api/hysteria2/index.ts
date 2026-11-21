@@ -1,6 +1,7 @@
 import { AxiosPromise } from "axios";
 import { Hysteria2ServerConfig } from "@/api/config/types";
 import request from "@/utils/request";
+import type { Hysteria2ApplyResult } from "@/api/config";
 import {
   Hysteria2KickDto,
   Hysteria2SubscribeVo,
@@ -45,16 +46,16 @@ export function hysteria2RoutingStatusApi(): AxiosPromise<Hysteria2RoutingStatus
   });
 }
 
-export function startHysteria2Api(): AxiosPromise {
-  return request({ url: "/hysteria2/start", method: "post" });
+export function startHysteria2Api(): AxiosPromise<Hysteria2ApplyResult> {
+  return request({ url: "/hysteria2/start", method: "post", params: { async: 1 } });
 }
 
-export function stopHysteria2Api(): AxiosPromise {
-  return request({ url: "/hysteria2/stop", method: "post" });
+export function stopHysteria2Api(): AxiosPromise<Hysteria2ApplyResult> {
+  return request({ url: "/hysteria2/stop", method: "post", params: { async: 1 } });
 }
 
-export function restartHysteria2Api(): AxiosPromise {
-  return request({ url: "/hysteria2/restart", method: "post" });
+export function restartHysteria2Api(): AxiosPromise<Hysteria2ApplyResult> {
+  return request({ url: "/hysteria2/restart", method: "post", params: { async: 1 } });
 }
 
 export function hysteria2SubscribeUrlApi(

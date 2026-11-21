@@ -22,8 +22,9 @@ var hysteria2RuntimeStatsPort atomic.Int64
 
 const (
 	hysteria2StartupAttempts        = 120
-	hysteria2ACMEDNSStartupAttempts = 1200
 	hysteria2StartupInterval        = 250 * time.Millisecond
+	hysteria2ACMEDNSStartupTimeout  = 6*time.Minute + 30*time.Second
+	hysteria2ACMEDNSStartupAttempts = int(hysteria2ACMEDNSStartupTimeout / hysteria2StartupInterval)
 )
 
 type hysteria2ReadinessOps struct {
@@ -245,9 +246,9 @@ func startHysteria2Runtime() error {
 
 func hysteria2StartupAttemptsForConfig(config *bo.Hysteria2ServerConfig) int {
 	if config != nil && config.ACME != nil && config.ACME.DNS != nil {
-		// CertMagic's DNS propagation window is two minutes by default. Allow
-		// the ACME operation to finish and emit its real fatal error instead of
-		// replacing it with an h-ui readiness timeout after thirty seconds.
+		// A paired kernel allows four minutes for DNS-01 startup and up
+		// to two additional minutes for CertMagic to clean up a challenge.
+		// Leave time for the process to report its result before stopping it.
 		return hysteria2ACMEDNSStartupAttempts
 	}
 	return hysteria2StartupAttempts
