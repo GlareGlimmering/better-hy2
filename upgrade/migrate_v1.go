@@ -46,6 +46,24 @@ func migratePair(ctx context.Context, assets string, opts Options, deps Dependen
 	if err := normalizeAndValidate(&opts, &deps); err != nil {
 		return err
 	}
+	releaseLock, err := lockUpgrade(opts.InstallDir)
+	if err != nil {
+		return err
+	}
+	defer releaseLock()
+	return migratePairLocked(ctx, assets, opts, deps, source, pinnedAssets)
+}
+
+func lockUpgrade(installDir string) (func(), error) {
+	// Share the lock with existing maintenance tools for the same installation.
+	lock := filepath.Join(installDir, ".migrate-v1.lock")
+	if err := os.Mkdir(lock, 0700); err != nil {
+		return nil, fmt.Errorf("acquire upgrade lock %s (if interrupted, recover the prior snapshot before retrying): %w", lock, err)
+	}
+	return func() { _ = os.Remove(lock) }, nil
+}
+
+func migratePairLocked(ctx context.Context, assets string, opts Options, deps Dependencies, source migrationSourcePair, pinnedAssets map[string]string) error {
 	opts.CurrentVersion = source.version
 	binary := filepath.Join(opts.InstallDir, "h-ui")
 	kernel := filepath.Join(opts.DataDir, util.GetHysteria2BinPath())
@@ -64,12 +82,6 @@ func migratePair(ctx context.Context, assets string, opts Options, deps Dependen
 			return fmt.Errorf("source HY2 is not ready: %w", err)
 		}
 	}
-	lock := filepath.Join(opts.InstallDir, ".migrate-v1.lock")
-	if err := os.Mkdir(lock, 0700); err != nil {
-		return fmt.Errorf("acquire migration lock %s (if interrupted, recover the prior snapshot before retrying): %w", lock, err)
-	}
-	defer os.Remove(lock)
-
 	work, err := os.MkdirTemp(opts.InstallDir, ".migrate-v1-")
 	if err != nil {
 		return err

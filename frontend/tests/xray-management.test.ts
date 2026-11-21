@@ -19,8 +19,8 @@ test("Xray page groups service, outbound, and configuration actions", () => {
   assert.match(component, /v-if="!status\.running"/);
   assert.doesNotMatch(component, /xray\.advancedOperations/);
   assert.match(component, /xray\.installKernel/);
-  assert.match(component, /xray\.saveDraft/);
-  assert.match(component, /xray\.checkConfig/);
+  assert.doesNotMatch(component, /xray\.saveDraft/);
+  assert.doesNotMatch(component, /xray\.checkConfig/);
 });
 
 test("missing Xray runtime is explicit and cannot be started", () => {
@@ -83,4 +83,11 @@ test("failed node apply keeps the editor open and restores the local row", () =>
 
 test("native SOCKS5 tests are available without a running Xray", () => {
   assert.match(component, /:disabled="!scope\.row\.enabled \|\| \(scope\.row\.protocol !== 'socks5' && !status\.running\) \|\| testing\[scope\.row\.id\]"/);
+});
+
+test("Xray install is a single action and node edits keep applying automatically", () => {
+  assert.doesNotMatch(component, /@click="(?:saveAndApply|saveDraft|validateConfig)"/);
+  const install = component.slice(component.indexOf("const install ="), component.indexOf("const runAction ="));
+  assert.match(install, /await installXrayApi\(settings.version\)/);
+  assert.doesNotMatch(install, /ElMessageBox|applyXrayApi/);
 });

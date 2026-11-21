@@ -83,34 +83,9 @@ func preflightReleasePair(ctx context.Context, release releaseInfo, panel, sums,
 }
 
 func verifyReleasePairFiles(tag, panel, sums, manifest, kernel string, deps Dependencies) (string, error) {
-	if err := verifyPairChecksum(manifest, sums); err != nil {
-		return "", err
-	}
-	file, err := os.Open(manifest)
+	pair, err := readReleasePair(tag, sums, manifest)
 	if err != nil {
 		return "", err
-	}
-	defer file.Close()
-	if info, err := file.Stat(); err != nil || info.Size() > 4096 {
-		return "", errors.New("invalid paired release manifest size")
-	}
-	decoder := json.NewDecoder(file)
-	decoder.DisallowUnknownFields()
-	var pair releasePair
-	if err := decoder.Decode(&pair); err != nil {
-		return "", errors.New("invalid paired release manifest")
-	}
-	if err := decoder.Decode(new(any)); err != io.EOF {
-		return "", errors.New("invalid trailing content in paired release manifest")
-	}
-	if err := pair.validate(tag); err != nil {
-		return "", err
-	}
-	for name, digest := range map[string]string{BinaryAsset: pair.Panel.SHA256, pairKernelAsset: pair.Kernel.SHA256} {
-		expected, err := expectedChecksum(sums, name)
-		if err != nil || expected != digest {
-			return "", fmt.Errorf("manifest and SHA256SUMS disagree for %s", name)
-		}
 	}
 	if err := verifyPairExecutable(panel); err != nil {
 		return "", fmt.Errorf("panel candidate: %w", err)
@@ -145,6 +120,80 @@ func verifyReleasePairFiles(tag, panel, sums, manifest, kernel string, deps Depe
 		return "", errors.New("kernel build or capabilities do not match release manifest")
 	}
 	return pair.Kernel.SHA256, nil
+}
+
+// readReleasePair verifies the manifest and its binary digests against SHA256SUMS.
+func readReleasePair(tag, sums, manifest string) (releasePair, error) {
+	if err := verifyPairChecksum(manifest, sums); err != nil {
+		return releasePair{}, err
+	}
+	file, err := os.Open(manifest)
+	if err != nil {
+		return releasePair{}, err
+	}
+	defer file.Close()
+	if info, err := file.Stat(); err != nil || info.Size() > 4096 {
+		return releasePair{}, errors.New("invalid paired release manifest size")
+	}
+	decoder := json.NewDecoder(file)
+	decoder.DisallowUnknownFields()
+	var pair releasePair
+	if err := decoder.Decode(&pair); err != nil {
+		return releasePair{}, errors.New("invalid paired release manifest")
+	}
+	if err := decoder.Decode(new(any)); err != io.EOF {
+		return releasePair{}, errors.New("invalid trailing content in paired release manifest")
+	}
+	if err := pair.validate(tag); err != nil {
+		return releasePair{}, err
+	}
+	for name, digest := range map[string]string{BinaryAsset: pair.Panel.SHA256, pairKernelAsset: pair.Kernel.SHA256} {
+		expected, err := expectedChecksum(sums, name)
+		if err != nil || expected != digest {
+			return releasePair{}, fmt.Errorf("manifest and SHA256SUMS disagree for %s", name)
+		}
+	}
+	return pair, nil
+}
+
+func readInstalledPair(ctx context.Context, opts Options, dir string, deps Dependencies) (migrationSourcePair, error) {
+	source := opts
+	source.Version = opts.CurrentVersion
+	release, err := resolveRelease(ctx, source, deps)
+	if err != nil {
+		return migrationSourcePair{}, err
+	}
+	if release.TagName != source.Version || release.Draft || release.Prerelease != isPrereleaseTag(source.Version) {
+		return migrationSourcePair{}, errors.New("installed release identity does not match its published channel")
+	}
+	sourceDir := filepath.Join(dir, "source")
+	if err = os.Mkdir(sourceDir, 0700); err != nil {
+		return migrationSourcePair{}, err
+	}
+	for _, name := range []string{ChecksumAsset, pairManifestAsset} {
+		var locator string
+		for _, asset := range release.Assets {
+			if asset.Name == name {
+				if locator != "" {
+					return migrationSourcePair{}, fmt.Errorf("duplicate source asset %s", name)
+				}
+				locator = asset.URL
+			}
+		}
+		if locator == "" {
+			return migrationSourcePair{}, fmt.Errorf("installed release has no %s", name)
+		}
+		if err := downloadFile(ctx, locator, filepath.Join(sourceDir, name), deps); err != nil {
+			return migrationSourcePair{}, err
+		}
+	}
+	pair, err := readReleasePair(source.Version, filepath.Join(sourceDir, ChecksumAsset), filepath.Join(sourceDir, pairManifestAsset))
+	if err != nil {
+		return migrationSourcePair{}, err
+	}
+	return migrationSourcePair{
+		version: source.Version, panelSHA: pair.Panel.SHA256, kernelSHA: pair.Kernel.SHA256, paired: true,
+	}, nil
 }
 
 func verifyPairChecksum(path, sums string) error {

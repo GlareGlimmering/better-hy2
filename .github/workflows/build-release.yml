@@ -209,10 +209,10 @@ jobs:
         if: steps.release-tag.outputs.paired == 'true'
         id: kernel-pin
         run: |
-          jq -r '"commit=\(.commit)", "version=\(.version)", "sha256=\(.sha256)"' model/constant/hy2-pair.json >> "$GITHUB_OUTPUT"
+          jq -r '"commit=\(.commit)", "version=\(.version)", "sha256=\(.sha256)", "asset-release=\(.assetRelease // "")"' model/constant/hy2-pair.json >> "$GITHUB_OUTPUT"
 
       - name: Check out the paired kernel
-        if: steps.release-tag.outputs.paired == 'true'
+        if: steps.release-tag.outputs.paired == 'true' && steps.kernel-pin.outputs.asset-release == ''
         uses: actions/checkout@v7
         with:
           repository: GlareGlimmering/hysteria
@@ -221,39 +221,48 @@ jobs:
           persist-credentials: false
 
       - name: Set up the kernel Go toolchain
-        if: steps.release-tag.outputs.paired == 'true'
+        if: steps.release-tag.outputs.paired == 'true' && steps.kernel-pin.outputs.asset-release == ''
         uses: actions/setup-go@v7
         with:
           go-version-file: kernel-source/app/go.mod
           cache: false
 
-      - name: Build and verify the paired release assets
+      - name: Verify and package the paired release assets
         if: steps.release-tag.outputs.paired == 'true'
         env:
           CGO_ENABLED: '0'
           GOOS: linux
           GOARCH: amd64
           KERNEL_VERSION: ${{ steps.kernel-pin.outputs.version }}
+          KERNEL_COMMIT: ${{ steps.kernel-pin.outputs.commit }}
+          KERNEL_ASSET_RELEASE: ${{ steps.kernel-pin.outputs.asset-release }}
           KERNEL_SHA256: ${{ steps.kernel-pin.outputs.sha256 }}
           PANEL_VERSION: ${{ steps.release-tag.outputs.tag }}
         shell: bash
         run: |
-          kernel_sha=$(git -C kernel-source rev-parse HEAD)
           export PANEL_SHA=$(git rev-parse HEAD)
-          (
-            cd kernel-source
-            go build -buildvcs=false -trimpath -ldflags="-X github.com/apernet/hysteria/app/v2/cmd.appVersion=$KERNEL_VERSION -X github.com/apernet/hysteria/app/v2/cmd.appCommit=$kernel_sha" -o ../build/hysteria-linux-amd64 ./app
-          )
+          if [[ -n "$KERNEL_ASSET_RELEASE" ]]; then
+            [[ "$KERNEL_ASSET_RELEASE" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-z]+\.[0-9]+)?$ ]]
+            curl -fsSL --retry 3 -o build/hysteria-linux-amd64 \
+              "https://github.com/GlareGlimmering/better-hy2/releases/download/$KERNEL_ASSET_RELEASE/hysteria-linux-amd64"
+          else
+            test "$(git -C kernel-source rev-parse HEAD)" = "$KERNEL_COMMIT"
+            (
+              cd kernel-source
+              go build -buildvcs=false -trimpath -ldflags="-X github.com/apernet/hysteria/app/v2/cmd.appVersion=$KERNEL_VERSION -X github.com/apernet/hysteria/app/v2/cmd.appCommit=$KERNEL_COMMIT" -o ../build/hysteria-linux-amd64 ./app
+            )
+          fi
+          printf '%s  %s\n' "$KERNEL_SHA256" build/hysteria-linux-amd64 | sha256sum --check
+          chmod 0755 build/hysteria-linux-amd64
           build/hysteria-linux-amd64 version --json | python3 -c 'import json, sys; assert json.load(sys.stdin)["acmeDNSWorker"] == 1'
-          python3 scripts/write-pair-manifest.py build "$PANEL_VERSION" "$PANEL_SHA" "$KERNEL_VERSION" "$kernel_sha"
+          python3 scripts/write-pair-manifest.py build "$PANEL_VERSION" "$PANEL_SHA" "$KERNEL_VERSION" "$KERNEL_COMMIT"
           HUI_PAIR_TEST_PANEL="$PWD/build/h-ui-linux-amd64" \
           HUI_PAIR_TEST_KERNEL="$PWD/build/hysteria-linux-amd64" \
           HUI_PAIR_TEST_PANEL_VERSION="$PANEL_VERSION" \
           HUI_PAIR_TEST_PANEL_COMMIT="$PANEL_SHA" \
-          HUI_PAIR_TEST_KERNEL_COMMIT="$kernel_sha" \
+          HUI_PAIR_TEST_KERNEL_COMMIT="$KERNEL_COMMIT" \
           go test ./upgrade -run '^TestPairPreflightCompiledArtifacts(UpgradesWithMatchingInstalledKernel)?$' -count=1 -v
           cd build
-          printf '%s  %s\n' "$KERNEL_SHA256" hysteria-linux-amd64 | sha256sum --check
           files=(h-ui-linux-amd64 hysteria-linux-amd64 HY2-PAIR.json)
           if [[ "$PANEL_VERSION" == v2.* || "${{ steps.release-tag.outputs.prerelease }}" != "true" ]]; then
             files+=(install.sh)

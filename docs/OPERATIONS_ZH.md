@@ -14,7 +14,17 @@
 sudo /usr/local/h-ui/h-ui reset
 ```
 
-不会删除普通代理账户。显式 `HUI_DATA` 可选择其他数据根目录，生产环境不要误设。
+自定义管理员凭据可以使用：
+
+```bash
+sudo hui reset --interactive
+sudo hui reset username
+sudo hui reset password
+```
+
+第一条交互设置用户名和密码，后两条只修改对应字段。用户名也可直接作为 `hui reset username <用户名>` 的参数。密码输入不会回显，脚本可用 `hui reset --username <用户名> --password-stdin` 或 `hui reset password --stdin` 从标准输入读取一行。直接运行 `hui reset` 仍保留现有管理员名称并生成随机密码。
+
+普通代理账户会保留。显式 `HUI_DATA` 可选择其他数据根目录，生产环境不要误设。
 
 
 ## RC.4 及后续版本的面板管理员
@@ -37,11 +47,11 @@ sudo /usr/local/h-ui/h-ui reset
 
 `v2.0.2-rc.1` 配套 `v2.13.0-hui.6-dev`。在全新隔离 Linux AMD64 systemd 环境中运行该 RC 自带的 `install.sh --version v2.0.2-rc.1`，安装器会校验并装入配套内核。已安装旧内核的环境会被 `hui update` 拦截，需在维护模式成对替换和恢复。
 
-在 HY 管理选择 ACME 的 DNS 模式和 `worker`，填入 `worker_url`（HTTPS 根地址）和 `worker_token`（节点凭据）。用独立测试域名、独立 `acme.dir` 和 `letsencrypt-staging` 验证首次签发与实际重新验证 DNS-01 的续期。测试域名对应的 TXT 必须在节点白名单内。生产切换沿用原证书域名与 ACME 目录，保留原 CA。旧直连 Token 可在联调和灰度通过后撤销。
+在 HY 管理选择 ACME 的 DNS 模式和 `worker`，在同一个输入框填写 HTTPS 根地址、空格和节点凭据。一次复制会复制完整凭据，并要求先确认。用独立测试域名、独立 `acme.dir` 和 `letsencrypt-staging` 验证首次签发与实际重新验证 DNS-01 的续期。测试域名对应的 TXT 必须在节点白名单内。生产切换沿用原证书域名与 ACME 目录，保留原 CA。旧直连 Token 可在联调和灰度通过后撤销。
 
 ## HY2 配置
 
-在 HY2 管理设置监听、TLS/ACME 和网络选项。使用固定定制内核 `v2.13.0-hui.5-dev`，SHA256：`f8cf6f7f5691e7eec1ef3f7392939e24788c3088378008ad1e17ca7e53bc42af`。HTTP Auth 与 `userOutbounds` 由面板维护，不要手改覆盖。保留定制内核的 ACME IPv4 DNS 传播逻辑，不全局禁用 IPv6，不关闭证书验证。
+在 HY2 管理设置监听、TLS/ACME 和网络选项。使用当前 Release 的 `HY2-PAIR.json` 指定的定制内核。HTTP Auth 与 `userOutbounds` 由面板维护，不要手改覆盖。保留定制内核的 ACME IPv4 DNS 传播逻辑，不全局禁用 IPv6，不关闭证书验证。
 
 订阅节点默认使用检测到的公网 IPv4；只有 NAT、接口无公网地址时需显式配置 `HUI_NODE_ADDRESS`。HTTP 订阅 URL、节点地址与 TLS SNI 是独立概念。
 
@@ -51,13 +61,13 @@ sudo /usr/local/h-ui/h-ui reset
 
 ## 出站和账户绑定
 
-DIRECT 内置；原生 SOCKS5 无需 Xray。VLESS/HTTP 节点在「出站节点」配置，需要时安装固定 Xray 内核，填写认证和 CA 后验证、应用。每个适配节点使用独立 loopback SOCKS5 端口，不允许监听公网。HTTP CONNECT 不代表 UDP 支持。
+DIRECT 内置；原生 SOCKS5 无需 Xray。VLESS/HTTP 节点在「出站节点」配置，先用「安装/更新内核」安装固定 Xray 版本。节点保存时会验证并应用配置。每个适配节点使用独立 loopback SOCKS5 端口，不允许监听公网。HTTP CONNECT 不代表 UDP 支持。
 
 在账户抽屉选择启用节点并保存。严格路由下，每个有效用户都需明确绑定（DIRECT 也是显式绑定）。失效绑定不会自动改成 DIRECT；被引用节点不能删除/禁用。TCP、UDP 单独测试，最近测试不代表实时在线。无法识别归属的历史 HY2 规则保留在高级设置，继续保留 RC.23 幽灵节点选择器保护。
 
 ## 升级与恢复
 
-从 RC.7 升级请使用 README 中固定到 v2.0.1 的安装命令。安装器调用新版更新器，在停止服务前验证配套内核，内核哈希不匹配时拒绝升级。已运行 v2 时，`sudo hui update` 选择最新的 v2 正式版，也保留旧 `upgrade` 命令。使用原配套内核的 v1.0.0 可继续运行 v1，或在另一台主机全新安装 v2。
+目标版本的安装器会调用已验证的新版更新器，可供仍在使用旧更新器的实例进入升级。新版更新器在停机前验证发布制品。哈希相同仅更新面板，哈希不同时验证已安装的源配套并进行双制品维护升级。这条路径当前适用于正在运行的标准 v2 安装。已运行 v2 时，`sudo hui update` 选择最新的 v2 正式版，也保留旧 `upgrade` 命令。使用原配套内核的 v1.0.0 可继续运行 v1，或在另一台主机全新安装 v2。
 
 升级快照位于 `/var/lib/h-ui/backups/upgrade-*`，包含 SQLite 一致性备份、旧程序、systemd unit、HY2 YAML、相关 Xray 配置/CA 及文件所有权信息，保留最新五份。启动或 HTTP/入口资源检查失败会自动恢复快照与原运行状态；回滚失败会明确报错。配套内核匹配时更新器只替换面板。
 

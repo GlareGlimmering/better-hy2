@@ -285,6 +285,11 @@ export default {
   hysteria: {
     copyDNSKey: "Copy key",
     copyDNSValue: "Copy value",
+    acmeContact: "ACME account contact email (optional)",
+    workerCredentialsFormat: "Enter the HTTPS origin, a space, and the node credential",
+    workerCredentialsSaved: "Saved. Enter a new pair to replace it.",
+    copyWorkerCredentials: "Copy Worker credentials",
+    copyWorkerWarning: "This copies the Worker URL and the node secret to your clipboard. Confirm that the environment is safe.",
     copyDNSWarning: "This is a DNS provider API credential. It will be placed on the system clipboard. Confirm that your environment is secure.",
     copyDNSFailed: "Could not copy the DNS credential. Check your browser clipboard permissions.",
     tlsFilesMissing: "Select both a TLS certificate and its private key.",

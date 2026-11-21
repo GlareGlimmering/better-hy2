@@ -140,3 +140,18 @@ test("ACME DNS copy requests a secret only after confirmation", async () => {
   assert.equal(await copyConfirmedDNSValue(async () => true, read, copy), true);
   assert.deepEqual(calls, ["read", "fixture"]);
 });
+
+test("Worker credentials keep the URL and token as separate payload values", async () => {
+  const { parseWorkerCredentials } = await import("../src/views/hysteria/list/dns-copy.ts");
+  assert.deepEqual(parseWorkerCredentials("https://worker.example  node.test-token"), {
+    worker_url: "https://worker.example",
+    worker_token: "node.test-token",
+  });
+  assert.deepEqual(parseWorkerCredentials("https://worker.example "), {
+    worker_url: "https://worker.example",
+    worker_token: "",
+  });
+  const page = readFileSync(new URL("../src/views/hysteria/list/index.vue", import.meta.url), "utf8");
+  assert.ok(page.indexOf("hy2-configuration") < page.indexOf("lifecycle-panel"));
+  assert.match(page, /<worker-credentials[\s\S]*v-if="dataForm.acme.dns.name === 'worker'"/);
+});

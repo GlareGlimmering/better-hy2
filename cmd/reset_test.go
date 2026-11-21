@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"bytes"
 	"database/sql"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"h-ui/dao"
@@ -153,5 +155,57 @@ func TestResetUsesExecutableDirectoryOutsideCurrentWorkingDirectory(t *testing.T
 	unexpectedDatabase := filepath.Join(otherDir, filepath.FromSlash(constant.SqliteDBPath))
 	if _, err = os.Stat(unexpectedDatabase); !os.IsNotExist(err) {
 		t.Fatalf("reset created a database relative to cwd: %s (%v)", unexpectedDatabase, err)
+	}
+}
+
+func TestCustomResetSubcommandsPreserveUnchangedCredentials(t *testing.T) {
+	path := resetTestDatabase(t)
+	first, second := "first-password-1234", "second-password-5678"
+	run := func(input string, args ...string) (string, error) {
+		var output bytes.Buffer
+		command := newResetCommand()
+		command.SetArgs(args)
+		command.SetIn(strings.NewReader(input))
+		command.SetOut(&output)
+		command.SetErr(&output)
+		err := command.Execute()
+		if strings.Contains(output.String(), first) || strings.Contains(output.String(), second) {
+			t.Fatal("custom password was printed")
+		}
+		return output.String(), err
+	}
+	if _, err := run(first+"\n", "--username", "first-admin", "--password-stdin"); err != nil {
+		t.Fatal(err)
+	}
+	db := openResetTestDatabase(t, path)
+	read := func() (string, string) {
+		t.Helper()
+		var username, hash string
+		if err := db.QueryRow("SELECT username, password_hash FROM panel_admin").Scan(&username, &hash); err != nil {
+			t.Fatal(err)
+		}
+		return username, hash
+	}
+	name, hash := read()
+	if name != "first-admin" || !util.VerifyPanelPassword(hash, first) {
+		t.Fatal("custom credentials were not stored")
+	}
+	if _, err := run("", "username", "next-admin"); err != nil {
+		t.Fatal(err)
+	}
+	if newName, newHash := read(); newName != "next-admin" || newHash != hash {
+		t.Fatal("rename did not preserve the password")
+	}
+	if _, err := run(second+"\n", "password", "--stdin"); err != nil {
+		t.Fatal(err)
+	}
+	if name, hash := read(); name != "next-admin" || !util.VerifyPanelPassword(hash, second) {
+		t.Fatal("password reset did not preserve the username")
+	}
+	if _, err := run("short\n", "password", "--stdin"); err == nil {
+		t.Fatal("accepted invalid password")
+	}
+	if name, hash := read(); name != "next-admin" || !util.VerifyPanelPassword(hash, second) {
+		t.Fatal("invalid reset changed the administrator")
 	}
 }

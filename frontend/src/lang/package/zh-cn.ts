@@ -283,6 +283,11 @@ export default {
   hysteria: {
     copyDNSKey: "复制键",
     copyDNSValue: "复制值",
+    acmeContact: "ACME 账户联系邮箱（可选）",
+    workerCredentialsFormat: "填写 HTTPS 根地址、空格、节点凭据",
+    workerCredentialsSaved: "已保存。输入一对新凭据可替换。",
+    copyWorkerCredentials: "复制 Worker 凭据",
+    copyWorkerWarning: "将 Worker 地址和节点密钥复制到系统剪贴板。请确认当前环境安全。",
     copyDNSWarning: "此内容为 DNS 服务商 API 密钥，复制后将进入系统剪贴板。请确认当前环境安全。",
     copyDNSFailed: "无法复制 DNS 凭据，请检查浏览器剪贴板权限。",
     tlsFilesMissing: "请同时配置 TLS 证书和私钥。",

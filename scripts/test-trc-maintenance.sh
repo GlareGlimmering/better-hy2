@@ -46,8 +46,12 @@ fi
 exec /usr/bin/systemctl "$@"
 SH
   chmod 0755 "$root/wrappers/systemctl"
+  local -a update=("$helper" "$artifacts")
+  if [[ -n ${HUI_TRC_UPGRADER_TEST:-} ]]; then
+    update=("$HUI_TRC_UPGRADER_TEST" -test.run '^TestTRCPairUpgradeOnDisposableSystemd$' -test.v)
+  fi
   touch "$root/fail-next-start"
-  if HUI_TRC_FIXTURE="$root" PATH="$root/wrappers:$PATH" "$helper" "$artifacts" >"$root/failed-trc.log" 2>&1; then
+  if HUI_TRC_FIXTURE="$root" PATH="$root/wrappers:$PATH" "${update[@]}" >"$root/failed-trc.log" 2>&1; then
     echo "expected failure and rollback from failed candidate health" >&2
     return 1
   fi
@@ -64,7 +68,7 @@ SH
   check_panel
   check_proxy "$artifacts/old-kernel"
 
-  "$helper" "$artifacts"
+  "${update[@]}"
   cmp "$live/h-ui" "$artifacts/h-ui-linux-amd64"
   cmp "$live/bin/hysteria-linux-amd64" "$artifacts/hysteria-linux-amd64"
   cmp "$unitfile" "$root/old-unit"
