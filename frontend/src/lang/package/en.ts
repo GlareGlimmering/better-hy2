@@ -285,6 +285,7 @@ export default {
   hysteria: {
     copyDNSKey: "Copy key",
     copyDNSValue: "Copy value",
+    kernelDerivedFrom: "Derived from official Hysteria2 {upstream} · Build {build}",
     acmeContact: "ACME account contact email (optional)",
     workerCredentialsFormat: "Enter the HTTPS origin, a space, and the node credential",
     workerCredentialsSaved: "Saved. Enter a new pair to replace it.",

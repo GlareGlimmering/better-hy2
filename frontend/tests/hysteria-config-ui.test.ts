@@ -155,3 +155,14 @@ test("Worker credentials keep the URL and token as separate payload values", asy
   assert.ok(page.indexOf("hy2-configuration") < page.indexOf("lifecycle-panel"));
   assert.match(page, /<worker-credentials[\s\S]*v-if="dataForm.acme.dns.name === 'worker'"/);
 });
+
+test("kernel aliases display the known upstream without changing the selected build", async () => {
+  const { describeHY2Kernel } = await import("../src/utils/hy2-kernel.ts");
+  assert.deepEqual(describeHY2Kernel("v2.14.0-hui.2-dev"), { label: "v1.2", upstream: "v2.14.0", channel: "Stable" });
+  assert.deepEqual(describeHY2Kernel("v2.13.0-hui.6-dev"), { label: "v1.1", upstream: "v2.13.0", channel: "Stable" });
+  assert.deepEqual(describeHY2Kernel("v2.15.0"), { label: "v2.15.0" });
+  assert.deepEqual(describeHY2Kernel(""), { label: "—" });
+  const page = readFileSync(new URL("../src/views/hysteria/list/index.vue", import.meta.url), "utf8");
+  assert.match(page, /:label="describeHY2Kernel\(item\)\.label"\s+:value="item"/);
+  assert.match(page, /:title="kernelTooltip\(hysteria2Monitor\.version\)"/);
+});
