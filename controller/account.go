@@ -62,21 +62,6 @@ func Login(c *gin.Context) {
 	vo.Success(jwtVo, c)
 }
 
-func ChangePanelPassword(c *gin.Context) {
-	c.Header("Cache-Control", "no-store")
-	var credentials dto.PanelPasswordChangeDto
-	if c.ShouldBindJSON(&credentials) != nil || validate.Struct(credentials) != nil {
-		vo.Fail(constant.InvalidError, c)
-		return
-	}
-	token, err := service.ChangePanelPassword(*credentials.Username, *credentials.Pass, *credentials.NewPassword)
-	if err != nil {
-		vo.Fail(err.Error(), c)
-		return
-	}
-	vo.Success(vo.JwtVo{TokenType: constant.TokenType, AccessToken: token}, c)
-}
-
 func PageAccount(c *gin.Context) {
 	accountPageDto, err := validateField(c, dto.AccountPageDto{})
 	if err != nil {

@@ -15,17 +15,10 @@ var ErrPanelPasswordChangeRequired = errors.New("administrator password change r
 var panelAuthSlots = make(chan struct{}, 4)
 
 func Login(username, password string) (string, error) {
-	return authenticatePanelAdmin(username, password, "", util.VerifyPanelPassword)
+	return authenticatePanelAdmin(username, password, util.VerifyPanelPassword)
 }
 
-func ChangePanelPassword(username, currentPassword, newPassword string) (string, error) {
-	if len(newPassword) < 12 || len(newPassword) > 128 || currentPassword == newPassword {
-		return "", errors.New("choose a different administrator password of 12 to 128 bytes")
-	}
-	return authenticatePanelAdmin(username, currentPassword, newPassword, util.VerifyPanelPassword)
-}
-
-func authenticatePanelAdmin(username, password, newPassword string, verify func(string, string) bool) (string, error) {
+func authenticatePanelAdmin(username, password string, verify func(string, string) bool) (string, error) {
 	select {
 	case panelAuthSlots <- struct{}{}:
 		defer func() { <-panelAuthSlots }()
@@ -41,14 +34,11 @@ func authenticatePanelAdmin(username, password, newPassword string, verify func(
 	if err != nil || !verified {
 		return "", errors.New(constant.WrongPassword)
 	}
-	if admin.MustChange && newPassword == "" {
+	if admin.MustChange {
 		return "", ErrPanelPasswordChangeRequired
 	}
-	if newPassword != "" || admin.Legacy {
-		if newPassword == "" {
-			newPassword = password
-		}
-		hash, err := util.HashPanelPassword(newPassword)
+	if admin.Legacy {
+		hash, err := util.HashPanelPassword(password)
 		if err != nil {
 			return "", errors.New(constant.SysError)
 		}

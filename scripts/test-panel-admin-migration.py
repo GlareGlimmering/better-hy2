@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import re
 import sqlite3
+import subprocess
 import sys
 import time
 import urllib.error
@@ -78,8 +79,15 @@ with sqlite3.connect(live / "data" / "h_ui.db") as db:
         else:
             assert auth["ok"] is False
         assert proxy_credential.encode() in call("/" + proxy_credential)
-        assert call("/auth/changePassword", {**legacy, "newPassword": legacy["pass"]})["type"] != "ok"
-        token = call("/auth/changePassword", {**legacy, "newPassword": new_password})["data"]["accessToken"]
+        try:
+            call("/auth/changePassword", {**legacy, "newPassword": new_password})
+        except urllib.error.HTTPError as err:
+            assert err.code == 404
+        else:
+            raise AssertionError("web password change is still exposed")
+        subprocess.run([str(live / "h-ui"), "reset", "password", "--stdin"],
+                       input=new_password + "\n", text=True, check=True, capture_output=True)
+        token = login({**legacy, "pass": new_password})["data"]["accessToken"]
         assert info(token)["type"] == "ok"
         assert login(legacy)["type"] != "ok"
         assert login({**legacy, "pass": new_password})["data"]["accessToken"]

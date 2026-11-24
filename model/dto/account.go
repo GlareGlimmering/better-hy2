@@ -40,8 +40,3 @@ type AccountUpdateDto struct {
 	DownloadMbps *int64  `json:"downloadMbps" form:"downloadMbps" validate:"omitempty,min=0,max=100000"`
 	Outbound     *string `json:"outbound" form:"outbound" validate:"omitempty,max=64"`
 }
-
-type PanelPasswordChangeDto struct {
-	LoginDto
-	NewPassword *string `json:"newPassword" validate:"required,max=128"`
-}

@@ -41,7 +41,7 @@ export default {
   login: {
     capsLock: "大写锁定已开启",
     changePassword: "修改密码",
-    passwordChangeRequired: "旧密码与代理凭据共用。请先设置新的面板密码。",
+    passwordChangeRequired: "请通过 SSH 执行 sudo hui reset password，然后用新密码登录。",
     newPassword: "新面板密码",
     confirmPassword: "确认新密码",
     invalidNewPassword: "请输入与旧密码不同的 12 到 128 字节密码，并确认新密码。",
@@ -285,6 +285,9 @@ export default {
     copyDNSValue: "复制值",
     kernelDerivedFrom: "派生自官方 Hysteria2 {upstream} · 构建 {build}",
     acmeContact: "ACME 账户联系邮箱（可选）",
+    workerCredentialsLabel: "ACME DNS 服务地址与节点令牌",
+    workerCredentialsHelp: "输入 Worker 的 HTTPS 根地址（不用添加 API 路径），加一个空格，再填节点令牌。此令牌只用于 DNS 验证，与 HY2 订阅无关。",
+    providerCredentialsHelp: "填写 DNS 提供商要求的 API 凭据。已有凭据会脱敏显示。",
     workerCredentialsFormat: "填写 HTTPS 根地址、空格、节点凭据",
     workerCredentialsSaved: "已保存。输入一对新凭据可替换。",
     copyWorkerCredentials: "复制 Worker 凭据",

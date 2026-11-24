@@ -370,7 +370,14 @@ func TestPanelAdminMigrationAndPasswordGate(t *testing.T) {
 	if token, err := Login("former-admin", "shared-password"); !errors.Is(err, ErrPanelPasswordChangeRequired) || token != "" {
 		t.Fatal("coupled password obtained a session")
 	}
-	if token, err := ChangePanelPassword("former-admin", "shared-password", "replacement-panel-password"); err != nil || token == "" {
+	hash, err := util.HashPanelPassword("replacement-panel-password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := dao.ResetPanelAdmin("former-admin", hash); err != nil {
+		t.Fatal(err)
+	}
+	if token, err := Login("former-admin", "replacement-panel-password"); err != nil || token == "" {
 		t.Fatal("coupled password could not be replaced", err)
 	}
 	if _, found, err := dao.FindHysteria2AuthAccount("old-prefix.shared-password"); err != nil || found {

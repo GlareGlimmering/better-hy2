@@ -41,7 +41,7 @@ export default {
   login: {
     capsLock: "Caps Lock is on",
     changePassword: "Change password",
-    passwordChangeRequired: "Set a new panel password to continue. The old password was shared with a proxy credential.",
+    passwordChangeRequired: "Run sudo hui reset password over SSH, then sign in with the new password.",
     newPassword: "New panel password",
     confirmPassword: "Confirm new password",
     invalidNewPassword: "Use a different password of 12 to 128 bytes and confirm it.",
@@ -287,6 +287,9 @@ export default {
     copyDNSValue: "Copy value",
     kernelDerivedFrom: "Derived from official Hysteria2 {upstream} · Build {build}",
     acmeContact: "ACME account contact email (optional)",
+    workerCredentialsLabel: "ACME DNS service URL and node token",
+    workerCredentialsHelp: "Enter the Worker HTTPS origin without an API path, then a space and the node token. This token is for DNS verification, separate from HY2 subscriptions.",
+    providerCredentialsHelp: "Enter the DNS provider’s API credentials. Saved values are masked.",
     workerCredentialsFormat: "Enter the HTTPS origin, a space, and the node credential",
     workerCredentialsSaved: "Saved. Enter a new pair to replace it.",
     copyWorkerCredentials: "Copy Worker credentials",

@@ -41,7 +41,7 @@ export default {
   login: {
     capsLock: "Включён Caps Lock",
     changePassword: "Сменить пароль",
-    passwordChangeRequired: "Старый пароль использовался для прокси. Установите новый пароль панели.",
+    passwordChangeRequired: "Выполните sudo hui reset password по SSH, затем войдите с новым паролем.",
     newPassword: "Новый пароль панели",
     confirmPassword: "Подтвердите пароль",
     invalidNewPassword: "Введите и подтвердите другой пароль длиной от 12 до 128 байт.",
@@ -289,6 +289,9 @@ export default {
     copyDNSValue: "Копировать значение",
     kernelDerivedFrom: "На основе официальной Hysteria2 {upstream} · Сборка {build}",
     acmeContact: "Контактный адрес учётной записи ACME (необязательно)",
+    workerCredentialsLabel: "Адрес службы ACME DNS и токен узла",
+    workerCredentialsHelp: "Введите адрес Worker HTTPS без пути API, пробел и токен узла. Токен используется для проверки DNS отдельно от подписок HY2.",
+    providerCredentialsHelp: "Укажите данные API поставщика DNS. Сохранённые значения скрыты.",
     workerCredentialsFormat: "Введите адрес HTTPS, пробел и ключ узла",
     workerCredentialsSaved: "Сохранено. Введите новую пару для замены.",
     copyWorkerCredentials: "Копировать данные Worker",

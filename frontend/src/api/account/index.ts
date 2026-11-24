@@ -143,7 +143,3 @@ export function getConnectionPasswordApi(data: IdDto): AxiosPromise<string> {
 export function generateConnectionPasswordApi(): AxiosPromise<string> {
   return request({ url: "/account/generateConnectionPassword", method: "post" });
 }
-
-export function changePanelPasswordApi(data: AccountLoginDto & { newPassword: string }): AxiosPromise<AccountLoginVo> {
-  return request({ url: "/auth/changePassword", method: "post", data });
-}

@@ -28,7 +28,7 @@ func TestFailedPanelLoginVerifiesPasswordOnce(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			calls := 0
-			token, err := authenticatePanelAdmin(tc.name, password, "", func(encoded, input string) bool {
+			token, err := authenticatePanelAdmin(tc.name, password, func(encoded, input string) bool {
 				calls++
 				if encoded != tc.hash || input != password {
 					t.Fatal("unexpected verification input")

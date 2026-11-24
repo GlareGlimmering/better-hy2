@@ -330,7 +330,8 @@
               :content="$t('hysteria.config.acme.dns.config')"
               placement="bottom"
             >
-              <el-form-item label="acme.dns.config" prop="acme.dns.config">
+              <el-form-item :label="dataForm.acme.dns.name === 'worker' ? $t('hysteria.workerCredentialsLabel') : 'acme.dns.config'" prop="acme.dns.config">
+                <p>{{ $t(dataForm.acme.dns.name === 'worker' ? 'hysteria.workerCredentialsHelp' : 'hysteria.providerCredentialsHelp') }}</p>
                 <worker-credentials
                   v-if="dataForm.acme.dns.name === 'worker'"
                   v-model="dataForm.acme.dns.config"

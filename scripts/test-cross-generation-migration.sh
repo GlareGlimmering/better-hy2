@@ -13,6 +13,7 @@ exercise_cross_generation_migration() {
 #!/usr/bin/env python3
 from pathlib import Path
 import sqlite3
+import subprocess
 import sys
 import time
 
@@ -163,7 +164,10 @@ assert auth.encode() in call("/" + auth)
 login = call("/auth/login", legacy)
 if phase == "migrated":
     assert login["data"] == {"passwordChangeRequired": True}
-    login = call("/auth/changePassword", {**legacy, "newPassword": "fixture-panel-new-password-2026"})
+    new_password = "fixture-panel-new-password-2026"
+    subprocess.run([str(live / "h-ui"), "reset", "password", "--stdin"],
+                   input=new_password + "\n", text=True, check=True, capture_output=True)
+    login = call("/auth/login", {**legacy, "pass": new_password})
 assert call("/account/getAccountInfo", token=login["data"]["accessToken"])["code"] == 20000
 print(f"v1 migration fixture: {phase}")
 PY

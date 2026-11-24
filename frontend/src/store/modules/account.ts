@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 
-import { changePanelPasswordApi, getAccountInfoApi, loginApi } from "@/api/account";
+import { getAccountInfoApi, loginApi } from "@/api/account";
 import { resetRouter } from "@/router";
 import { store } from "@/store";
 
@@ -20,10 +20,8 @@ export const useAccountStore = defineStore("account", () => {
    *
    * @returns
    */
-  async function login(credentials: AccountLoginDto, newPassword?: string) {
-    const { data } = newPassword === undefined
-      ? await loginApi(credentials)
-      : await changePanelPasswordApi({ ...credentials, newPassword });
+  async function login(credentials: AccountLoginDto) {
+    const { data } = await loginApi(credentials);
     if (data.passwordChangeRequired) {
       resetToken();
       return false;

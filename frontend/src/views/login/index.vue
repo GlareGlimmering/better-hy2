@@ -31,26 +31,10 @@
           />
           <small v-if="isCapslock" class="caps-warning" role="status">{{ $t("login.capsLock") }}</small>
         </el-form-item>
-        <template v-if="changingPassword">
-          <el-alert
-            v-if="passwordChangeRequired"
-            :title="$t('login.passwordChangeRequired')"
-            type="warning"
-            :closable="false"
-            class="password-notice"
-          />
-          <el-form-item :label="$t('login.newPassword')" prop="newPassword">
-            <el-input v-model="newPassword" type="password" autocomplete="new-password" show-password maxlength="128" />
-          </el-form-item>
-          <el-form-item :label="$t('login.confirmPassword')">
-            <el-input v-model="confirmPassword" type="password" autocomplete="new-password" show-password maxlength="128" />
-          </el-form-item>
-        </template>
+        <el-alert v-if="passwordChangeRequired" :title="$t('login.passwordChangeRequired')" type="warning"
+          :closable="false" class="password-notice" />
         <el-button native-type="submit" size="large" :loading="loading" type="primary" class="login-submit">
-          {{ $t(changingPassword ? "login.changePassword" : "login.login") }}
-        </el-button>
-        <el-button v-if="!passwordChangeRequired" native-type="button" text class="password-switch" @click="changingPassword = !changingPassword">
-          {{ $t(changingPassword ? "login.login" : "login.changePassword") }}
+          {{ $t("login.login") }}
         </el-button>
       </el-form>
     </section>
@@ -74,15 +58,10 @@ import { useAccountStore } from "@/store/modules/account";
 // API依赖
 import { LocationQuery, LocationQueryValue, useRoute } from "vue-router";
 import { AccountLoginDto } from "@/api/account/types";
-import { useI18n } from "vue-i18n";
 
 const accountStore = useAccountStore();
 const route = useRoute();
-const { t } = useI18n();
-const changingPassword = ref(false);
 const passwordChangeRequired = ref(false);
-const newPassword = ref("");
-const confirmPassword = ref("");
 
 /**
  * 按钮loading
@@ -145,28 +124,16 @@ const checkCapslock = (event: KeyboardEvent) => {
 const handleLogin = () => {
   loginFormRef.value.validate((valid: boolean) => {
     if (valid && !loading.value) {
-      if (changingPassword.value && (
-        new TextEncoder().encode(newPassword.value).length < 12 ||
-        new TextEncoder().encode(newPassword.value).length > 128 ||
-        newPassword.value !== confirmPassword.value ||
-        newPassword.value === loginForm.value.pass
-      )) {
-        ElMessage.error(t("login.invalidNewPassword"));
-        return;
-      }
       loading.value = true;
       const params = { ...loginForm.value };
       accountStore
-        .login(params, changingPassword.value ? newPassword.value : undefined)
+        .login(params)
         .then((signedIn) => {
           if (!signedIn) {
             passwordChangeRequired.value = true;
-            changingPassword.value = true;
             return;
           }
           loginForm.value.pass = "";
-          newPassword.value = "";
-          confirmPassword.value = "";
           const query: LocationQuery = route.query;
 
           const redirect = (query.redirect as LocationQueryValue) ?? "/";
@@ -226,7 +193,6 @@ const handleLogin = () => {
 }
 
 .login-submit { width: 100%; }
-.login-form .password-switch { display: flex; margin: 8px auto 0; }
 .password-notice { margin-bottom: 14px; }
 .caps-warning { color: var(--el-color-warning); }
 </style>

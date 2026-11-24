@@ -81,7 +81,8 @@ test("account management has no import or export control", () => {
 test("pending password change stays on login without storing a session", () => {
   const login = readFileSync(new URL("../src/views/login/index.vue", import.meta.url), "utf8");
   const store = readFileSync(new URL("../src/store/modules/account.ts", import.meta.url), "utf8");
-  assert.match(login, /if \(!signedIn\) \{\s*passwordChangeRequired\.value = true;\s*changingPassword\.value = true;\s*return;/);
+  assert.match(login, /if \(!signedIn\) \{\s*passwordChangeRequired\.value = true;\s*return;/);
+  assert.doesNotMatch(login, /changingPassword|confirmPassword/);
   assert.match(store, /if \(data\.passwordChangeRequired\) \{\s*resetToken\(\);\s*return false;/);
 });
 

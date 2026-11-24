@@ -10,6 +10,5 @@ func initAuthRouter(authApi *gin.RouterGroup) {
 	auth := authApi.Group("/auth", middleware.PanelLoginLimiter())
 	{
 		auth.POST("/login", controller.Login)
-		auth.POST("/changePassword", controller.ChangePanelPassword)
 	}
 }
