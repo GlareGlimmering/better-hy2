@@ -13,7 +13,6 @@ exercise_cross_generation_migration() {
 #!/usr/bin/env python3
 from pathlib import Path
 import sqlite3
-import subprocess
 import sys
 import time
 
@@ -124,6 +123,7 @@ import json
 from pathlib import Path
 import re
 import sqlite3
+import subprocess
 import sys
 import urllib.request
 
