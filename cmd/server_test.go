@@ -136,14 +136,14 @@ func TestPanelLoginLimitOnlyTrustsConfiguredProxy(t *testing.T) {
 	if got := send("login", "198.51.100.10:1001", "192.0.2.99", bad); got.Code != http.StatusTooManyRequests {
 		t.Fatalf("login did not reject a spoofed address after exhausting the budget: %d", got.Code)
 	}
-	if got := send("changePassword", "198.51.100.10:1001", "192.0.2.100", bad); got.Code != http.StatusTooManyRequests {
-		t.Fatalf("spoofed header or alternate endpoint bypassed the login limit: %d", got.Code)
+	if got := send("changePassword", "198.51.100.10:1001", "192.0.2.100", bad); got.Code != http.StatusNotFound {
+		t.Fatalf("removed web password change endpoint returned: %d", got.Code)
 	}
 	for i := 0; i < 5; i++ {
 		spoofed := fmt.Sprintf("192.0.2.%d, 198.51.100.12", i+20)
 		send("login", "127.0.0.1:1000", spoofed, bad)
 	}
-	got := send("changePassword", "127.0.0.1:1000", "192.0.2.120, 198.51.100.12", bad)
+	got := send("login", "127.0.0.1:1000", "192.0.2.120, 198.51.100.12", bad)
 	if got.Code != http.StatusTooManyRequests {
 		t.Fatalf("forged hop bypassed limit behind trusted proxy: %d", got.Code)
 	}
