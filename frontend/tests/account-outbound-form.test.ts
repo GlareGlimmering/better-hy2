@@ -17,7 +17,7 @@ test("account dialog always renders the outbound field", () => {
   );
   assert.match(
     component,
-    /<el-form-item :label="\$t\('account\.outbound'\)" prop="outbound">/
+    /<el-form-item :label="\$t\('account\.outbound'\)" prop="outbound"[^>]*>/
   );
   assert.doesNotMatch(
     component,
@@ -85,4 +85,11 @@ test("selector fetches authoritative options on each open and clears failed stal
   assert.match(component, /const handleUpdate = async[\s\S]*await Promise\.all\(\[loadOutboundOptions\(\)/);
   assert.match(component, /catch \{\s*state\.outboundOptions = \[\]/);
   assert.match(component, /outboundBindingUnavailable/);
+});
+
+test("WireGuard accounts select only fixed relays", () => {
+  const nodes = [{ name: "DIRECT", type: "direct" }, { name: "WG", type: "udprelay" }];
+  assert.deepEqual(buildAccountOutboundFormState(nodes, "user").options, [nodes[0]]);
+  assert.deepEqual(buildAccountOutboundFormState(nodes, "user", true).options, [nodes[1]]);
+  assert.equal(buildAccountOutboundFormState([nodes[0]], "user", true).disabled, true);
 });

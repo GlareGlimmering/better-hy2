@@ -111,6 +111,11 @@ export default {
       "Хочу стать падающей звездой, прорезающей тьму, лишь бы осветить ваши сны. Спокойной ночи 🌛！",
   },
   account: {
+    kind: "Тип учётной записи",
+    kindProxy: "Обычный прокси",
+    kindRelay: "Реле UDP WireGuard",
+    relayHelp: "Выберите фиксированное реле. Адрес udpForwarding.remote должен совпадать с адресом реле.",
+    relayBindingRequired: "Выберите фиксированное UDP-реле.",
     outboundLoadFailed: "Не удалось загрузить выходы. Повторите попытку; привязка не изменена.",
     outboundBindingUnavailable: "Текущая привязка {name} недоступна для выбора. Проверьте настройки; автоматического переключения на DIRECT нет.",
     outboundHistoricalExcluded: "Неприменённые, отключённые или непроверенные локальные правила исключены; исходная конфигурация сохранена.",
@@ -287,6 +292,7 @@ export default {
   hysteria: {
     copyDNSKey: "Копировать ключ",
     copyDNSValue: "Копировать значение",
+    relayEndpoint: "Адрес WireGuard IPv4:порт UDP",
     kernelDerivedFrom: "На основе официальной Hysteria2 {upstream} · Сборка {build}",
     acmeContact: "Контактный адрес учётной записи ACME (необязательно)",
     workerCredentialsLabel: "Адрес службы ACME DNS и токен узла",

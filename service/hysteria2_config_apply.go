@@ -17,17 +17,18 @@ import (
 var hysteria2ConfigApplyMutex sync.Mutex
 
 type hysteria2ConfigApplyOps struct {
-	prepare   func(bo.Hysteria2ServerConfig) ([]byte, error)
-	readDB    func() ([]byte, error)
-	writeDB   func([]byte) error
-	readFile  func(string) ([]byte, error)
-	writeFile func(string, []byte, os.FileMode) error
-	remove    func(string) error
-	validate  func(string) error
-	isRunning func() bool
-	stop      func() error
-	start     func() error
-	path      string
+	prepare     func(bo.Hysteria2ServerConfig) ([]byte, error)
+	runtimeYAML func([]byte) ([]byte, error)
+	readDB      func() ([]byte, error)
+	writeDB     func([]byte) error
+	readFile    func(string) ([]byte, error)
+	writeFile   func(string, []byte, os.FileMode) error
+	remove      func(string) error
+	validate    func(string) error
+	isRunning   func() bool
+	stop        func() error
+	start       func() error
+	path        string
 }
 
 func ApplyHysteria2Config(config bo.Hysteria2ServerConfig) error {
@@ -47,7 +48,8 @@ func applyHysteria2ConfigSerialized(config bo.Hysteria2ServerConfig, ops hysteri
 
 func defaultHysteria2ConfigApplyOps() hysteria2ConfigApplyOps {
 	return hysteria2ConfigApplyOps{
-		prepare: prepareHysteria2ConfigYAML,
+		prepare:     prepareHysteria2ConfigYAML,
+		runtimeYAML: runtimeHysteria2YAML,
 		readDB: func() ([]byte, error) {
 			config, err := dao.GetConfig("key = ?", constant.Hysteria2Config)
 			if err != nil {
@@ -80,9 +82,19 @@ func applyHysteria2Config(config bo.Hysteria2ServerConfig, ops hysteria2ConfigAp
 	if err != nil {
 		return fmt.Errorf("validate new Hysteria2 config: %w", err)
 	}
+	runtimeYAML := newYAML
+	if ops.runtimeYAML != nil {
+		runtimeYAML, err = ops.runtimeYAML(newYAML)
+		if err != nil {
+			return err
+		}
+	}
 	oldDB, err := ops.readDB()
 	if err != nil {
 		return fmt.Errorf("backup old Hysteria2 database config: %w", err)
+	}
+	if err := preserveUDPRelayTypes(oldDB, newYAML); err != nil {
+		return err
 	}
 	oldYAML, readErr := ops.readFile(ops.path)
 	oldYAMLExists := readErr == nil
@@ -91,7 +103,7 @@ func applyHysteria2Config(config bo.Hysteria2ServerConfig, ops hysteria2ConfigAp
 	}
 
 	candidate := ops.path + ".candidate"
-	if err := ops.writeFile(candidate, newYAML, constant.Hysteria2ConfigMode); err != nil {
+	if err := ops.writeFile(candidate, runtimeYAML, constant.Hysteria2ConfigMode); err != nil {
 		return fmt.Errorf("write Hysteria2 candidate config: %w", err)
 	}
 	defer ops.remove(candidate)
@@ -108,7 +120,7 @@ func applyHysteria2Config(config bo.Hysteria2ServerConfig, ops hysteria2ConfigAp
 			return applyFailureWithRollback("stop old Hysteria2 process", err, oldDB, oldYAML, oldYAMLExists, wasRunning, ops)
 		}
 	}
-	if err := ops.writeFile(ops.path, newYAML, constant.Hysteria2ConfigMode); err != nil {
+	if err := ops.writeFile(ops.path, runtimeYAML, constant.Hysteria2ConfigMode); err != nil {
 		return applyFailureWithRollback("replace Hysteria2 YAML", err, oldDB, oldYAML, oldYAMLExists, wasRunning, ops)
 	}
 	if wasRunning {
@@ -168,6 +180,9 @@ func validateHysteria2Candidate(path, kernelPath string) error {
 		return errors.New("trafficStats.listen is required")
 	}
 	if err := validateACMEWorker(config, kernelPath); err != nil {
+		return err
+	}
+	if err := validateUDPRelayKernel(config, kernelPath); err != nil {
 		return err
 	}
 	return ValidateHysteria2OutboundConfig(config)

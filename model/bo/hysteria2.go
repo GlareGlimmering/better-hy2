@@ -185,12 +185,17 @@ type ServerConfigOutboundHTTP struct {
 	Insecure *bool   `yaml:"insecure,omitempty" json:"insecure" validate:"required"`
 }
 
+type ServerConfigOutboundUDPRelay struct {
+	Addr string `yaml:"addr" json:"addr" validate:"required"`
+}
+
 type ServerConfigOutboundEntry struct {
-	Name   *string                     `yaml:"name,omitempty" json:"name" validate:"required"`
-	Type   *string                     `yaml:"type,omitempty" json:"type" validate:"omitempty"`
-	Direct *ServerConfigOutboundDirect `yaml:"direct,omitempty" json:"direct" validate:"omitempty"`
-	SOCKS5 *ServerConfigOutboundSOCKS5 `yaml:"socks5,omitempty" json:"socks5" validate:"omitempty"`
-	HTTP   *ServerConfigOutboundHTTP   `yaml:"http,omitempty" json:"http" validate:"omitempty"`
+	UDPRelay *ServerConfigOutboundUDPRelay `yaml:"udpRelay,omitempty" json:"udpRelay,omitempty" validate:"omitempty"`
+	Name     *string                       `yaml:"name,omitempty" json:"name" validate:"required"`
+	Type     *string                       `yaml:"type,omitempty" json:"type" validate:"omitempty"`
+	Direct   *ServerConfigOutboundDirect   `yaml:"direct,omitempty" json:"direct" validate:"omitempty"`
+	SOCKS5   *ServerConfigOutboundSOCKS5   `yaml:"socks5,omitempty" json:"socks5" validate:"omitempty"`
+	HTTP     *ServerConfigOutboundHTTP     `yaml:"http,omitempty" json:"http" validate:"omitempty"`
 }
 
 type ServerConfigTrafficStats struct {

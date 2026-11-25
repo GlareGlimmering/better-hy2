@@ -53,6 +53,9 @@
             </el-select>
           </el-form-item>
         </el-tooltip>
+        <el-form-item v-if="dataForm.type === 'udpRelay' && dataForm.udpRelay" prop="udpRelay.addr" :label="$t('hysteria.relayEndpoint')">
+          <el-input v-model="dataForm.udpRelay.addr" placeholder="192.0.2.10:51820" />
+        </el-form-item>
         <template v-if="dataForm.type === 'socks5'">
           <el-tooltip
             :content="$t('hysteria.config.outbounds.socks5.addr')"
@@ -186,6 +189,9 @@
             <el-tag>{{ outboundInfo.type }}</el-tag>
           </el-form-item>
         </el-tooltip>
+        <el-form-item v-if="outboundInfo.type === 'udpRelay'" :label="$t('hysteria.relayEndpoint')">
+          <el-tag>{{ outboundInfo.udpRelay?.addr }}</el-tag>
+        </el-form-item>
         <template v-if="outboundInfo.type === 'socks5'">
           <el-tooltip
             :content="$t('hysteria.config.outbounds.socks5.addr')"
@@ -310,6 +316,7 @@ import { PropType } from "vue";
 import { deepCopy } from "@/utils/copy";
 
 const props = defineProps({
+  relaySupported: Boolean,
   outbounds: {
     required: true,
     type: Array as PropType<Array<Hysteria2ServerConfigOutbound>>,
@@ -346,7 +353,7 @@ const state = reactive({
 
 const { dataForm, dialog, outboundInfoDialog, outboundInfo } = toRefs(state);
 
-const outboundTypes = ["socks5", "direct"];
+const outboundTypes = computed(() => props.relaySupported ? ["socks5", "direct", "udpRelay"] : ["socks5", "direct"]);
 
 const outboundDirectModes = ["auto", "64", "46", "6", "4"];
 
@@ -356,6 +363,7 @@ const dataFormRules = {
     { max: 64, message: "Name is too long", trigger: ["change", "blur"] },
   ],
   type: [{ required: true, message: "Required", trigger: "change" }],
+  "udpRelay.addr": [{ required: true, message: "Expected IPv4:port", trigger: ["change", "blur"] }],
   "socks5.addr": [
     { required: true, message: "Required", trigger: ["change", "blur"] },
     {
@@ -401,6 +409,7 @@ const handleEdit = (outbound: Hysteria2ServerConfigOutbound) => {
 
 const handleTypeChange = (type: string) => {
   const defaults = deepCopy(defaultHysteria2ServerConfigOutbound);
+  if (type === "udpRelay" && !state.dataForm.udpRelay) state.dataForm.udpRelay = { addr: "" };
   if (type === "socks5" && !state.dataForm.socks5) {
     state.dataForm.socks5 = defaults.socks5;
   }
@@ -424,7 +433,12 @@ const submitForm = () => {
         return;
       }
       state.dataForm.name = normalizedName;
-      if (state.dataForm.type === "socks5") {
+      if (state.dataForm.type !== "udpRelay") delete state.dataForm.udpRelay;
+      if (state.dataForm.type === "udpRelay") {
+        state.dataForm.direct = undefined;
+        state.dataForm.socks5 = undefined;
+        state.dataForm.http = undefined;
+      } else if (state.dataForm.type === "socks5") {
         state.dataForm.http = undefined;
         state.dataForm.direct = undefined;
       } else if (state.dataForm.type === "direct") {

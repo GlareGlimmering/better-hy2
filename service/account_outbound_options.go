@@ -9,6 +9,7 @@ import (
 	"h-ui/model/bo"
 	"h-ui/model/constant"
 	"h-ui/model/vo"
+	"h-ui/util"
 )
 
 // GetAccountOutboundOptions reads applied inventory, not editable drafts. It
@@ -26,14 +27,25 @@ func GetAccountOutboundOptions() (vo.AccountOutboundOptions, error) {
 	if err != nil {
 		return vo.AccountOutboundOptions{}, err
 	}
-	return accountOutboundOptions(active, draft, config, func(address string) bool {
+	options := accountOutboundOptions(active, draft, config, func(address string) bool {
 		conn, err := net.DialTimeout("tcp", address, 150*time.Millisecond)
 		if err != nil {
 			return false
 		}
 		_ = conn.Close()
 		return true
-	}), nil
+	})
+	if hasUDPRelay(config) && !kernelSupportsUDPRelay(util.GetHysteria2BinPath()) {
+		for i := len(options.Options) - 1; i >= 0; i-- {
+			item := options.Options[i]
+			if item.Type == "udprelay" {
+				item.Reason = "kernel_incompatible"
+				options.Unavailable = append(options.Unavailable, item)
+				options.Options = append(options.Options[:i], options.Options[i+1:]...)
+			}
+		}
+	}
+	return options, nil
 }
 
 func accountOutboundOptions(active, draft bo.XraySettings, config bo.Hysteria2ServerConfig, localReady func(string) bool) vo.AccountOutboundOptions {
@@ -79,7 +91,7 @@ func accountOutboundOptions(active, draft bo.XraySettings, config bo.Hysteria2Se
 			result.Unavailable = append(result.Unavailable, item)
 			continue
 		}
-		if item.Type != "direct" && item.Type != "socks5" {
+		if item.Type != "direct" && item.Type != "socks5" && item.Type != "udprelay" {
 			continue
 		}
 		if item.Type == "socks5" && rule.SOCKS5 != nil && rule.SOCKS5.Addr != nil {

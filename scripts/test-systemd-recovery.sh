@@ -279,6 +279,12 @@ for path in ("capabilities", "traffic/batch"):
         assert f"account:{account_id}" in result["users"]
 PY
 
+if [[ ${3:-} == v2-stable && $2 == active ]] &&
+   "$artifacts/hysteria-linux-amd64" version --json | python3 -c 'import json, sys; sys.exit(json.load(sys.stdin).get("udpRelay") != 1)'; then
+  source "$(dirname "$0")/test-udp-relay.sh"
+  exercise_udp_relay
+fi
+
 systemctl stop "$unit"
 # Inject a real systemd start failure after the candidate has migrated SQLite.
 printf '\n[Service]\nExecStartPost=/bin/false\n' >>"$unitfile"

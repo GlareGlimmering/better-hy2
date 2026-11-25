@@ -109,6 +109,11 @@ export default {
     greeting5: "我愿成为流星，划破黑夜，只为照亮你的梦境，晚安🌛！",
   },
   account: {
+    kind: "账号类型",
+    kindProxy: "普通代理",
+    kindRelay: "WireGuard UDP 中继",
+    relayHelp: "仅可绑定固定落地中继。客户端 udpForwarding.remote 须与落地地址一致。",
+    relayBindingRequired: "请选择一个固定 UDP 中继。",
     outboundLoadFailed: "出站列表加载失败，请重试；当前绑定未更改。",
     outboundBindingUnavailable: "当前绑定 {name} 不在可用候选中，请检查出站配置；不会自动切换 DIRECT。",
     outboundHistoricalExcluded: "部分未应用、禁用或无法验证的历史本地映射已排除，原配置仍保留。",
@@ -283,6 +288,7 @@ export default {
   hysteria: {
     copyDNSKey: "复制键",
     copyDNSValue: "复制值",
+    relayEndpoint: "WireGuard 落地 IPv4:UDP 端口",
     kernelDerivedFrom: "派生自官方 Hysteria2 {upstream} · 构建 {build}",
     acmeContact: "ACME 账户联系邮箱（可选）",
     workerCredentialsLabel: "ACME DNS 服务地址与节点令牌",

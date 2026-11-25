@@ -7,6 +7,7 @@ import (
 )
 
 type Hysteria2RoutingStatusVo struct {
+	UDPRelay         bool     `json:"udpRelay"`
 	Enabled          bool     `json:"enabled"`
 	Ready            bool     `json:"ready"`
 	ActiveUsers      int      `json:"activeUsers"`

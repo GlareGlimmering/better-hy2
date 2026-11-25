@@ -9,6 +9,7 @@ import (
 	"h-ui/model/bo"
 	"h-ui/model/constant"
 	"h-ui/model/entity"
+	"h-ui/util"
 	"strconv"
 	"strings"
 )
@@ -95,6 +96,9 @@ func prepareHysteria2ConfigYAML(hysteria2ServerConfig bo.Hysteria2ServerConfig) 
 		return nil, errors.New("hysteria2 traffic stats config is required")
 	}
 	if err := EnsureHysteria2UserRoutingCompatible(hysteria2ServerConfig); err != nil {
+		return nil, err
+	}
+	if err := validateUDPRelayKernel(hysteria2ServerConfig, util.GetHysteria2BinPath()); err != nil {
 		return nil, err
 	}
 	secret, err := trafficStatsSecret()

@@ -110,6 +110,11 @@ export default {
       "I want to be a shooting star, cutting through the darkness, just to illuminate your dreams, good night🌛！",
   },
   account: {
+    kind: "Account type",
+    kindProxy: "Regular proxy",
+    kindRelay: "WireGuard UDP relay",
+    relayHelp: "Bind a fixed relay. The client udpForwarding.remote must match its endpoint.",
+    relayBindingRequired: "Select a fixed UDP relay.",
     outboundLoadFailed: "Could not load outbounds. Retry; the current binding is unchanged.",
     outboundBindingUnavailable: "Current binding {name} is not selectable. Check the outbound configuration; it will not switch to DIRECT automatically.",
     outboundHistoricalExcluded: "Unapplied, disabled or unverified local mappings are excluded; their original configuration is retained.",
@@ -285,6 +290,7 @@ export default {
   hysteria: {
     copyDNSKey: "Copy key",
     copyDNSValue: "Copy value",
+    relayEndpoint: "WireGuard endpoint IPv4:UDP port",
     kernelDerivedFrom: "Derived from official Hysteria2 {upstream} · Build {build}",
     acmeContact: "ACME account contact email (optional)",
     workerCredentialsLabel: "ACME DNS service URL and node token",

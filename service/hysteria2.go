@@ -97,10 +97,14 @@ func setHysteria2ConfigYAML() error {
 	if err != nil {
 		return err
 	}
+	runtimeYAML, err := runtimeHysteria2YAML(hysteria2Config)
+	if err != nil {
+		return err
+	}
 	if err := persistHysteria2ConfigYAML(hysteria2Config); err != nil {
 		return err
 	}
-	if err := atomicWriteFile(constant.Hysteria2ConfigPath, hysteria2Config, constant.Hysteria2ConfigMode); err != nil {
+	if err := atomicWriteFile(constant.Hysteria2ConfigPath, runtimeYAML, constant.Hysteria2ConfigMode); err != nil {
 		logrus.Errorf("write hysteria2 config file err: %v", err)
 		return errors.New("hysteria2 config file write err")
 	}

@@ -1003,7 +1003,7 @@
             :label="$t('hysteria.outbounds')"
             name="outbounds"
           >
-            <Outbounds :outbounds="dataForm.outbounds" />
+            <Outbounds :outbounds="dataForm.outbounds" :relay-supported="routingStatus.udpRelay === true" />
           </el-tab-pane>
           <el-tab-pane :label="$t('hysteria.http')" name="http">
             <el-tooltip

@@ -29,6 +29,7 @@ export interface Hysteria2UrlVo {
 }
 
 export interface Hysteria2RoutingStatus {
+  udpRelay?: boolean;
   enabled: boolean;
   ready: boolean;
   activeUsers: number;

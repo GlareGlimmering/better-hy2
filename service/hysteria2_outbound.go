@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"net/url"
 	"strconv"
 	"strings"
@@ -101,6 +102,9 @@ func MergeManagedOutboundNodes(config bo.Hysteria2ServerConfig, settings bo.Xray
 		}
 		key := strings.ToLower(strings.TrimSpace(*existing.Name))
 		if replacement, ok := managed[key]; ok {
+			if isUDPRelay(existing) {
+				return config, fmt.Errorf("UDP relay %q conflicts with a managed outbound", *existing.Name)
+			}
 			result = append(result, replacement)
 			seen[key] = true
 			continue
@@ -192,6 +196,7 @@ func Hysteria2RoutingStatus() (vo.Hysteria2RoutingStatusVo, error) {
 	if status.ActiveUsers == 0 {
 		status.Errors = append(status.Errors, "no active regular users")
 	}
+	status.UDPRelay = kernelSupportsUDPRelay(util.GetHysteria2BinPath())
 	status.Ready = status.ActiveUsers > 0 && status.BoundUsers == status.ActiveUsers && len(bindings) > 0 && status.KernelCompatible && len(status.Errors) == 0
 	return status, nil
 }
@@ -393,6 +398,14 @@ func validateOutboundEntry(entry bo.ServerConfigOutboundEntry) error {
 		}
 		if err := validateHostPort(*entry.SOCKS5.Addr); err != nil {
 			return fmt.Errorf("outbound %q has invalid SOCKS5 address: %w", name, err)
+		}
+	case "udprelay":
+		if entry.UDPRelay == nil || *entry.Type != "udpRelay" {
+			return fmt.Errorf("outbound %q requires type udpRelay and a fixed endpoint", name)
+		}
+		addr, err := netip.ParseAddrPort(entry.UDPRelay.Addr)
+		if err != nil || !addr.Addr().Is4() || addr.Port() == 0 || addr.Addr().IsUnspecified() || addr.Addr().IsMulticast() || addr.Addr() == netip.AddrFrom4([4]byte{255, 255, 255, 255}) {
+			return fmt.Errorf("outbound %q requires a unicast IPv4 address and UDP port", name)
 		}
 	case "http":
 		// Retain compatibility with previously imported official Hysteria2

@@ -254,7 +254,7 @@ jobs:
           fi
           printf '%s  %s\n' "$KERNEL_SHA256" build/hysteria-linux-amd64 | sha256sum --check
           chmod 0755 build/hysteria-linux-amd64
-          build/hysteria-linux-amd64 version --json | python3 -c 'import json, sys; assert json.load(sys.stdin)["acmeDNSWorker"] == 1'
+          build/hysteria-linux-amd64 version --json | python3 -c 'import json, sys; caps = json.load(sys.stdin); assert caps["acmeDNSWorker"] == 1; assert caps.get("udpRelay") == 1 if caps["version"] == "v2.14.0-hui.3-dev" else True'
           python3 scripts/write-pair-manifest.py build "$PANEL_VERSION" "$PANEL_SHA" "$KERNEL_VERSION" "$KERNEL_COMMIT"
           HUI_PAIR_TEST_PANEL="$PWD/build/h-ui-linux-amd64" \
           HUI_PAIR_TEST_KERNEL="$PWD/build/hysteria-linux-amd64" \

@@ -46,7 +46,7 @@ test("account row opens the editor and three accessible links stop row clicks", 
 
 test("account password is read-only and can be regenerated before saving", () => {
   const start = accountPage.indexOf('prop="conPass"');
-  const password = accountPage.slice(start, accountPage.indexOf('prop="outbound"', start));
+  const password = accountPage.slice(start, accountPage.indexOf('</el-form-item>', start));
   assert.match(password, /<template #append>/);
   assert.match(password, /@click="generatePassword"/);
   assert.match(password, /:model-value="connectionPasswordDisplay"/);

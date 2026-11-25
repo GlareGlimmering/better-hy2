@@ -290,6 +290,7 @@ export const defaultHysteria2ServerConfig: Hysteria2ServerConfig = {
 };
 
 export interface Hysteria2ServerConfigOutbound {
+  udpRelay?: { addr: string };
   name: string;
   type: string;
   socks5?: {

@@ -71,3 +71,9 @@
 - 2026-11-21 人工实测。用该 Linux AMD64 内核，在 WSL 的空 ACME 目录及回环监听上配置 Worker 和 Let's Encrypt staging。确认 CA 颁发包含测试名称的 staging 证书，内核从开始 DNS-01 挑战到 QUIC 开始监听约 30 秒。随后直接查询两台权威 DNS，确认临时 TXT 已清理。首次试跑记录到 UDP 被中间网络接管，TCP 回退版本通过实测。
 - 自动回归覆盖递归 TXT 负缓存、权威服务器返回另一订单的值、非权威 UDP 响应和 TCP 回退。
 - 2026-11-21 SJC 操作者反馈，测试面板已成功取得证书信息。本条记录面板端的观察，SJC 客户端转发、TXT 清理及续期结果待单独确认。
+
+## WireGuard 固定 UDP 中继 TRC
+
+- 候选配套内核为 v2.14.0-hui.3-dev（0735b069e63acf79d1fe3e90e24ae87b23bd81c1）。面板要求内核报告 udpRelay: 1。
+- 在 HY 管理的高级出站中新建 udpRelay，填写落地 IPv4:UDP 端口。保存后在新增账号选择「WireGuard UDP 中继」和该出站。普通账号继续使用既有出站。启用严格绑定前，需要显式处理已有未绑定账号。
+- 路由器 HY2 的 udpForwarding.remote 必须等于落地端点。私钥继续保存在 WireGuard 端点。实际 ImmortalWrt 跨 VPS 握手、HTTP 传输和落地断开后的隔离仍待人工验证。

@@ -184,7 +184,7 @@
             style="width: 100%"
             @update:model-value="routingBindings.set(username, $event)"
           >
-            <el-option v-for="item in outboundOptions" :key="item.name" :label="item.name" :value="item.name" />
+            <el-option v-for="item in ordinaryOutboundOptions" :key="item.name" :label="item.name" :value="item.name" />
           </el-select>
         </el-form-item>
       </el-form>
@@ -273,7 +273,15 @@
           :closable="false"
           :title="$t('account.homeProxyRotationNotice')"
         />
-        <el-form-item :label="$t('account.outbound')" prop="outbound">
+        <el-form-item v-if="dataForm.role !== 'admin' && (dataForm.id === undefined ? relayOptionsAvailable : relayAccount)" :label="$t('account.kind')">
+          <el-radio-group v-if="dataForm.id === undefined" v-model="relayAccount" @change="changeAccountKind">
+            <el-radio :label="false">{{ $t("account.kindProxy") }}</el-radio>
+            <el-radio :label="true">{{ $t("account.kindRelay") }}</el-radio>
+          </el-radio-group>
+          <el-tag v-else>{{ $t("account.kindRelay") }}</el-tag>
+          <div v-if="relayAccount" class="form-tip">{{ $t("account.relayHelp") }}</div>
+        </el-form-item>
+        <el-form-item :label="$t('account.outbound')" prop="outbound" :required="relayAccount">
           <el-select
             v-model="dataForm.outbound"
             :loading="outboundOptionsLoading"
@@ -316,7 +324,7 @@
               style="width: 100%"
               @update:model-value="creationBindings.set(username, $event)"
             >
-              <el-option v-for="item in outboundOptions" :key="item.name" :label="item.name" :value="item.name" />
+              <el-option v-for="item in ordinaryOutboundOptions" :key="item.name" :label="item.name" :value="item.name" />
             </el-select>
           </el-form-item>
         </template>
@@ -729,10 +737,19 @@ const routingStatusDescription = computed(() => {
   return parts.join(" · ");
 });
 
+const relayAccount = ref(false);
+const unavailableOutboundOptions = ref<AccountOutboundOption[]>([]);
+const ordinaryOutboundOptions = computed(() => buildAccountOutboundFormState(state.outboundOptions, "user").options);
+const relayOptionsAvailable = computed(() => state.outboundOptions.some(item => item.type === "udprelay"));
+const changeAccountKind = () => {
+  state.dataForm.outbound = "";
+  creationBindings.clear();
+};
 const outboundFormState = computed(() =>
   buildAccountOutboundFormState(
     state.outboundOptions,
-    state.dataForm.role
+    state.dataForm.role,
+    relayAccount.value
   )
 );
 const drawerAccount = computed(() =>
@@ -759,6 +776,7 @@ const loadOutboundOptions = (): Promise<void> => {
     try {
       const { data } = await getAccountOutboundOptionsApi();
       state.outboundOptions = data.options;
+      unavailableOutboundOptions.value = data.unavailable;
       outboundExcludedCount.value = data.unavailable.length;
       outboundOptionsFailed.value = false;
     } catch {
@@ -899,6 +917,7 @@ const handleAdd = async () => {
   if (request !== accountEditorRequest) return;
   savedHomeProxyCredentialIncompatible.value = false;
   state.dataForm = newAccountForm(accountExpiryAfterMonths(1));
+  relayAccount.value = false;
   creationBindings.clear();
   quotaTmp.value = 0;
   unlimitedQuota.value = false;
@@ -917,6 +936,9 @@ const handleUpdate = async (row: AccountVo) => {
   const [, { data }] = await Promise.all([loadOutboundOptions(), getAccountApi({ id: row.id })]);
   if (request !== accountEditorRequest) return;
   state.dataForm = editAccountForm(data);
+  relayAccount.value = [...state.outboundOptions, ...unavailableOutboundOptions.value].some(item =>
+    item.type === "udprelay" && item.name.toLowerCase() === data.outbound?.toLowerCase()
+  );
   savedHomeProxyCredentialIncompatible.value = data.homeProxyCredentialIncompatible === true;
   const input = quotaInput(data.quota);
   unlimitedQuota.value = input < 0;
@@ -934,6 +956,10 @@ const submitForm = async () => {
   const request = accountEditorRequest;
   const valid = await dataFormRef.value?.validate().catch(() => false);
   if (!valid || request !== accountEditorRequest || passwordGenerating.value || accountSaving.value || !creationBindingsComplete.value) return;
+  if (relayAccount.value && !outboundFormState.value.options.some(item => item.name === state.dataForm.outbound)) {
+    ElMessage.error(t("account.relayBindingRequired"));
+    return;
+  }
   const quotaValue = unlimitedQuota.value ? -1 : quotaTmp.value;
   const unchangedQuota = state.dataForm.id && quotaValue === quotaInput(state.dataForm.quota);
   const quota = unchangedQuota ? undefined : quotaInputBytes(quotaValue);
