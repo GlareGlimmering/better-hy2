@@ -273,7 +273,7 @@
           :closable="false"
           :title="$t('account.homeProxyRotationNotice')"
         />
-        <el-form-item v-if="dataForm.role !== 'admin' && (dataForm.id === undefined ? relayOptionsAvailable : relayAccount)" :label="$t('account.kind')">
+        <el-form-item v-if="dataForm.role !== 'admin' && (dataForm.id === undefined || relayAccount)" :label="$t('account.kind')">
           <el-radio-group v-if="dataForm.id === undefined" v-model="relayAccount" @change="changeAccountKind">
             <el-radio :label="false">{{ $t("account.kindProxy") }}</el-radio>
             <el-radio :label="true">{{ $t("account.kindRelay") }}</el-radio>
@@ -301,7 +301,13 @@
           <div v-if="outboundFormState.admin" class="form-tip">
             {{ $t("account.outboundAdminOnly") }}
           </div>
-          <div v-else-if="outboundFormState.noOptions" class="form-tip">
+          <div v-else-if="relayAccount && outboundFormState.noOptions && !outboundOptionsLoading && !outboundOptionsFailed" class="form-tip">
+            {{ $t("account.relayOutboundMissing") }}
+            <el-button link type="primary" @click="openRelaySettings">
+              {{ $t("account.configureRelayOutbound") }}
+            </el-button>
+          </div>
+          <div v-else-if="!relayAccount && outboundFormState.noOptions" class="form-tip">
             {{ $t("account.outboundUnavailable") }}
             <el-button link type="primary" @click="openHysteriaSettings">
               {{ $t("account.configureOutbounds") }}
@@ -409,7 +415,7 @@
       <template #footer>
         <div class="drawer-footer">
           <el-button :disabled="accountSaving" @click="closeDialog">{{ $t("common.cancel") }}</el-button>
-          <el-button type="primary" :loading="accountSaving" :disabled="accountSaving || passwordGenerating || !creationBindingsComplete" @click="submitForm">{{ $t("common.save") }}</el-button>
+          <el-button type="primary" :loading="accountSaving" :disabled="accountSaving || passwordGenerating || !creationBindingsComplete || !relayBindingReady" @click="submitForm">{{ $t("common.save") }}</el-button>
         </div>
       </template>
     </el-drawer>
@@ -740,7 +746,6 @@ const routingStatusDescription = computed(() => {
 const relayAccount = ref(false);
 const unavailableOutboundOptions = ref<AccountOutboundOption[]>([]);
 const ordinaryOutboundOptions = computed(() => buildAccountOutboundFormState(state.outboundOptions, "user").options);
-const relayOptionsAvailable = computed(() => state.outboundOptions.some(item => item.type === "udprelay"));
 const changeAccountKind = () => {
   state.dataForm.outbound = "";
   creationBindings.clear();
@@ -751,6 +756,9 @@ const outboundFormState = computed(() =>
     state.dataForm.role,
     relayAccount.value
   )
+);
+const relayBindingReady = computed(() =>
+  !relayAccount.value || outboundFormState.value.options.some(item => item.name === state.dataForm.outbound)
 );
 const drawerAccount = computed(() =>
   state.records.find(item => item.id === state.dataForm.id)
@@ -794,6 +802,11 @@ const refreshOutboundOptions = (visible: boolean) => { if (visible) void loadOut
 const openHysteriaSettings = () => {
   closeDialog();
   router.push({ name: "XrayOutbound" });
+};
+
+const openRelaySettings = () => {
+  closeDialog();
+  router.push({ name: "HysteriaList", query: { section: "outbounds" } });
 };
 
 const loadRoutingStatus = async () => {
@@ -956,7 +969,7 @@ const submitForm = async () => {
   const request = accountEditorRequest;
   const valid = await dataFormRef.value?.validate().catch(() => false);
   if (!valid || request !== accountEditorRequest || passwordGenerating.value || accountSaving.value || !creationBindingsComplete.value) return;
-  if (relayAccount.value && !outboundFormState.value.options.some(item => item.name === state.dataForm.outbound)) {
+  if (!relayBindingReady.value) {
     ElMessage.error(t("account.relayBindingRequired"));
     return;
   }

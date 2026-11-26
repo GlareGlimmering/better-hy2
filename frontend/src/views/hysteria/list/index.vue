@@ -1288,6 +1288,7 @@ import {
   uploadCertFileApi,
 } from "@/api/config";
 import { useI18n } from "vue-i18n";
+import { useRoute } from "vue-router";
 import { describeHY2Kernel } from "@/utils/hy2-kernel";
 import { assignWith, deepCopy } from "@/utils/copy";
 import {
@@ -1769,6 +1770,16 @@ const uploadCertFile = async (params: UploadRequestOptions) => {
     /* empty */
   }
 };
+
+const route = useRoute();
+watch(() => route.query.section, section => {
+  if (section === "outbounds") {
+    state.activeName = "outbounds";
+    if (!state.expandedGroups.includes("advancedRules")) {
+      state.expandedGroups.push("advancedRules");
+    }
+  }
+}, { immediate: true });
 
 onMounted(() => {
   void setConfig().catch(() => {});

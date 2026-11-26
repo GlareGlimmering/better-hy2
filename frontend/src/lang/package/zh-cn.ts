@@ -113,6 +113,8 @@ export default {
     kindProxy: "普通代理",
     kindRelay: "WireGuard UDP 中继",
     relayHelp: "仅可绑定固定落地中继。客户端 udpForwarding.remote 须与落地地址一致。",
+    relayOutboundMissing: "请先在 HY 管理启用自定义出站规则，添加一条 udpRelay 并保存配置。",
+    configureRelayOutbound: "前往中继配置",
     relayBindingRequired: "请选择一个固定 UDP 中继。",
     outboundLoadFailed: "出站列表加载失败，请重试；当前绑定未更改。",
     outboundBindingUnavailable: "当前绑定 {name} 不在可用候选中，请检查出站配置；不会自动切换 DIRECT。",

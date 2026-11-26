@@ -114,6 +114,8 @@ export default {
     kindProxy: "Regular proxy",
     kindRelay: "WireGuard UDP relay",
     relayHelp: "Bind a fixed relay. The client udpForwarding.remote must match its endpoint.",
+    relayOutboundMissing: "Enable custom outbound rules in HY management, add a udpRelay rule, and save the configuration.",
+    configureRelayOutbound: "Configure UDP relay",
     relayBindingRequired: "Select a fixed UDP relay.",
     outboundLoadFailed: "Could not load outbounds. Retry; the current binding is unchanged.",
     outboundBindingUnavailable: "Current binding {name} is not selectable. Check the outbound configuration; it will not switch to DIRECT automatically.",

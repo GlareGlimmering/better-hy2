@@ -93,3 +93,19 @@ test("WireGuard accounts select only fixed relays", () => {
   assert.deepEqual(buildAccountOutboundFormState(nodes, "user", true).options, [nodes[1]]);
   assert.equal(buildAccountOutboundFormState([nodes[0]], "user", true).disabled, true);
 });
+
+test("new accounts can discover WireGuard relays before configuring an outbound", () => {
+  const account = readFileSync(new URL("../src/views/account/list/index.vue", import.meta.url), "utf8");
+  const hysteria = readFileSync(new URL("../src/views/hysteria/list/index.vue", import.meta.url), "utf8");
+
+  assert.match(account, /dataForm\.role !== 'admin' && \(dataForm\.id === undefined \|\| relayAccount\)/);
+  assert.doesNotMatch(account, /relayOptionsAvailable/);
+  assert.match(account, /relayAccount && outboundFormState\.noOptions && !outboundOptionsLoading && !outboundOptionsFailed/);
+  assert.match(account, /@click="openRelaySettings"/);
+  assert.match(account, /router\.push\(\{ name: "HysteriaList", query: \{ section: "outbounds" \} \}\)/);
+  assert.match(account, /:disabled="accountSaving[^"]*\|\| !relayBindingReady"/);
+  assert.match(account, /if \(!relayBindingReady\.value\)/);
+  assert.match(hysteria, /watch\(\(\) => route\.query\.section/);
+  assert.match(hysteria, /if \(section === "outbounds"\) \{\s*state\.activeName = "outbounds"/);
+  assert.match(hysteria, /state\.expandedGroups\.push\("advancedRules"\)/);
+});

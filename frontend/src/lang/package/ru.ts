@@ -115,6 +115,8 @@ export default {
     kindProxy: "Обычный прокси",
     kindRelay: "Реле UDP WireGuard",
     relayHelp: "Выберите фиксированное реле. Адрес udpForwarding.remote должен совпадать с адресом реле.",
+    relayOutboundMissing: "Включите пользовательские правила в разделе HY, добавьте правило udpRelay и сохраните конфигурацию.",
+    configureRelayOutbound: "Настроить UDP-реле",
     relayBindingRequired: "Выберите фиксированное UDP-реле.",
     outboundLoadFailed: "Не удалось загрузить выходы. Повторите попытку; привязка не изменена.",
     outboundBindingUnavailable: "Текущая привязка {name} недоступна для выбора. Проверьте настройки; автоматического переключения на DIRECT нет.",

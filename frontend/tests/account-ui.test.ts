@@ -55,7 +55,7 @@ test("account password is read-only and can be regenerated before saving", () =>
   assert.match(password, /:loading="passwordGenerating"/);
   assert.match(accountPage, /state\.dataForm = newAccountForm\(accountExpiryAfterMonths\(1\)\);[\s\S]*void generatePassword\(\)/);
   assert.match(accountPage, /request === passwordRequest && dialog\.value\.visible && state\.dataForm\.id === accountID/);
-  assert.match(accountPage, /:disabled="accountSaving \|\| passwordGenerating \|\| !creationBindingsComplete" @click="submitForm"/);
+  assert.match(accountPage, /:disabled="accountSaving \|\| passwordGenerating \|\| !creationBindingsComplete \|\| !relayBindingReady" @click="submitForm"/);
 });
 
 test("account drawer uses tenths of G and omits unchanged legacy quota", () => {
