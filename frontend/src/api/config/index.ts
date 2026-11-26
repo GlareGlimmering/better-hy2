@@ -64,6 +64,14 @@ export function addFixedUDPRelayApi(data: FixedUDPRelay): AxiosPromise<Hysteria2
   return request({ url: "/config/fixedUDPRelays", method: "post", data });
 }
 
+export function updateFixedUDPRelayApi(previousName: string, relay: FixedUDPRelay): AxiosPromise<Hysteria2ApplyResult> {
+  return request({ url: "/config/fixedUDPRelays", method: "put", data: { previousName, ...relay } });
+}
+
+export function deleteFixedUDPRelayApi(name: string): AxiosPromise<Hysteria2ApplyResult> {
+  return request({ url: "/config/fixedUDPRelays", method: "delete", data: { name } });
+}
+
 export async function waitForHysteria2Job(initial: Hysteria2ApplyResult, pageClosed: () => boolean) {
   let result = initial;
   // Applying a configuration can include both a DNS-01 start and a rollback.

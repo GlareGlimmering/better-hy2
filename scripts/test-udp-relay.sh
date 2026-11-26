@@ -15,11 +15,11 @@ creds = {
     for key, label in (("username", "Username"), ("pass", "Password"))
 }
 
-def call(path, data=None, token=None):
+def call(path, data=None, token=None, method=None):
     headers = {"Content-Type": "application/json"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
-    req = urllib.request.Request(origin + "/hui" + path, None if data is None else json.dumps(data).encode(), headers)
+    req = urllib.request.Request(origin + "/hui" + path, None if data is None else json.dumps(data).encode(), headers, method=method)
     with urllib.request.urlopen(req, timeout=5) as response:
         reply = json.load(response)
     assert reply["code"] == 20000, f"{path} failed with application code {reply['code']}"
@@ -29,15 +29,23 @@ token = call("/auth/login", creds)["accessToken"]
 path = "/config/fixedUDPRelays"
 assert call(path, token=token) == {"supported": True, "relays": []}
 relay = {"name": "FIXTURE_RELAY", "addr": "127.0.0.1:18501"}
-job = call(path, relay, token)
-for _ in range(120):
-    result = call("/config/applyHysteria2Config?id=" + job["id"], token=token)
-    if result["state"] != "pending":
-        break
-    time.sleep(0.5)
-assert result["state"] == "succeeded", result
+def apply(data, method):
+    job = call(path, data, token, method)
+    for _ in range(120):
+        result = call("/config/applyHysteria2Config?id=" + job["id"], token=token)
+        if result["state"] != "pending":
+            break
+        time.sleep(0.5)
+    assert result["state"] == "succeeded", result
+
+temporary = {"name": "TEMP_RELAY", "addr": "127.0.0.1:18502"}
+apply(temporary, "POST")
+apply({"previousName": temporary["name"], **relay}, "PUT")
 assert call(path, token=token) == {"supported": True, "relays": [relay]}
-print("Added and listed a fixed UDP relay through the authenticated panel API.")
+apply(temporary, "POST")
+apply({"name": temporary["name"]}, "DELETE")
+assert call(path, token=token) == {"supported": True, "relays": [relay]}
+print("Added, edited, and deleted fixed UDP relays through the authenticated panel API.")
 PY
   systemctl stop "$unit"
   python3 - "$live/data/h_ui.db" <<'PY'

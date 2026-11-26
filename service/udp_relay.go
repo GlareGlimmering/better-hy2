@@ -6,11 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"slices"
 	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
+	"h-ui/dao"
 	"h-ui/model/bo"
+	"h-ui/model/entity"
 	"h-ui/util"
 )
 
@@ -41,7 +44,12 @@ func ListFixedUDPRelays() (FixedUDPRelayInventory, error) {
 	return list, nil
 }
 
-func AddFixedUDPRelay(relay FixedUDPRelay) error {
+// ChangeFixedUDPRelay adds a relay when previous is empty and removes it when next is nil.
+func ChangeFixedUDPRelay(previous string, next *FixedUDPRelay) error {
+	previous = strings.TrimSpace(previous)
+	if previous == "" && next == nil {
+		return errors.New("UDP relay name is required")
+	}
 	return runHysteria2Lifecycle(func() error {
 		hysteria2ConfigApplyMutex.Lock()
 		defer hysteria2ConfigApplyMutex.Unlock()
@@ -49,23 +57,51 @@ func AddFixedUDPRelay(relay FixedUDPRelay) error {
 		if err != nil {
 			return err
 		}
-		if err := appendFixedUDPRelay(&config, relay); err != nil {
+		var accounts []entity.Account
+		if previous != "" && (next == nil || !strings.EqualFold(previous, strings.TrimSpace(next.Name))) {
+			accounts, err = dao.ListAccount("role = ?", "user")
+			if err != nil {
+				return err
+			}
+		}
+		if err := changeFixedUDPRelay(&config, previous, next, accounts); err != nil {
 			return err
 		}
 		return applyHysteria2Config(config, defaultHysteria2ConfigApplyOps())
 	})
 }
 
-func appendFixedUDPRelay(config *bo.Hysteria2ServerConfig, relay FixedUDPRelay) error {
-	name, kind := strings.TrimSpace(relay.Name), "udpRelay"
+func changeFixedUDPRelay(config *bo.Hysteria2ServerConfig, previous string, next *FixedUDPRelay, accounts []entity.Account) error {
+	index := -1
+	if previous != "" {
+		index = slices.IndexFunc(config.Outbounds, func(entry bo.ServerConfigOutboundEntry) bool {
+			return isUDPRelay(entry) && entry.Name != nil && strings.EqualFold(*entry.Name, previous)
+		})
+		if index < 0 {
+			return fmt.Errorf("UDP relay %q not found", previous)
+		}
+		if (next == nil || !strings.EqualFold(previous, strings.TrimSpace(next.Name))) && OutboundInUse(previous, accounts) {
+			return fmt.Errorf("UDP relay %q is still assigned to an account", previous)
+		}
+	}
+	if next == nil {
+		config.Outbounds = slices.Delete(config.Outbounds, index, index+1)
+		return nil
+	}
+	name, kind := strings.TrimSpace(next.Name), "udpRelay"
 	entry := bo.ServerConfigOutboundEntry{
 		Name: &name, Type: &kind,
-		UDPRelay: &bo.ServerConfigOutboundUDPRelay{Addr: strings.TrimSpace(relay.Addr)},
+		UDPRelay: &bo.ServerConfigOutboundUDPRelay{Addr: strings.TrimSpace(next.Addr)},
 	}
 	if err := validateOutboundEntry(entry); err != nil {
 		return err
 	}
-	outbounds := append(config.Outbounds, entry)
+	outbounds := slices.Clone(config.Outbounds)
+	if index < 0 {
+		outbounds = append(outbounds, entry)
+	} else {
+		outbounds[index] = entry
+	}
 	if _, err := outboundNames(outbounds); err != nil {
 		return err
 	}

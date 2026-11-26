@@ -2,6 +2,7 @@ package controller
 
 import (
 	"errors"
+	"strings"
 	"sync"
 
 	"github.com/gin-gonic/gin"
@@ -89,7 +90,32 @@ func BeginAddFixedUDPRelay(c *gin.Context) {
 	if err != nil {
 		return
 	}
-	beginHysteria2Job(c, func() error { return service.AddFixedUDPRelay(relay) })
+	beginHysteria2Job(c, func() error { return service.ChangeFixedUDPRelay("", &relay) })
+}
+
+func BeginUpdateFixedUDPRelay(c *gin.Context) {
+	request, err := validateField(c, struct {
+		PreviousName string `json:"previousName" validate:"required,max=64"`
+		service.FixedUDPRelay
+	}{})
+	if err != nil {
+		return
+	}
+	if strings.TrimSpace(request.PreviousName) == "" {
+		vo.Fail("UDP relay name is required", c)
+		return
+	}
+	beginHysteria2Job(c, func() error { return service.ChangeFixedUDPRelay(request.PreviousName, &request.FixedUDPRelay) })
+}
+
+func BeginDeleteFixedUDPRelay(c *gin.Context) {
+	request, err := validateField(c, struct {
+		Name string `json:"name" validate:"required,max=64"`
+	}{})
+	if err != nil {
+		return
+	}
+	beginHysteria2Job(c, func() error { return service.ChangeFixedUDPRelay(request.Name, nil) })
 }
 
 func beginHysteria2Job(c *gin.Context, operation func() error) {

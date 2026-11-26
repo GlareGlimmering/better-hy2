@@ -133,13 +133,6 @@ func UpdateAccount(account entity.Account) error {
 // restored if the running configuration cannot be applied.
 func UpdateAccountWithResult(account entity.Account) (AccountUpdateResult, error) {
 	result := AccountUpdateResult{}
-	if account.Outbound != nil {
-		outbound, err := CanonicalAccountOutbound(*account.Outbound)
-		if err != nil {
-			return result, err
-		}
-		account.Outbound = &outbound
-	}
 	updates := map[string]interface{}{}
 	if account.Username != nil && *account.Username != "" {
 		updates["username"] = *account.Username
@@ -184,9 +177,6 @@ func UpdateAccountWithResult(account entity.Account) (AccountUpdateResult, error
 	if account.Remark != nil {
 		updates["remark"] = *account.Remark
 	}
-	if account.Outbound != nil {
-		updates["outbound"] = *account.Outbound
-	}
 	hasBandwidth := account.UploadMbps != nil || account.DownloadMbps != nil
 	if account.UploadMbps != nil {
 		updates["upload_mbps"] = *account.UploadMbps
@@ -201,6 +191,14 @@ func UpdateAccountWithResult(account entity.Account) (AccountUpdateResult, error
 	hysteria2ConfigApplyMutex.Lock()
 	defer hysteria2ConfigApplyMutex.Unlock()
 
+	if account.Outbound != nil {
+		outbound, err := CanonicalAccountOutbound(*account.Outbound)
+		if err != nil {
+			return result, err
+		}
+		account.Outbound = &outbound
+		updates["outbound"] = outbound
+	}
 	if err := validateBandwidth(account); err != nil {
 		return result, err
 	}

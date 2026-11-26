@@ -18,6 +18,8 @@ func initConfigRouter(configApi *gin.RouterGroup) {
 		config.GET("/applyHysteria2Config", controller.Hysteria2ConfigApplyStatus)
 		config.GET("/fixedUDPRelays", controller.ListFixedUDPRelays)
 		config.POST("/fixedUDPRelays", controller.BeginAddFixedUDPRelay)
+		config.PUT("/fixedUDPRelays", controller.BeginUpdateFixedUDPRelay)
+		config.DELETE("/fixedUDPRelays", controller.BeginDeleteFixedUDPRelay)
 		config.POST("/exportHysteria2Config", controller.ExportHysteria2Config)
 		config.POST("/importHysteria2Config", controller.ImportHysteria2Config)
 		config.POST("/exportConfig", controller.ExportConfig)
