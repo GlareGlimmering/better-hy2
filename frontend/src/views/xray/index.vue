@@ -4,6 +4,7 @@
       <h1>{{ $t("route.xrayOutbound") }}</h1>
       <el-button type="primary" @click="openCreate">+ {{ $t("xray.addOutbound") }}</el-button>
     </header>
+    <FixedUDPRelays :drawer-size="compactTable ? '100%' : '560px'" />
     <el-card shadow="never" class="hui-panel section-card">
       <template #header>
         <div class="section-header">
@@ -127,6 +128,7 @@ import { useI18n } from "vue-i18n";
 import { applyXrayApi, getXraySettingsApi, getXrayStatusApi, installXrayApi, restartXrayApi, saveXrayDraftApi, startXrayApi, stopXrayApi, testXrayOutboundApi, uploadXrayCAApi } from "@/api/xray";
 import type { XrayOutbound, XraySettings, XrayStatus, XrayTestResult } from "@/api/xray/types";
 import { validateOutboundEditor } from "./outbound-form";
+import FixedUDPRelays from "./fixed-udp-relays.vue";
 import { failedTestResult, relativeTestTime, visibleExitIp } from "./test-result";
 
 const { width } = useWindowSize();

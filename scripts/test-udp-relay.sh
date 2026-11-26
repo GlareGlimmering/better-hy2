@@ -1,20 +1,50 @@
 # Sourced by the disposable systemd test after the candidate starts.
 exercise_udp_relay() {
-  systemctl stop "$unit"
-  python3 - "$live/data/h_ui.db" "$root" <<'PY'
+  python3 - "$root" "$panel_origin$panel_path" <<'PY'
 import json
+from pathlib import Path
+import re
+import sys
+import time
+import urllib.request
+
+root, origin = sys.argv[1:]
+output = (Path(root) / "reset.log").read_text()
+creds = {
+    key: re.search(rf"^Better HY2 Login {label}: (.+)$", output, re.M)[1]
+    for key, label in (("username", "Username"), ("pass", "Password"))
+}
+
+def call(path, data=None, token=None):
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    req = urllib.request.Request(origin + "/hui" + path, None if data is None else json.dumps(data).encode(), headers)
+    with urllib.request.urlopen(req, timeout=5) as response:
+        reply = json.load(response)
+    assert reply["code"] == 20000, f"{path} failed with application code {reply['code']}"
+    return reply["data"]
+
+token = call("/auth/login", creds)["accessToken"]
+path = "/config/fixedUDPRelays"
+assert call(path, token=token) == {"supported": True, "relays": []}
+relay = {"name": "FIXTURE_RELAY", "addr": "127.0.0.1:18501"}
+job = call(path, relay, token)
+for _ in range(120):
+    result = call("/config/applyHysteria2Config?id=" + job["id"], token=token)
+    if result["state"] != "pending":
+        break
+    time.sleep(0.5)
+assert result["state"] == "succeeded", result
+assert call(path, token=token) == {"supported": True, "relays": [relay]}
+print("Added and listed a fixed UDP relay through the authenticated panel API.")
+PY
+  systemctl stop "$unit"
+  python3 - "$live/data/h_ui.db" <<'PY'
 import sqlite3
 import sys
 
-path, fixture = sys.argv[1:]
-with sqlite3.connect(path) as db:
-    config = {
-        "listen": "127.0.0.1:18443",
-        "tls": {"cert": f"{fixture}/cert.pem", "key": f"{fixture}/key.pem"},
-        "trafficStats": {"listen": "127.0.0.1:19090"},
-        "outbounds": [{"name": "FIXTURE_RELAY", "type": "udpRelay", "udpRelay": {"addr": "127.0.0.1:18501"}}],
-    }
-    db.execute("UPDATE config SET value=? WHERE key='HYSTERIA2_CONFIG'", (json.dumps(config),))
+with sqlite3.connect(sys.argv[1]) as db:
     db.execute("INSERT INTO account(username, con_pass, quota, expire_time, outbound, device_no) VALUES (?, ?, ?, ?, ?, ?)",
                ("relay-fixture", "relay-fixture.udp-test", 1000000000, 253370736000000, "FIXTURE_RELAY", 2))
 PY

@@ -51,6 +51,31 @@ export function getHysteria2ConfigApplyStatusApi(id: string): AxiosPromise<Hyste
   return request({ url: "/config/applyHysteria2Config", method: "get", params: { id } });
 }
 
+export interface FixedUDPRelay {
+  name: string;
+  addr: string;
+}
+
+export function listFixedUDPRelaysApi(): AxiosPromise<{ supported: boolean; relays: FixedUDPRelay[] }> {
+  return request({ url: "/config/fixedUDPRelays", method: "get" });
+}
+
+export function addFixedUDPRelayApi(data: FixedUDPRelay): AxiosPromise<Hysteria2ApplyResult> {
+  return request({ url: "/config/fixedUDPRelays", method: "post", data });
+}
+
+export async function waitForHysteria2Job(initial: Hysteria2ApplyResult, pageClosed: () => boolean) {
+  let result = initial;
+  // Applying a configuration can include both a DNS-01 start and a rollback.
+  const deadline = Date.now() + 14 * 60_000;
+  while (!pageClosed() && result.state === "pending" && Date.now() < deadline) {
+    await new Promise(resolve => window.setTimeout(resolve, 2_000));
+    if (pageClosed()) break;
+    ({ data: result } = await getHysteria2ConfigApplyStatusApi(result.id));
+  }
+  return result;
+}
+
 export function getConfigApi(data: ConfigDto): AxiosPromise<ConfigVo> {
   return request({
     url: "/config/getConfig",

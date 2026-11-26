@@ -44,11 +44,13 @@ func TestHysteria2ConfigApplyRoutesRequireAuthentication(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
 	Router(engine, nil)
-	for _, method := range []string{http.MethodPost, http.MethodGet} {
-		recorder := httptest.NewRecorder()
-		engine.ServeHTTP(recorder, httptest.NewRequest(method, "/hui/config/applyHysteria2Config", nil))
-		if !strings.Contains(recorder.Body.String(), `"message":"unauthorized"`) {
-			t.Fatalf("%s response=%s", method, recorder.Body.String())
+	for _, path := range []string{"/hui/config/applyHysteria2Config", "/hui/config/fixedUDPRelays"} {
+		for _, method := range []string{http.MethodPost, http.MethodGet} {
+			recorder := httptest.NewRecorder()
+			engine.ServeHTTP(recorder, httptest.NewRequest(method, path, nil))
+			if !strings.Contains(recorder.Body.String(), `"message":"unauthorized"`) {
+				t.Fatalf("%s %s response=%s", method, path, recorder.Body.String())
+			}
 		}
 	}
 }

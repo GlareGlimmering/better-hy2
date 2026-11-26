@@ -116,11 +116,11 @@ test("HY2 page uses fixed groups and does not expose managed userOutbounds", () 
   assert.match(component, /v-loading.fullscreen.lock="savingConfig"/);
   const save = component.slice(component.indexOf("const submitForm ="), component.indexOf("const setConfig ="));
   assert.match(save, /await beginHysteria2ConfigApplyApi\(params\)/);
-  assert.match(save, /await waitForHysteria2Job\(job\)/);
-  const poll = component.slice(component.indexOf("const waitForHysteria2Job ="), component.indexOf("const submitForm ="));
+  assert.match(save, /await waitForHysteria2Job\(job, \(\) => pageClosed\)/);
+  const poll = readFileSync(new URL("../src/api/config/index.ts", import.meta.url), "utf8");
   assert.match(poll, /await getHysteria2ConfigApplyStatusApi\(result.id\)/);
   const lifecycle = component.slice(component.indexOf("const handleLifecycleAction ="), component.indexOf("const handleHysteria2ChangeVersion ="));
-  assert.match(lifecycle, /await waitForHysteria2Job\(job\)/);
+  assert.match(lifecycle, /await waitForHysteria2Job\(job, \(\) => pageClosed\)/);
   assert.match(lifecycle, /result\.error/);
   const failure = save.slice(save.indexOf('result.state === "failed"'), save.indexOf("} else {"));
   assert.match(failure, /result.error/);

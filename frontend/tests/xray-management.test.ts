@@ -91,3 +91,13 @@ test("Xray install is a single action and node edits keep applying automatically
   assert.match(install, /await installXrayApi\(settings.version\)/);
   assert.doesNotMatch(install, /ElMessageBox|applyXrayApi/);
 });
+
+test("Outbound Nodes adds a fixed UDP relay through its own HY2 apply job", () => {
+  const relay = readFileSync(new URL("../src/views/xray/fixed-udp-relays.vue", import.meta.url), "utf8");
+  assert.match(component, /<FixedUDPRelays /);
+  assert.match(relay, /!inventory\?\.supported \|\| loading/);
+  assert.match(relay, /await addFixedUDPRelayApi\(relay\)/);
+  assert.match(relay, /await waitForHysteria2Job\(job, \(\) => pageClosed\)/);
+  assert.match(relay, /result\.state === "failed"[\s\S]*?saveError\.value = result\.error/);
+  assert.doesNotMatch(relay, /saveXrayDraftApi|applyXrayApi|getHysteria2ConfigApi/);
+});

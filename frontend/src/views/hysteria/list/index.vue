@@ -1284,7 +1284,7 @@ import {
   listConfigApi,
   updateConfigsApi,
   beginHysteria2ConfigApplyApi,
-  getHysteria2ConfigApplyStatusApi,
+  waitForHysteria2Job,
   uploadCertFileApi,
 } from "@/api/config";
 import { useI18n } from "vue-i18n";
@@ -1566,18 +1566,6 @@ const configSaveError = ref("");
 let pageClosed = false;
 onBeforeUnmount(() => { pageClosed = true; });
 
-const waitForHysteria2Job = async (initial: Hysteria2ApplyResult) => {
-  let result = initial;
-  // Applying a configuration can include both a DNS-01 start and a rollback.
-  const deadline = Date.now() + 14 * 60_000;
-  while (!pageClosed && result.state === "pending" && Date.now() < deadline) {
-    await new Promise(resolve => window.setTimeout(resolve, 2_000));
-    if (pageClosed) break;
-    ({ data: result } = await getHysteria2ConfigApplyStatusApi(result.id));
-  }
-  return result;
-};
-
 const submitForm = async () => {
   if (savingConfig.value || state.lifecycleLoading) return;
   if (!await dataFormRef.value.validate().catch(() => false) ||
@@ -1603,7 +1591,7 @@ const submitForm = async () => {
     if (pageClosed) return;
     awaitingResult = true;
     const { data: job } = await beginHysteria2ConfigApplyApi(params);
-    const result = await waitForHysteria2Job(job);
+    const result = await waitForHysteria2Job(job, () => pageClosed);
     if (pageClosed) return;
     if (result.state === "pending") {
       configSaveError.value = t("hysteria.configResultUnknown");
@@ -1710,7 +1698,7 @@ const handleLifecycleAction = async (
     const { data: job } = await begin();
     let result: Hysteria2ApplyResult;
     try {
-      result = await waitForHysteria2Job(job);
+      result = await waitForHysteria2Job(job, () => pageClosed);
     } catch {
       if (!pageClosed) ElMessage.error(t("hysteria.lifecycleResultUnknown"));
       return;

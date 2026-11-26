@@ -75,5 +75,5 @@
 ## WireGuard 固定 UDP 中继 TRC
 
 - 候选配套内核为 v2.14.0-hui.3-dev（0735b069e63acf79d1fe3e90e24ae87b23bd81c1）。面板要求内核报告 udpRelay: 1。
-- 在 HY 管理的高级出站中新建 udpRelay，填写落地 IPv4:UDP 端口。新增账号可直接选择「WireGuard UDP 中继」。没有可用中继时，从表单跳转到自定义出站规则，启用规则并添加 udpRelay，保存 HY 配置后返回新增账号绑定该出站。普通账号继续使用既有出站。启用严格绑定前，需要显式处理已有未绑定账号。
+- 在「出站节点」添加 WireGuard UDP 中继，填写落地 IPv4:UDP 端口并保存。也可从新增账户的中继类型直接跳到「出站节点」。保存后在新增账户绑定该中继。普通账号继续使用既有出站。启用严格绑定前，需要显式处理已有未绑定账号。
 - 路由器 HY2 的 udpForwarding.remote 必须等于落地端点。私钥继续保存在 WireGuard 端点。实际 ImmortalWrt 跨 VPS 握手、HTTP 传输和落地断开后的隔离仍待人工验证。

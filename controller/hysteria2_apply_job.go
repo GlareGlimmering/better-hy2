@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"h-ui/model/bo"
 	"h-ui/model/vo"
+	"h-ui/service"
 )
 
 const maxHysteria2ApplyResults = 16
@@ -72,6 +73,23 @@ func BeginHysteria2ConfigApply(c *gin.Context) {
 		return
 	}
 	beginHysteria2Job(c, func() error { return applyHysteria2Config(config) })
+}
+
+func ListFixedUDPRelays(c *gin.Context) {
+	inventory, err := service.ListFixedUDPRelays()
+	if err != nil {
+		vo.Fail(err.Error(), c)
+		return
+	}
+	vo.Success(inventory, c)
+}
+
+func BeginAddFixedUDPRelay(c *gin.Context) {
+	relay, err := validateField(c, service.FixedUDPRelay{})
+	if err != nil {
+		return
+	}
+	beginHysteria2Job(c, func() error { return service.AddFixedUDPRelay(relay) })
 }
 
 func beginHysteria2Job(c *gin.Context, operation func() error) {

@@ -303,7 +303,7 @@
           </div>
           <div v-else-if="relayAccount && outboundFormState.noOptions && !outboundOptionsLoading && !outboundOptionsFailed" class="form-tip">
             {{ $t("account.relayOutboundMissing") }}
-            <el-button link type="primary" @click="openRelaySettings">
+            <el-button link type="primary" @click="openHysteriaSettings">
               {{ $t("account.configureRelayOutbound") }}
             </el-button>
           </div>
@@ -802,11 +802,6 @@ const refreshOutboundOptions = (visible: boolean) => { if (visible) void loadOut
 const openHysteriaSettings = () => {
   closeDialog();
   router.push({ name: "XrayOutbound" });
-};
-
-const openRelaySettings = () => {
-  closeDialog();
-  router.push({ name: "HysteriaList", query: { section: "outbounds" } });
 };
 
 const loadRoutingStatus = async () => {

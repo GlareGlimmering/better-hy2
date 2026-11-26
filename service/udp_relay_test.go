@@ -55,3 +55,28 @@ func TestUDPRelayKernelCapability(t *testing.T) {
 		}
 	}
 }
+
+func TestAppendFixedUDPRelayPreservesExistingConfiguration(t *testing.T) {
+	var config bo.Hysteria2ServerConfig
+	if err := yaml.Unmarshal([]byte("listen: ':443'\noutbounds: [{name: DIRECT, type: direct, direct: {}}]\nuserOutbounds: {ordinary: DIRECT}"), &config); err != nil {
+		t.Fatal(err)
+	}
+	if err := appendFixedUDPRelay(&config, FixedUDPRelay{Name: " WG ", Addr: " 192.0.2.10:51820 "}); err != nil {
+		t.Fatal(err)
+	}
+	relay := config.Outbounds[1]
+	if len(config.Outbounds) != 2 || *config.Outbounds[0].Name != "DIRECT" ||
+		!isUDPRelay(relay) || *relay.Name != "WG" || relay.UDPRelay.Addr != "192.0.2.10:51820" ||
+		*config.Listen != ":443" || config.UserOutbounds["ordinary"] != "DIRECT" {
+		t.Fatalf("unexpected relay merge: %#v", config)
+	}
+	for _, invalid := range []FixedUDPRelay{
+		{Name: "wg", Addr: "192.0.2.20:51820"},
+		{Name: "another", Addr: "example.org:51820"},
+		{Name: " ", Addr: "192.0.2.20:51820"},
+	} {
+		if err := appendFixedUDPRelay(&config, invalid); err == nil || len(config.Outbounds) != 2 {
+			t.Fatalf("invalid relay altered config: %#v, %v", invalid, err)
+		}
+	}
+}

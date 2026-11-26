@@ -11,7 +11,67 @@ import (
 
 	"gopkg.in/yaml.v3"
 	"h-ui/model/bo"
+	"h-ui/util"
 )
+
+type FixedUDPRelay struct {
+	Name string `json:"name" validate:"required,max=64"`
+	Addr string `json:"addr" validate:"required"`
+}
+
+type FixedUDPRelayInventory struct {
+	Supported bool            `json:"supported"`
+	Relays    []FixedUDPRelay `json:"relays"`
+}
+
+func ListFixedUDPRelays() (FixedUDPRelayInventory, error) {
+	config, err := GetHysteria2Config()
+	if err != nil {
+		return FixedUDPRelayInventory{}, err
+	}
+	list := FixedUDPRelayInventory{
+		Supported: kernelSupportsUDPRelay(util.GetHysteria2BinPath()),
+		Relays:    []FixedUDPRelay{},
+	}
+	for _, entry := range config.Outbounds {
+		if isUDPRelay(entry) && entry.Name != nil && entry.UDPRelay != nil {
+			list.Relays = append(list.Relays, FixedUDPRelay{Name: *entry.Name, Addr: entry.UDPRelay.Addr})
+		}
+	}
+	return list, nil
+}
+
+func AddFixedUDPRelay(relay FixedUDPRelay) error {
+	return runHysteria2Lifecycle(func() error {
+		hysteria2ConfigApplyMutex.Lock()
+		defer hysteria2ConfigApplyMutex.Unlock()
+		config, err := GetHysteria2Config()
+		if err != nil {
+			return err
+		}
+		if err := appendFixedUDPRelay(&config, relay); err != nil {
+			return err
+		}
+		return applyHysteria2Config(config, defaultHysteria2ConfigApplyOps())
+	})
+}
+
+func appendFixedUDPRelay(config *bo.Hysteria2ServerConfig, relay FixedUDPRelay) error {
+	name, kind := strings.TrimSpace(relay.Name), "udpRelay"
+	entry := bo.ServerConfigOutboundEntry{
+		Name: &name, Type: &kind,
+		UDPRelay: &bo.ServerConfigOutboundUDPRelay{Addr: strings.TrimSpace(relay.Addr)},
+	}
+	if err := validateOutboundEntry(entry); err != nil {
+		return err
+	}
+	outbounds := append(config.Outbounds, entry)
+	if _, err := outboundNames(outbounds); err != nil {
+		return err
+	}
+	config.Outbounds = outbounds
+	return nil
+}
 
 func isUDPRelay(entry bo.ServerConfigOutboundEntry) bool {
 	return entry.Type != nil && strings.EqualFold(*entry.Type, "udpRelay")

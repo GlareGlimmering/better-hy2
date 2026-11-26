@@ -101,8 +101,8 @@ test("new accounts can discover WireGuard relays before configuring an outbound"
   assert.match(account, /dataForm\.role !== 'admin' && \(dataForm\.id === undefined \|\| relayAccount\)/);
   assert.doesNotMatch(account, /relayOptionsAvailable/);
   assert.match(account, /relayAccount && outboundFormState\.noOptions && !outboundOptionsLoading && !outboundOptionsFailed/);
-  assert.match(account, /@click="openRelaySettings"/);
-  assert.match(account, /router\.push\(\{ name: "HysteriaList", query: \{ section: "outbounds" \} \}\)/);
+  assert.match(account, /account\.relayOutboundMissing[\s\S]*?@click="openHysteriaSettings"/);
+  assert.match(account, /router\.push\(\{ name: "XrayOutbound" \}\)/);
   assert.match(account, /:disabled="accountSaving[^"]*\|\| !relayBindingReady"/);
   assert.match(account, /if \(!relayBindingReady\.value\)/);
   assert.match(hysteria, /watch\(\(\) => route\.query\.section/);
