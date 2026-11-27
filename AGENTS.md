@@ -7,6 +7,11 @@
 - Preserve `main` and the stable release tags as rollback points unless the user explicitly requests changing them.
 - Develop each iteration on an appropriate non-`main` development or feature branch.
 
+## Public wording
+
+- Describe the project as research into Linux multi-hop data transfer and which initial network fingerprint characteristics survive each hop.
+- In new public documentation, commit messages, and release notes, use neutral research terminology and describe the actual changes accurately. Omit references to proxying, firewall circumvention, Xray, and HY2 where writing those public summaries.
+
 ## Implementation and acceptance
 
 - The implementation Codex writes code, fixes bugs, and runs the relevant automated checks. The operator and review assistant review changes, propose features, and conduct acceptance testing. The operator relays instructions and results between sessions.

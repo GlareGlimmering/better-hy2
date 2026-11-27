@@ -1,5 +1,5 @@
 # Legacy upstream example, not a Better HY2 image or supported installation.
-# Use the systemd installer in README.md for Better HY2.
+# Use the systemd installer from GitHub Releases.
 version: '3'
 
 services:
