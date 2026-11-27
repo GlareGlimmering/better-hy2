@@ -2,7 +2,7 @@
 
 ## Installation and first-time setup
 
-Use the [README installer](../README.md). The README pins a stable tag. The installer verifies SHA256 and executable version, installs HY2, initializes schema/admin without starting the server, then installs systemd and checks HTML plus the entry JavaScript. A partial installation without a valid binary/unit resumes fresh initialization. An existing valid installation uses the candidate's upgrader. No credentials or databases are shipped in releases.
+Choose a specific stable tag and use its installer from [GitHub Releases](https://github.com/GlareGlimmering/better-hy2/releases). The installer verifies SHA256 and executable version, installs HY2, initializes schema/admin without starting the server, then installs systemd and checks HTML plus the entry JavaScript. A partial installation without a valid binary/unit resumes fresh initialization. An existing valid installation uses the candidate's upgrader. No credentials or databases are shipped in releases.
 
 The service remains `h-ui.service`, executable `/usr/local/h-ui/h-ui`, data root `HUI_DATA=/usr/local/h-ui/`, SQLite `/usr/local/h-ui/data/h_ui.db`, runtime data `/var/lib/h-ui`. The new `/usr/local/bin/hui` is a symlink to that binary. An unrelated existing `hui` command is never overwritten.
 
